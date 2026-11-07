@@ -1,0 +1,13 @@
+{
+  "name": "mrf-music",
+  "version": "1.0.0",
+  "description": "MRF — Music Streaming, static site",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve public",
+    "build": "echo 'Static site, no build step'"
+  },
+  "devDependencies": {
+    "serve": "14.2.3"
+  }
+}
