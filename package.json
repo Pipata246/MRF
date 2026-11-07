@@ -1,7 +1,7 @@
 {
   "name": "mrf-music",
   "version": "1.0.0",
-  "description": "MRF — Music Streaming, static site",
+  "description": "MRF — Music Streaming",
   "private": true,
   "scripts": {
     "dev": "npx serve public",
