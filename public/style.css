@@ -42,24 +42,18 @@ html, body {
 body {
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
-  grid-template-rows: 1fr var(--player-h);
-  grid-template-areas: "sidebar main" "player player";
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "sidebar topbar"
+    "sidebar main"
+    "player  player";
   --np-w: 0px;
   gap: 8px;
   padding: 8px;
-  padding-bottom: 0;
-  background: #0a0a0a;
+  background: #1a1a1a;
 }
 
 /* когда открыта NowPlaying панель — сжимаем main */
-.main-content {
-  grid-area: main;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  margin-right: var(--np-w);
-  transition: margin-right 0.22s ease;
-}
 
 /* ===== SIDEBAR COLLAPSE BTN ===== */
 .sidebar-collapse-btn {
@@ -127,8 +121,9 @@ img { display: block; }
 /* ===== SIDEBAR ===== */
 .sidebar {
   grid-area: sidebar;
-  background: #111111;
+  background: #0d0d0d;
   border-radius: 14px;
+  border: 1.5px solid #000;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -156,11 +151,13 @@ img { display: block; }
   position: relative;
 }
 .logo img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
   object-position: center;
   display: block;
+  border-radius: 50%;
+  mix-blend-mode: screen;
 }
 
 .nav { padding: 10px 0; flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
@@ -245,49 +242,86 @@ img { display: block; }
   overflow: hidden;
   margin-right: var(--np-w);
   transition: margin-right 0.22s ease;
-  background: #111111;
+  background: #0d0d0d;
   border-radius: 14px;
+  border: 1.5px solid #000;
 }
 
 /* TOPBAR */
 .topbar {
+  grid-area: topbar;
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 0 24px;
+  padding: 0 20px;
+  height: 72px;
+  background: #0d0d0d;
+  border-radius: 14px;
+  border: 1.5px solid #000;
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+/* контент */
+.feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px 28px;
+  background: transparent;
+}
+
+/* TOPBAR */
+/* TOPBAR */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
   height: 80px;
   background: transparent;
   border-bottom: none;
   flex-shrink: 0;
   z-index: 20;
 }
-.topbar-nav { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* виджет навигации — просто flex, без фона */
+.topbar-nav {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .topbar-btn {
-  width: 34px; height: 34px; border-radius: 50%;
-  border: 1px solid var(--border); background: var(--bg-2); color: var(--text-2);
+  width: 34px; height: 34px; border-radius: 8px;
+  border: none; background: transparent; color: var(--text-2);
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
 }
-.topbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+.topbar-btn:hover { background: var(--bg-hover); color: var(--accent); }
 .topbar-btn svg { width: 15px; height: 15px; }
 
+/* виджет поиска */
 .topbar-search {
   flex: 1; max-width: 440px;
   display: flex; align-items: center; gap: 9px;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0 16px; height: 42px;
-  transition: border-color 0.2s;
+  background: #1a1a1a;
+  border: none;
+  border-radius: 10px;
+  padding: 0 16px; height: 46px;
+  transition: background 0.2s;
 }
-.topbar-search:focus-within { border-color: var(--accent); }
+.topbar-search:focus-within { background: #222; outline: 1.5px solid var(--accent); outline-offset: 0; border-radius: 10px; }
 .topbar-search svg { width: 15px; height: 15px; color: var(--text-3); flex-shrink: 0; }
 .topbar-search input { background: none; border: none; outline: none; color: var(--text); font-size: 13px; width: 100%; font-family: Arial, Helvetica, sans-serif; }
 .topbar-search input::placeholder { color: var(--text-3); }
 .search-clear { color: var(--text-3); cursor: pointer; font-size: 13px; padding: 2px 4px; transition: color 0.15s; }
 .search-clear:hover { color: var(--text); }
 
-.topbar-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
+/* виджет действий — просто flex, без фона */
+.topbar-actions {
+  display: flex; align-items: center; gap: 8px;
+  margin-left: auto; flex-shrink: 0;
+}
 .btn-premium {
   background: var(--accent); color: #000;
   border: none; border-radius: 6px; padding: 7px 16px;
@@ -573,9 +607,9 @@ img { display: block; }
   align-items: center;
   gap: 12px;
   padding: 0 20px;
-  background: #111111;
-  border-top: none;
+  background: #0d0d0d;
   border-radius: 14px;
+  border: 1.5px solid #000;
   height: var(--player-h);
   z-index: 100;
   margin: 0 0 8px 0;
