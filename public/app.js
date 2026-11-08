@@ -112,7 +112,7 @@ function bindAudio() {
     else { nextTrack(); }
   });
   audio.addEventListener('error', () => {
-    isPlaying=false; setPlayIcon(false);
+    isPlaying = false; setPlayIcon(false);
     showNotification('❌ Ошибка воспроизведения');
   });
   audio.addEventListener('timeupdate',     tickProgress);
@@ -499,7 +499,7 @@ function playNow() {
   addToRecent(t);
   renderQueuePanel();
   updateFavBtn();
-  if (!t.preview) { showNotification('⚠️ Для этого трека нет превью'); return; }
+  if (!t.preview) { showNotification('⚠️ Нет превью'); return; }
   audio.pause();
   audio.src    = t.preview;
   audio.volume = isMuted ? 0 : volume;
@@ -886,8 +886,34 @@ function loaderHTML(msg){
 }
 
 /* ══════════════════════════════════
-   NOW PLAYING PANEL
+   SIDEBAR RESIZE + COLLAPSE
 ══════════════════════════════════ */
+/* ══════════════════════════════════
+   SIDEBAR COLLAPSE
+══════════════════════════════════ */
+(function() {
+  const DEFAULT_W = 240, COLLAPSED_W = 60;
+
+  const isCollapsed = localStorage.getItem('mrf_sidebar_collapsed') === '1';
+
+  function setWidth(w) {
+    document.body.style.setProperty('--sidebar-w', w + 'px');
+  }
+
+  if (isCollapsed) {
+    document.body.classList.add('sidebar-collapsed');
+    setWidth(COLLAPSED_W);
+  } else {
+    setWidth(DEFAULT_W);
+  }
+})();
+
+function toggleSidebar() {
+  const COLLAPSED_W = 60, DEFAULT_W = 240;
+  const collapsed = document.body.classList.toggle('sidebar-collapsed');
+  document.body.style.setProperty('--sidebar-w', collapsed ? COLLAPSED_W + 'px' : DEFAULT_W + 'px');
+  localStorage.setItem('mrf_sidebar_collapsed', collapsed ? '1' : '0');
+}
 function toggleNowPlaying() {
   const panel = el('now-playing-panel');
   if (!queue[queueIndex]) return;

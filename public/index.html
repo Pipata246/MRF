@@ -9,27 +9,43 @@
 <body>
 
 <!-- ===================== SIDEBAR ===================== -->
-<aside class="sidebar">
-  <div class="logo" onclick="showPage('home', document.querySelector('[data-page=home]'))" style="cursor:pointer">
-    <img src="img/logo.png" alt="MRF" />
+<aside class="sidebar" id="sidebar">
+  <div class="logo" id="sidebar-logo" onclick="showPage('home', document.querySelector('[data-page=home]'))" style="cursor:pointer">
+    <img src="img/logo.png" alt="MRF" class="logo-img" />
+    <button class="sidebar-collapse-btn" onclick="event.stopPropagation();toggleSidebar()" title="Свернуть">
+      <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+        <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M9 3v18" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M6 8l-2 4 2 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+  <div class="logo-collapsed hidden" id="logo-collapsed">
+    <button class="sidebar-expand-btn" onclick="toggleSidebar()" title="Развернуть">
+      <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+        <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M9 3v18" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M12 8l2 4-2 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
   </div>
 
   <nav class="nav">
     <a href="#" class="nav-item active" data-page="home" onclick="showPage('home', this); return false">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M3 12L12 3L21 12V20H15V14H9V20H3V12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-      Главная
+      <span class="nav-label">Главная</span>
     </a>
     <a href="#" class="nav-item" data-page="search" onclick="showPage('search', this); return false">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      Поиск
+      <span class="nav-label">Поиск</span>
     </a>
     <a href="#" class="nav-item" data-page="charts" onclick="showPage('charts', this); return false">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Чарты
+      <span class="nav-label">Чарты</span>
     </a>
     <a href="#" class="nav-item" data-page="library" onclick="showFavourites(); return false">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M9 18V6l12-3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="15" r="3" stroke="currentColor" stroke-width="1.8"/></svg>
-      Моя библиотека
+      <span class="nav-label">Моя библиотека</span>
       <span class="nav-badge" id="fav-count">0</span>
     </a>
     <div class="nav-divider"></div>
