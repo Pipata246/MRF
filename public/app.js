@@ -21,7 +21,8 @@ let queue        = [];
 let queueIndex   = -1;
 let isPlaying    = false;
 let isShuffle    = false;
-let isRepeat     = false;
+let _originalQueue = []; // оригинальный порядок для восстановления
+let isRepeat     = 'off'; // 'off' | 'all' | 'one'
 let isMuted      = false;
 let volume       = 0.7;
 let currentTab   = 'tracks';
@@ -107,7 +108,8 @@ function bindAudio() {
   audio.addEventListener('pause', () => { isPlaying=false; setPlayIcon(false); stopProgress();  });
   audio.addEventListener('ended', () => {
     stopProgress();
-    isRepeat ? (audio.currentTime=0, audio.play()) : nextTrack();
+    if (isRepeat === 'one') { audio.currentTime = 0; audio.play(); }
+    else { nextTrack(); }
   });
   audio.addEventListener('error', () => {
     isPlaying=false; setPlayIcon(false);
@@ -150,8 +152,8 @@ function showSearchEmpty() {
   el('search-results').innerHTML = `
     <div class="search-empty">
       <svg viewBox="0 0 24 24" fill="none" width="64" height="64">
-        <circle cx="11" cy="11" r="7" stroke="#68C7EC" stroke-width="1.5"/>
-        <path d="M20 20L16.5 16.5" stroke="#68C7EC" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="11" cy="11" r="7" stroke="#E35A90" stroke-width="1.5"/>
+        <path d="M20 20L16.5 16.5" stroke="#E35A90" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
       <p>Начни вводить название трека или артиста</p>
     </div>`;
@@ -472,8 +474,21 @@ async function searchByTag(tag) {
 function playFromSrc(key, index) {
   const list = _src[key];
   if (!list?.length) return;
-  queue      = list.map(t => ({ ...t }));
-  queueIndex = index;
+  _originalQueue = list.map(t => ({ ...t }));
+  if (isShuffle) {
+    // перемешиваем, выбранный трек ставим первым
+    const current = _originalQueue[index];
+    const rest = _originalQueue.filter((_, i) => i !== index);
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    queue = [current, ...rest];
+    queueIndex = 0;
+  } else {
+    queue = _originalQueue;
+    queueIndex = index;
+  }
   playNow();
 }
 
@@ -490,7 +505,6 @@ function playNow() {
   audio.volume = isMuted ? 0 : volume;
   audio.load();
   audio.play()
-    .then(() => showNotification(`▶  ${t.title} — ${t.artist?.name||''}`))
     .catch(() => showNotification('❌ Не удалось воспроизвести'));
 }
 
@@ -501,7 +515,7 @@ function togglePlay() {
 }
 function nextTrack() {
   if (!queue.length) return;
-  queueIndex = isShuffle ? Math.floor(Math.random()*queue.length) : (queueIndex+1)%queue.length;
+  queueIndex = (queueIndex + 1) % queue.length;
   playNow();
 }
 function prevTrack() {
@@ -513,20 +527,56 @@ function prevTrack() {
 function toggleShuffle() {
   isShuffle = !isShuffle;
   el('btn-shuffle').classList.toggle('active-btn', isShuffle);
-  showNotification(isShuffle ? '🔀 Перемешивание включено' : '🔀 Перемешивание выключено');
+
+  if (queue.length) {
+    const currentTrack = queue[queueIndex];
+    if (isShuffle) {
+      const rest = queue.filter((_, i) => i !== queueIndex);
+      for (let i = rest.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rest[i], rest[j]] = [rest[j], rest[i]];
+      }
+      queue = [currentTrack, ...rest];
+      queueIndex = 0;
+    } else {
+      if (_originalQueue.length) {
+        queue = _originalQueue.map(t => ({ ...t }));
+        queueIndex = queue.findIndex(t => t.id === currentTrack.id);
+        if (queueIndex === -1) queueIndex = 0;
+      }
+    }
+    renderQueuePanel();
+  }
 }
 function toggleRepeat() {
-  isRepeat = !isRepeat;
-  el('btn-repeat').classList.toggle('active-btn', isRepeat);
-  showNotification(isRepeat ? '🔁 Повтор включён' : '🔁 Повтор выключён');
+  if (isRepeat === 'off')      isRepeat = 'all';
+  else if (isRepeat === 'all') isRepeat = 'one';
+  else                         isRepeat = 'off';
+  updateRepeatBtn();
+}
+function updateRepeatBtn() {
+  const btn = el('btn-repeat');
+  btn.classList.toggle('active-btn', isRepeat !== 'off');
+  const badge = btn.querySelector('.repeat-one-badge');
+  if (badge) badge.remove();
+  if (isRepeat === 'one') {
+    const b = document.createElement('span');
+    b.className = 'repeat-one-badge';
+    b.textContent = '1';
+    btn.appendChild(b);
+  }
 }
 
 /* ── Player UI ── */
 function setPlayIcon(on) {
-  const ic = el('play-icon'); if (!ic) return;
-  ic.innerHTML = on
-    ? '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>'
-    : '<polygon points="5,3 19,12 5,21"/>';
+  const btn = el('btn-play'); if (!btn) return;
+  if (on) {
+    // пауза — две полоски
+    btn.innerHTML = '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5203 21.9939 21.9939 17.5203 22 12ZM11.996 19.992C16.4127 19.9942 19.9956 16.4167 20 12C19.9956 7.58329 16.4127 3.98979 11.996 3.992C7.57929 3.99421 4 7.57528 4 11.992C4 16.4087 7.57929 19.9898 11.996 19.992Z" fill-rule="evenodd" clip-rule="evenodd" fill="currentColor"/><path d="M11 8H9V16H11V8Z" fill="currentColor"/><path d="M13 16V8H15V16H13Z" fill="currentColor"/></svg>';
+  } else {
+    // плей — треугольник
+    btn.innerHTML = '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5203 21.9939 21.9939 17.5203 22 12ZM11.996 19.992C16.4127 19.9942 19.9956 16.4167 20 12C19.9956 7.58329 16.4127 3.98979 11.996 3.992C7.57929 3.99421 4 7.57528 4 11.992C4 16.4087 7.57929 19.9898 11.996 19.992Z" fill-rule="evenodd" clip-rule="evenodd" fill="currentColor"/><path d="M10 16V8L16 12L10 16Z" fill="currentColor"/></svg>';
+  }
 }
 function updatePlayerUI(t) {
   el('player-title').textContent  = t.title           || '—';
@@ -539,6 +589,8 @@ function updatePlayerUI(t) {
   el('time-total').textContent    = t.duration ? fmt(t.duration) : '0:30';
   el('time-current').textContent  = '0:00';
   el('progress-fill').style.width = '0%';
+  el('player-like-btn').classList.add('visible');
+  updateNowPlayingPanel(t);
 }
 
 /* ── Progress ── */
@@ -553,19 +605,109 @@ function tickProgress() {
 }
 function seekTo(e) {
   if (!audio.duration) return;
-  const r = e.currentTarget.getBoundingClientRect();
-  audio.currentTime = audio.duration * Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  const r = el('progress-track').getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  audio.currentTime = audio.duration * pct;
+  const fill = el('progress-fill');
+  fill.style.transition = 'none';
+  fill.style.width = (pct * 100) + '%';
+  requestAnimationFrame(() => { fill.style.transition = ''; });
 }
 function setVolume(e) {
-  const r = e.currentTarget.getBoundingClientRect();
-  volume  = Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
-  audio.volume=volume; isMuted=false;
-  el('volume-fill').style.width=(volume*100)+'%';
+  const r = el('volume-track').getBoundingClientRect();
+  volume = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  audio.volume = volume;
+  isMuted = volume === 0;
+  el('volume-fill').style.width = (volume * 100) + '%';
+  updateVolumeIcon();
 }
 function toggleMute() {
-  isMuted=!isMuted; audio.volume=isMuted?0:volume;
-  el('volume-fill').style.width=(isMuted?0:volume*100)+'%';
+  isMuted = !isMuted;
+  audio.volume = isMuted ? 0 : volume;
+  el('volume-fill').style.width = (isMuted ? 0 : volume * 100) + '%';
+  updateVolumeIcon();
 }
+function updateVolumeIcon() {
+  const btn = el('btn-vol');
+  if (isMuted || volume === 0) {
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><line x1="22" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="16" y1="9" x2="22" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  } else {
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  }
+}
+
+/* ── Drag для прогресс-бара ── */
+(function() {
+  document.addEventListener('DOMContentLoaded', () => {
+    const track = el('progress-track');
+    let dragging = false;
+    let rect = null;
+
+    function getPct(clientX) {
+      return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    }
+    function applyPct(pct) {
+      const fill = el('progress-fill');
+      fill.style.transition = 'none';
+      fill.style.width = (pct * 100) + '%';
+      el('time-current').textContent = fmt((audio.duration || 0) * pct);
+    }
+
+    track.addEventListener('pointerdown', e => {
+      dragging = true;
+      rect = track.getBoundingClientRect();
+      track.setPointerCapture(e.pointerId);
+      applyPct(getPct(e.clientX));
+      e.preventDefault();
+    });
+    track.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      applyPct(getPct(e.clientX));
+    });
+    track.addEventListener('pointerup', e => {
+      if (!dragging) return;
+      dragging = false;
+      if (audio.duration) audio.currentTime = audio.duration * getPct(e.clientX);
+      requestAnimationFrame(() => { el('progress-fill').style.transition = ''; });
+    });
+    track.addEventListener('pointercancel', () => { dragging = false; });
+  });
+})();
+
+/* ── Drag для громкости ── */
+(function() {
+  document.addEventListener('DOMContentLoaded', () => {
+    const track = el('volume-track');
+    let dragging = false;
+    let rect = null;
+
+    function getVol(clientX) {
+      return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    }
+    function applyVol(v) {
+      volume = v; isMuted = v === 0; audio.volume = v;
+      el('volume-fill').style.width = (v * 100) + '%';
+      updateVolumeIcon();
+    }
+
+    track.addEventListener('pointerdown', e => {
+      dragging = true;
+      rect = track.getBoundingClientRect();
+      track.setPointerCapture(e.pointerId);
+      applyVol(getVol(e.clientX));
+      e.preventDefault();
+    });
+    track.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      applyVol(getVol(e.clientX));
+    });
+    track.addEventListener('pointerup', e => {
+      if (!dragging) return;
+      dragging = false;
+    });
+    track.addEventListener('pointercancel', () => { dragging = false; });
+  });
+})();
 
 /* ══════════════════════════════════
    FAVOURITES (LOCAL + SUPABASE SYNC)
@@ -580,11 +722,9 @@ function toggleFavByIdx(idx, key, btn) {
   if (isFav(title,artist)) {
     favourites=favourites.filter(f=>!(f.title===title&&f.artist===artist));
     btn.classList.remove('liked'); btn.querySelector('path').setAttribute('fill','none');
-    showNotification('💔 Убрано из избранного');
   } else {
     favourites.push({id:t.id,title,artist,cover,duration:t.duration||0,preview:t.preview||null,fullTrack:t.fullTrack||false});
     btn.classList.add('liked'); btn.querySelector('path').setAttribute('fill','currentColor');
-    showNotification('❤️ Добавлено в избранное');
   }
   localStorage.setItem('mrf_favs',JSON.stringify(favourites));
   updateFavBadge();
@@ -598,11 +738,9 @@ function toggleFavPlayer() {
   if (isFav(title,artist)) {
     favourites=favourites.filter(f=>!(f.title===title&&f.artist===artist));
     btn.classList.remove('liked'); btn.querySelector('path').setAttribute('fill','none');
-    showNotification('💔 Убрано из избранного');
   } else {
     favourites.push({id:t.id,title,artist,cover:t.album?.cover_medium||'',duration:t.duration||0,preview:t.preview||null,fullTrack:t.fullTrack||false});
     btn.classList.add('liked'); btn.querySelector('path').setAttribute('fill','currentColor');
-    showNotification('❤️ Добавлено в избранное');
   }
   localStorage.setItem('mrf_favs',JSON.stringify(favourites));
   updateFavBadge();
@@ -663,17 +801,35 @@ function addToRecent(t) {
 ══════════════════════════════════ */
 function toggleQueue() { el('queue-panel').classList.toggle('hidden'); renderQueuePanel(); }
 function renderQueuePanel() {
-  const box=el('queue-list');
-  if (!queue.length){box.innerHTML=`<div style="padding:24px;color:var(--text-3);font-size:13px;text-align:center">Очередь пуста</div>`;return;}
-  box.innerHTML=queue.map((t,i)=>`
-    <div class="queue-item${i===queueIndex?' current':''}" onclick="queueIndex=${i};playNow()">
-      ${t.album?.cover_medium?`<img class="queue-item-cover" src="${esc(t.album.cover_medium)}" alt="" loading="lazy">`:`<div class="queue-item-cover" style="display:flex;align-items:center;justify-content:center;color:var(--accent)">♪</div>`}
+  const box = el('queue-list');
+  if (!queue.length) {
+    box.innerHTML = `<div style="padding:24px;color:var(--text-3);font-size:13px;text-align:center">Очередь пуста</div>`;
+    return;
+  }
+
+  const current = queue[queueIndex];
+  const next    = queue.slice(queueIndex + 1);
+
+  const trackHTML = (t, i, isNext) => `
+    <div class="queue-item${!isNext ? ' current' : ''}" onclick="queueIndex=${i};playNow()">
+      ${t.album?.cover_medium
+        ? `<img class="queue-item-cover" src="${esc(t.album.cover_medium)}" alt="" loading="lazy">`
+        : `<div class="queue-item-cover" style="display:flex;align-items:center;justify-content:center;color:var(--accent)">♪</div>`}
       <div class="queue-item-info">
         <div class="queue-item-title">${esc(t.title)}</div>
-        <div class="queue-item-artist">${esc(t.artist?.name||'')}${t.fullTrack?' <span style="color:#68C7EC;font-size:9px">FULL</span>':''}</div>
+        <div class="queue-item-artist">${esc(t.artist?.name || '')}</div>
       </div>
-      <div class="queue-item-num">${i===queueIndex?'▶':i+1}</div>
-    </div>`).join('');
+      ${!isNext ? `<div class="queue-item-num" style="color:var(--accent)">▶</div>` : ``}
+    </div>`;
+
+  box.innerHTML = `
+    <div class="queue-section-title">Сейчас играет</div>
+    ${trackHTML(current, queueIndex, false)}
+    ${next.length ? `
+      <div class="queue-section-title" style="margin-top:8px">Далее</div>
+      ${next.map((t, i) => trackHTML(t, queueIndex + 1 + i, true)).join('')}
+    ` : ''}
+  `;
 }
 
 /* ══════════════════════════════════
@@ -727,4 +883,82 @@ function noteSVG(){
 }
 function loaderHTML(msg){
   return`<div class="loading-placeholder"><div class="spinner"></div><span>${msg}</span></div>`;
+}
+
+/* ══════════════════════════════════
+   NOW PLAYING PANEL
+══════════════════════════════════ */
+function toggleNowPlaying() {
+  const panel = el('now-playing-panel');
+  if (!queue[queueIndex]) return;
+  const isOpen = !panel.classList.contains('hidden');
+  if (isOpen) closeNowPlaying();
+  else openNowPlaying();
+}
+
+function openNowPlaying() {
+  el('now-playing-panel').classList.remove('hidden');
+  document.body.style.setProperty('--np-w', '320px');
+}
+
+function closeNowPlaying() {
+  el('now-playing-panel').classList.add('hidden');
+  document.body.style.setProperty('--np-w', '0px');
+}
+
+function updateNowPlayingPanel(t) {
+  const panel = el('now-playing-panel');
+  if (!panel) return;
+
+  const cover = t.album?.cover_medium || t.album?.cover || '';
+  const npCover = el('np-cover');
+  if (npCover) npCover.style.background = cover ? `url("${cover}") center/cover` : 'var(--bg-3)';
+
+  const npTitle = el('np-title');
+  if (npTitle) npTitle.textContent = t.title || '—';
+
+  const npArtistName = el('np-artist-name');
+  if (npArtistName) {
+    npArtistName.textContent = t.artist?.name || '—';
+    npArtistName.onclick = () => {
+      if (t.artist?.id) { closeNowPlaying(); openArtist(t.artist.id, t.artist.name); }
+    };
+  }
+
+  const npArtistNameBig = el('np-artist-name-big');
+  if (npArtistNameBig) npArtistNameBig.textContent = t.artist?.name || '—';
+
+  const npArtistBtn = el('np-artist-btn');
+  if (npArtistBtn) {
+    npArtistBtn.onclick = () => {
+      if (t.artist?.id) { closeNowPlaying(); openArtist(t.artist.id, t.artist.name); }
+    };
+  }
+
+  const artistCover = el('np-artist-cover');
+  if (artistCover) {
+    const artistPic = t.artist?.picture_medium || '';
+    artistCover.style.background = artistPic ? `url("${artistPic}") center top/cover` : 'var(--bg-3)';
+    if (!artistPic && t.artist?.id) {
+      dzObj(`/artist/${t.artist.id}`).then(info => {
+        const pic = info.picture_medium || info.picture_xl || '';
+        if (pic) artistCover.style.background = `url("${pic}") center top/cover`;
+      }).catch(() => {});
+    }
+  }
+
+  const npArtistWrap = el('np-artist-cover-wrap');
+  if (npArtistWrap) {
+    npArtistWrap.onclick = () => {
+      if (t.artist?.id) { closeNowPlaying(); openArtist(t.artist.id, t.artist.name); }
+    };
+  }
+}
+
+function goToNpArtist() {
+  const t = queue[queueIndex]; if (!t) return;
+  if (t.artist?.id) {
+    closeNowPlaying();
+    openArtist(t.artist.id, t.artist.name);
+  }
 }
