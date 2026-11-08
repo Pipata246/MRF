@@ -42,11 +42,8 @@ html, body {
 body {
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
-  grid-template-rows: auto 1fr auto;
-  grid-template-areas:
-    "sidebar topbar"
-    "sidebar main"
-    "player  player";
+  grid-template-rows: 1fr var(--player-h);
+  grid-template-areas: "sidebar main" "player player";
   --np-w: 0px;
   gap: 8px;
   padding: 8px;
@@ -244,20 +241,16 @@ img { display: block; }
   transition: margin-right 0.22s ease;
   background: #0d0d0d;
   border-radius: 14px;
-  border: 1.5px solid #000;
 }
 
 /* TOPBAR */
 .topbar {
-  grid-area: topbar;
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 0 20px;
   height: 72px;
-  background: #0d0d0d;
-  border-radius: 14px;
-  border: 1.5px solid #000;
+  background: transparent;
   flex-shrink: 0;
   z-index: 20;
 }
