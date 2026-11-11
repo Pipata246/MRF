@@ -152,8 +152,8 @@ function showSearchEmpty() {
   el('search-results').innerHTML = `
     <div class="search-empty">
       <svg viewBox="0 0 24 24" fill="none" width="64" height="64">
-        <circle cx="11" cy="11" r="7" stroke="#E35A90" stroke-width="1.5"/>
-        <path d="M20 20L16.5 16.5" stroke="#E35A90" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="11" cy="11" r="7" stroke="#EE90B7" stroke-width="1.5"/>
+        <path d="M20 20L16.5 16.5" stroke="#EE90B7" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
       <p>Начни вводить название трека или артиста</p>
     </div>`;
@@ -799,7 +799,23 @@ function addToRecent(t) {
 /* ══════════════════════════════════
    QUEUE
 ══════════════════════════════════ */
-function toggleQueue() { el('queue-panel').classList.toggle('hidden'); renderQueuePanel(); }
+function toggleQueue() {
+  const queuePanel = el('queue-panel');
+  const npPanel    = el('now-playing-panel');
+  const queueOpen  = !queuePanel.classList.contains('hidden');
+
+  if (queueOpen) {
+    // закрываем очередь
+    queuePanel.classList.add('hidden');
+    document.body.style.setProperty('--np-w', '0px');
+  } else {
+    // закрываем карточку если открыта, открываем очередь
+    npPanel.classList.add('hidden');
+    queuePanel.classList.remove('hidden');
+    document.body.style.setProperty('--np-w', '300px');
+    renderQueuePanel();
+  }
+}
 function renderQueuePanel() {
   const box = el('queue-list');
   if (!queue.length) {
@@ -923,6 +939,8 @@ function toggleNowPlaying() {
 }
 
 function openNowPlaying() {
+  // закрываем очередь если открыта
+  el('queue-panel').classList.add('hidden');
   el('now-playing-panel').classList.remove('hidden');
   document.body.style.setProperty('--np-w', '320px');
 }
@@ -930,6 +948,7 @@ function openNowPlaying() {
 function closeNowPlaying() {
   el('now-playing-panel').classList.add('hidden');
   document.body.style.setProperty('--np-w', '0px');
+  stopLrcSync();
 }
 
 function updateNowPlayingPanel(t) {
@@ -979,6 +998,9 @@ function updateNowPlayingPanel(t) {
       if (t.artist?.id) { closeNowPlaying(); openArtist(t.artist.id, t.artist.name); }
     };
   }
+
+  // загружаем текст
+  loadLyrics(t.title || '', t.artist?.name || '', t.duration || 0);
 }
 
 function goToNpArtist() {
@@ -987,4 +1009,131 @@ function goToNpArtist() {
     closeNowPlaying();
     openArtist(t.artist.id, t.artist.name);
   }
+}
+
+/* ══════════════════════════════════
+   LYRICS — LRCLIB
+══════════════════════════════════ */
+let _lrcLines  = [];   // [{time, text}]
+let _lrcTimer  = null;
+let _lrcActive = -1;
+let _lrcFullDuration = 0; // полная длина трека для масштабирования
+
+async function loadLyrics(title, artist, duration) {
+  const box = el('np-lyrics');
+  if (!box) return;
+
+  _lrcLines  = [];
+  _lrcActive = -1;
+  stopLrcSync();
+
+  box.innerHTML = '<div class="np-lyrics-loading"><div class="spinner" style="width:14px;height:14px"></div> Загружаем текст…</div>';
+
+  try {
+    const params = new URLSearchParams({
+      track_name:  title,
+      artist_name: artist,
+    });
+    if (duration) params.set('duration', Math.round(duration));
+
+    const res  = await fetch(`https://lrclib.net/api/get?${params}`);
+    if (!res.ok) throw new Error('not found');
+    const data = await res.json();
+
+    // сохраняем полную длину для масштабирования (превью = 30 сек)
+    _lrcFullDuration = data.duration || duration || 0;
+
+    if (data.syncedLyrics) {
+      _lrcLines = parseLrc(data.syncedLyrics);
+      renderLrcLines(box);
+      startLrcSync();
+    } else if (data.plainLyrics) {
+      box.innerHTML = data.plainLyrics
+        .split('\n')
+        .filter(l => l.trim())
+        .map(l => `<div class="np-lyrics-line">${esc(l)}</div>`)
+        .join('');
+    } else {
+      box.innerHTML = '<div class="np-lyrics-empty">Текст не найден</div>';
+    }
+  } catch {
+    box.innerHTML = '<div class="np-lyrics-empty">Текст не найден</div>';
+  }
+}
+
+function parseLrc(lrc) {
+  const lines = [];
+  const re = /\[(\d{2}):(\d{2})\.(\d{1,3})\](.*)/;
+  for (const line of lrc.split('\n')) {
+    const m = line.match(re);
+    if (!m) continue;
+    const time = parseInt(m[1]) * 60 + parseInt(m[2]) + parseInt(m[3].padEnd(3,'0')) / 1000;
+    lines.push({ time, text: m[4].trim() });
+  }
+  return lines.sort((a, b) => a.time - b.time);
+}
+
+function renderLrcLines(box) {
+  box.innerHTML = _lrcLines
+    .map((l, i) => `<div class="np-lyrics-line" id="lrc-${i}" onclick="seekTo2(${l.time})">${l.text ? esc(l.text) : '&nbsp;'}</div>`)
+    .join('');
+}
+
+function startLrcSync() {
+  stopLrcSync();
+  _lrcTimer = setInterval(syncLrc, 100);
+}
+
+function stopLrcSync() {
+  clearInterval(_lrcTimer);
+}
+
+function syncLrc() {
+  if (!_lrcLines.length || !audio.duration) return;
+
+  // пытаемся извлечь offset превью из URL
+  const t = audio.currentTime + getLrcOffset();
+
+  let active = -1;
+  for (let i = 0; i < _lrcLines.length; i++) {
+    if (_lrcLines[i].time <= t) active = i;
+    else break;
+  }
+
+  if (active === _lrcActive) return;
+  _lrcActive = active;
+
+  const box = el('np-lyrics');
+  if (!box) return;
+
+  box.querySelectorAll('.np-lyrics-line').forEach((line, i) => {
+    line.classList.toggle('active', i === active);
+  });
+
+  if (active >= 0) {
+    const activeLine = document.getElementById('lrc-' + active);
+    if (activeLine) activeLine.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+}
+
+function getLrcOffset() {
+  // Deezer preview URL содержит offset в пути:
+  // .../stream/c-xxx.../1/30/ → start=1*30=30сек
+  // или параметры могут быть другими, пробуем разные форматы
+  try {
+    const src = audio.src || '';
+    // формат: /NNN/30/ в конце пути — NNN это номер чанка * 30
+    const m1 = src.match(/\/(\d+)\/30\//);
+    if (m1) return parseInt(m1[1]) * 30;
+
+    // альтернативный формат: ?start=NNN
+    const m2 = src.match(/[?&]start=(\d+)/);
+    if (m2) return parseInt(m2[1]);
+  } catch {}
+  return 0;
+}
+
+// клик по строке — перемотка
+function seekTo2(time) {
+  if (audio.duration) audio.currentTime = time;
 }
