@@ -42,6 +42,11 @@ document.addEventListener('DOMContentLoaded', () => {
   updateFavBadge();
   loadHomeCharts();
   loadChartsPage();
+  renderHomeSections();
+  renderSidebarPlaylists();
+  // инициализируем стек с главной страницей
+  showPage('home', qs('[data-page=home]'), true);
+  updateNavBtns();
 });
 
 /* ══════════════════════════════════
@@ -134,7 +139,9 @@ function bindSearch() {
       if (q.length < 2) { showSearchEmpty(); return; }
       searchTimer = setTimeout(() => runSearch(q), 380);
     });
-    inp.addEventListener('focus', () => showPage('search', qs('[data-page=search]')));
+    inp.addEventListener('focus', () => {
+      showPage('search', qs('[data-page=search]'));
+    });
     inp.addEventListener('keydown', e => {
       if (e.key==='Enter' && inp.value.trim().length>=2) runSearch(inp.value.trim());
     });
@@ -223,7 +230,7 @@ function rowHTML(t, i, key) {
     : `<span class="src-badge none">— нет превью</span>`;
 
   return `
-  <div class="track-item${playing?' playing':''}" onclick="playFromSrc('${esc(key)}',${i})">
+  <div class="track-item${playing?' playing':''}" onclick="playFromSrc('${esc(key)}',${i})" oncontextmenu="showTrackMenu(event,${i},'${esc(key)}');return false">
     <div class="track-num">
       <span class="num-text">${playing?'▶':i+1}</span>
       <span class="play-hover">▶</span>
@@ -448,8 +455,45 @@ async function loadChartsPage() {
   const all       = dzTracks.map(normDZ);
   _src['charts']  = all;
   el('charts-list').innerHTML = all.length
-    ? `<div class="track-list">${all.map((t,i) => rowHTML(t,i,'charts')).join('')}</div>`
+    ? `<div class="track-list">${all.map((t,i) => {
+        const topClass = i===0 ? ' top-1' : i===1 ? ' top-2' : i===2 ? ' top-3' : '';
+        return rowHTMLCharts(t, i, 'charts', topClass);
+      }).join('')}</div>`
     : `<p style="color:var(--text-3)">Не удалось загрузить</p>`;
+}
+
+function rowHTMLCharts(t, i, key, extraClass='') {
+  const title  = esc(t.title || '');
+  const artist = esc(t.artist?.name || '');
+  const cover  = t.album?.cover_medium || t.album?.cover || '';
+  const dur    = t.duration ? fmt(t.duration) : '';
+  const fav    = isFav(t.title||'', t.artist?.name||'');
+  const playing= queueIndex>=0 && queue[queueIndex]?.id===t.id;
+
+  const medal = i===0 ? '🥇' : i===1 ? '🥈' : i===2 ? '🥉' : '';
+
+  return `
+  <div class="track-item${playing?' playing':''}${extraClass}" onclick="playFromSrc('${esc(key)}',${i})">
+    <div class="track-num">
+      <span class="num-text">${playing ? '▶' : (medal || i+1)}</span>
+      <span class="play-hover">▶</span>
+    </div>
+    ${cover
+      ? `<img class="track-cover" src="${cover}" alt="" loading="lazy" onerror="this.style.display='none'">`
+      : `<div class="track-cover-placeholder">${noteSVG()}</div>`}
+    <div class="track-info">
+      <div class="track-title">${title}</div>
+      <div class="track-artist">${artist}</div>
+    </div>
+    <div class="track-duration">${dur}</div>
+    <button class="track-like-btn${fav?' liked':''}"
+      onclick="event.stopPropagation();toggleFavByIdx(${i},'${esc(key)}',this)"
+      title="${fav?'Убрать':'В избранное'}">
+      <svg viewBox="0 0 24 24" fill="${fav?'currentColor':'none'}">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/>
+      </svg>
+    </button>
+  </div>`;
 }
 
 /* ══════════════════════════════════
@@ -728,6 +772,7 @@ function toggleFavByIdx(idx, key, btn) {
   }
   localStorage.setItem('mrf_favs',JSON.stringify(favourites));
   updateFavBadge();
+  syncFavIcons();
   syncFavToSupabase();
 }
 
@@ -744,6 +789,7 @@ function toggleFavPlayer() {
   }
   localStorage.setItem('mrf_favs',JSON.stringify(favourites));
   updateFavBadge();
+  syncFavIcons();
   syncFavToSupabase();
 }
 
@@ -755,9 +801,47 @@ function updateFavBtn() {
   b.querySelector('path').setAttribute('fill',f?'currentColor':'none');
 }
 
-function updateFavBadge() { el('fav-count').textContent=favourites.length; }
+function updateFavBadge() {
+  el('fav-count').textContent = favourites.length;
+  // обновляем список в библиотеке если она открыта
+  const favList = el('fav-list');
+  if (favList) {
+    const fake = favourites.map(f => ({
+      id: f.id||0, title: f.title,
+      artist: { name: f.artist },
+      album: { cover_medium: f.cover, cover: f.cover },
+      duration: f.duration||0, preview: f.preview||null, fullTrack: f.fullTrack||false
+    }));
+    _src['favs'] = fake;
+    favList.innerHTML = fake.map((t,i) => rowHTML(t,i,'favs')).join('');
+  }
+}
 
-function showFavourites() { showPage('library',qs('[data-page=library]')); renderFavList(); }
+/* обратная совместимость */
+function renderFavList() { renderLibrary('tracks'); }
+function syncFavIcons() {
+  document.querySelectorAll('.track-like-btn').forEach(btn => {
+    const item = btn.closest('.track-item');
+    if (!item) return;
+    const titleEl  = item.querySelector('.track-title');
+    const artistEl = item.querySelector('.track-artist');
+    if (!titleEl) return;
+    const title  = titleEl.textContent.trim();
+    // artist может содержать badge, берём только текст без дочерних элементов
+    const artist = artistEl ? [...artistEl.childNodes]
+      .filter(n => n.nodeType === 3)
+      .map(n => n.textContent.trim())
+      .join('') : '';
+    const fav = isFav(title, artist);
+    btn.classList.toggle('liked', fav);
+    const path = btn.querySelector('path');
+    if (path) path.setAttribute('fill', fav ? 'currentColor' : 'none');
+  });
+  // обновляем кнопку в плеере
+  updateFavBtn();
+}
+
+function showFavourites() { showPage('library', qs('[data-page=library]')); renderLibrary('all'); }
 
 function renderFavList() {
   const box=el('fav-list');
@@ -812,7 +896,7 @@ function toggleQueue() {
     // закрываем карточку если открыта, открываем очередь
     npPanel.classList.add('hidden');
     queuePanel.classList.remove('hidden');
-    document.body.style.setProperty('--np-w', '300px');
+    document.body.style.setProperty('--np-w', '308px');
     renderQueuePanel();
   }
 }
@@ -851,15 +935,54 @@ function renderQueuePanel() {
 /* ══════════════════════════════════
    NAVIGATION
 ══════════════════════════════════ */
-function showPage(pageId,navEl) {
-  qsAll('.page').forEach(p=>p.classList.add('hidden'));
-  document.getElementById('page-'+pageId)?.classList.remove('hidden');
-  qsAll('.nav-item').forEach(n=>n.classList.remove('active'));
+/* ══════════════════════════════════
+   NAVIGATION — SPA History Stack
+══════════════════════════════════ */
+const _navStack = [];   // [{pageId, navEl, label}]
+let   _navPos   = -1;  // текущая позиция в стеке
+
+function showPage(pageId, navEl, pushHistory = true) {
+  qsAll('.page').forEach(p => p.classList.add('hidden'));
+  document.getElementById('page-' + pageId)?.classList.remove('hidden');
+  qsAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (navEl) navEl.classList.add('active');
-  if (pageId==='library') renderFavList();
+  if (pageId === 'library') renderLibrary('all');
+
+  if (pushHistory) {
+    // обрезаем «будущее» если мы не в конце стека
+    if (_navPos < _navStack.length - 1) {
+      _navStack.splice(_navPos + 1);
+    }
+    _navStack.push({ pageId, label: pageId });
+    _navPos = _navStack.length - 1;
+  }
+
+  updateNavBtns();
 }
-function historyBack(){history.back();}
-function historyFwd() {history.forward();}
+
+function historyBack() {
+  if (_navPos <= 0) return;
+  _navPos--;
+  const { pageId } = _navStack[_navPos];
+  // найдём nav-элемент для этой страницы
+  const navEl = qs(`[data-page="${pageId}"]`);
+  showPage(pageId, navEl, false);
+}
+
+function historyFwd() {
+  if (_navPos >= _navStack.length - 1) return;
+  _navPos++;
+  const { pageId } = _navStack[_navPos];
+  const navEl = qs(`[data-page="${pageId}"]`);
+  showPage(pageId, navEl, false);
+}
+
+function updateNavBtns() {
+  const btnBack = el('btn-nav-back');
+  const btnFwd  = el('btn-nav-fwd');
+  if (btnBack) btnBack.style.opacity = _navPos > 0 ? '1' : '0.3';
+  if (btnFwd)  btnFwd.style.opacity  = _navPos < _navStack.length - 1 ? '1' : '0.3';
+}
 
 /* ══════════════════════════════════
    NOTIFICATION
@@ -939,10 +1062,9 @@ function toggleNowPlaying() {
 }
 
 function openNowPlaying() {
-  // закрываем очередь если открыта
   el('queue-panel').classList.add('hidden');
   el('now-playing-panel').classList.remove('hidden');
-  document.body.style.setProperty('--np-w', '320px');
+  document.body.style.setProperty('--np-w', '328px');
 }
 
 function closeNowPlaying() {
@@ -1030,25 +1152,17 @@ async function loadLyrics(title, artist, duration) {
   box.innerHTML = '<div class="np-lyrics-loading"><div class="spinner" style="width:14px;height:14px"></div> Загружаем текст…</div>';
 
   try {
-    const params = new URLSearchParams({
-      track_name:  title,
-      artist_name: artist,
-    });
+    const params = new URLSearchParams({ track_name: title, artist_name: artist });
     if (duration) params.set('duration', Math.round(duration));
 
     const res  = await fetch(`https://lrclib.net/api/get?${params}`);
     if (!res.ok) throw new Error('not found');
     const data = await res.json();
 
-    // сохраняем полную длину для масштабирования (превью = 30 сек)
-    _lrcFullDuration = data.duration || duration || 0;
+    const lyrics = data.plainLyrics || (data.syncedLyrics ? stripLrcTimecodes(data.syncedLyrics) : null);
 
-    if (data.syncedLyrics) {
-      _lrcLines = parseLrc(data.syncedLyrics);
-      renderLrcLines(box);
-      startLrcSync();
-    } else if (data.plainLyrics) {
-      box.innerHTML = data.plainLyrics
+    if (lyrics) {
+      box.innerHTML = lyrics
         .split('\n')
         .filter(l => l.trim())
         .map(l => `<div class="np-lyrics-line">${esc(l)}</div>`)
@@ -1061,79 +1175,483 @@ async function loadLyrics(title, artist, duration) {
   }
 }
 
-function parseLrc(lrc) {
-  const lines = [];
-  const re = /\[(\d{2}):(\d{2})\.(\d{1,3})\](.*)/;
-  for (const line of lrc.split('\n')) {
-    const m = line.match(re);
-    if (!m) continue;
-    const time = parseInt(m[1]) * 60 + parseInt(m[2]) + parseInt(m[3].padEnd(3,'0')) / 1000;
-    lines.push({ time, text: m[4].trim() });
+function stripLrcTimecodes(lrc) {
+  return lrc
+    .split('\n')
+    .map(l => l.replace(/\[\d{2}:\d{2}\.\d+\]/g, '').trim())
+    .filter(l => l)
+    .join('\n');
+}
+
+function parseLrc(lrc) { return []; } // не используется
+
+function renderLrcLines(box) {}
+function startLrcSync() {}
+function stopLrcSync() { clearInterval(_lrcTimer); }
+function syncLrc() {}
+function getLrcOffset() { return 0; }
+
+/* ══════════════════════════════════
+   HOME SECTIONS
+══════════════════════════════════ */
+function renderHomeSections() {
+  renderRecentGrid();
+  renderMoodGrid();
+  renderRecommendations();
+  renderNewReleases();
+}
+
+function renderRecentGrid() {
+  const box = el('recent-grid'); if (!box) return;
+  const items = recentTracks.length ? recentTracks : MOCK.recentlyPlayed;
+  if (!items.length) { box.innerHTML = '<p style="color:var(--text-3);font-size:13px">Пока ничего нет</p>'; return; }
+  box.innerHTML = items.slice(0, 6).map(t => `
+    <div class="quick-item" onclick="playFromRecent('${esc(t.title||'')}','${esc(t.artist?.name||t.artist||'')}')">
+      ${t.cover || t.album?.cover_medium
+        ? `<img src="${t.cover || t.album?.cover_medium}" class="quick-cover" alt="" loading="lazy" onerror="this.style.display='none'">`
+        : `<div class="quick-cover" style="display:flex;align-items:center;justify-content:center;color:var(--accent)">${noteSVG()}</div>`}
+      <div class="quick-item-info">
+        <div class="quick-item-title">${esc(t.title||'')}</div>
+        <div class="quick-item-sub">${esc(t.artist?.name||t.artist||'')}</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderMoodGrid() {
+  const box = el('mood-grid'); if (!box) return;
+  box.innerHTML = MOCK.moods.map(m => `
+    <div class="mood-tile" onclick="searchByTag('${esc(m.tag)}')" style="border-color:${m.color}20">
+      <svg viewBox="0 0 24 24" fill="none" width="28" height="28" style="color:${m.color}">${m.icon}</svg>
+      <div class="mood-tile-name">${esc(m.name)}</div>
+    </div>`).join('');
+}
+
+function renderRecommendations() {
+  const box = el('recommendations-row'); if (!box) return;
+  // BACKEND TODO: Получение персональных рекомендаций
+  box.innerHTML = MOCK.recommendations.map((t, i) => `
+    <div class="horiz-card" onclick="searchByTag('${esc(t.artist.name)}')">
+      ${t.album?.cover_medium
+        ? `<img src="${t.album.cover_medium}" class="horiz-card-cover" alt="" loading="lazy">`
+        : `<div class="horiz-card-cover-placeholder">${noteSVG()}</div>`}
+      <div class="horiz-card-title">${esc(t.title)}</div>
+      <div class="horiz-card-sub">${esc(t.artist.name)}</div>
+    </div>`).join('');
+}
+
+function renderNewReleases() {
+  const box = el('new-releases-row'); if (!box) return;
+  // BACKEND TODO: Получение новых релизов
+  box.innerHTML = MOCK.newReleases.map(r => `
+    <div class="horiz-card" onclick="searchByTag('${esc(r.artist)}')">
+      ${r.cover
+        ? `<img src="${r.cover}" class="horiz-card-cover" alt="" loading="lazy">`
+        : `<div class="horiz-card-cover-placeholder">${noteSVG()}</div>`}
+      <div class="horiz-card-title">${esc(r.title)}</div>
+      <div class="horiz-card-sub">${esc(r.artist)}</div>
+    </div>`).join('');
+}
+
+function playFromRecent(title, artist) {
+  // ищем трек в кэше
+  for (const key in _src) {
+    const idx = _src[key]?.findIndex(t =>
+      (t.title||'').toLowerCase() === title.toLowerCase() &&
+      (t.artist?.name||'').toLowerCase() === artist.toLowerCase()
+    );
+    if (idx >= 0) { playFromSrc(key, idx); return; }
   }
-  return lines.sort((a, b) => a.time - b.time);
+  // если не нашли — ищем через Deezer
+  runSearch(title + ' ' + artist);
 }
 
-function renderLrcLines(box) {
-  box.innerHTML = _lrcLines
-    .map((l, i) => `<div class="np-lyrics-line" id="lrc-${i}" onclick="seekTo2(${l.time})">${l.text ? esc(l.text) : '&nbsp;'}</div>`)
-    .join('');
-}
+/* ══════════════════════════════════
+   SIDEBAR PLAYLISTS
+══════════════════════════════════ */
+function renderSidebarPlaylists() {
+  const placeholder = qs('.nav-placeholder');
+  if (!placeholder) return;
+  if (!MOCK.playlists.length && !MOCK.followedArtists.length) return;
 
-function startLrcSync() {
-  stopLrcSync();
-  _lrcTimer = setInterval(syncLrc, 100);
-}
-
-function stopLrcSync() {
-  clearInterval(_lrcTimer);
-}
-
-function syncLrc() {
-  if (!_lrcLines.length || !audio.duration) return;
-
-  // пытаемся извлечь offset превью из URL
-  const t = audio.currentTime + getLrcOffset();
-
-  let active = -1;
-  for (let i = 0; i < _lrcLines.length; i++) {
-    if (_lrcLines[i].time <= t) active = i;
-    else break;
-  }
-
-  if (active === _lrcActive) return;
-  _lrcActive = active;
-
-  const box = el('np-lyrics');
-  if (!box) return;
-
-  box.querySelectorAll('.np-lyrics-line').forEach((line, i) => {
-    line.classList.toggle('active', i === active);
+  let html = '';
+  MOCK.playlists.slice(0, 5).forEach(pl => {
+    html += `
+      <a href="#" class="nav-item" onclick="openPlaylistPage('${pl.id}'); return false;" style="font-size:12px;padding:7px 18px">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M9 18V6l12-3v12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="15" r="3" stroke="currentColor" stroke-width="1.6"/></svg>
+        <span class="nav-label">${esc(pl.name)}</span>
+      </a>`;
   });
 
-  if (active >= 0) {
-    const activeLine = document.getElementById('lrc-' + active);
-    if (activeLine) activeLine.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  MOCK.followedArtists.slice(0, 3).forEach(a => {
+    html += `
+      <a href="#" class="nav-item" onclick="openArtist(${a.id},'${ejson(a.name)}'); return false;" style="font-size:12px;padding:7px 18px">
+        ${a.picture_medium
+          ? `<img src="${a.picture_medium}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">`
+          : `<div class="nav-icon" style="width:18px;height:18px;border-radius:50%;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--accent)">${(a.name[0]||'?')}</div>`}
+        <span class="nav-label">${esc(a.name)}</span>
+      </a>`;
+  });
+
+  placeholder.outerHTML = html;
+}
+
+/* ══════════════════════════════════
+   LIBRARY
+══════════════════════════════════ */
+let _libView = 'grid';
+let _libTab  = 'all';
+
+function setLibView(view) {
+  _libView = view;
+  el('lib-view-grid')?.classList.toggle('active', view === 'grid');
+  el('lib-view-list')?.classList.toggle('active', view === 'list');
+  renderLibrary(_libTab);
+}
+
+function switchLibTab(tab, btn) {
+  _libTab = tab;
+  qsAll('.lib-filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderLibrary(tab);
+}
+
+function renderLibrary(tab) {
+  const box = el('library-content'); if (!box) return;
+  _libTab = tab || _libTab;
+  let html = '';
+
+  if (tab === 'all' || tab === 'playlists') {
+    html += renderLibPlaylists();
+  }
+  if (tab === 'all' || tab === 'tracks') {
+    html += renderLibFavTracks();
+  }
+  if (tab === 'all' || tab === 'artists') {
+    html += renderLibArtists();
+  }
+  if (tab === 'all' || tab === 'albums') {
+    html += renderLibAlbums();
+  }
+
+  box.innerHTML = html || '<div class="search-empty" style="padding:40px 0"><p style="color:var(--text-3)">Здесь пока ничего нет</p></div>';
+}
+
+function renderLibPlaylists() {
+  const pls = MOCK.playlists;
+  if (!pls.length) return '';
+
+  if (_libView === 'grid') {
+    return `
+      <div class="section" style="margin-bottom:32px">
+        <div class="section-header"><h3 class="section-title" style="font-size:16px">Плейлисты</h3></div>
+        <div class="lib-grid">
+          ${pls.map(pl => `
+            <div class="lib-card" onclick="openPlaylistPage('${pl.id}')">
+              ${pl.cover
+                ? `<img src="${pl.cover}" class="lib-card-cover" alt="" loading="lazy">`
+                : `<div class="lib-card-cover-placeholder">${noteSVG()}</div>`}
+              <div class="lib-card-body">
+                <div class="lib-card-title">${esc(pl.name)}</div>
+                <div class="lib-card-sub">${pl.trackCount} треков</div>
+              </div>
+              <div class="lib-card-actions">
+                <button class="lib-card-btn" onclick="event.stopPropagation();confirmDeletePlaylist('${pl.id}')" title="Удалить">
+                  <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </button>
+              </div>
+            </div>`).join('')}
+          <div class="lib-card" style="border-style:dashed;cursor:pointer" onclick="showCreatePlaylist()">
+            <div class="lib-card-cover-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" width="32" height="32" style="color:var(--text-3)"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+            <div class="lib-card-body">
+              <div class="lib-card-title" style="color:var(--text-3)">Создать плейлист</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    return `
+      <div class="section" style="margin-bottom:32px">
+        <div class="section-header"><h3 class="section-title" style="font-size:16px">Плейлисты</h3></div>
+        <div class="lib-list">
+          ${pls.map(pl => `
+            <div class="lib-list-item" onclick="openPlaylistPage('${pl.id}')">
+              ${pl.cover
+                ? `<img src="${pl.cover}" class="lib-list-cover" alt="" loading="lazy">`
+                : `<div class="lib-list-cover" style="display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--bg-3)">${noteSVG()}</div>`}
+              <div class="lib-list-info">
+                <div class="lib-list-title">${esc(pl.name)}</div>
+                <div class="lib-list-sub">Плейлист · ${pl.trackCount} треков</div>
+              </div>
+              <div class="lib-list-actions">
+                <button class="lib-card-btn" onclick="event.stopPropagation();confirmDeletePlaylist('${pl.id}')" title="Удалить">
+                  <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </button>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
   }
 }
 
-function getLrcOffset() {
-  // Deezer preview URL содержит offset в пути:
-  // .../stream/c-xxx.../1/30/ → start=1*30=30сек
-  // или параметры могут быть другими, пробуем разные форматы
-  try {
-    const src = audio.src || '';
-    // формат: /NNN/30/ в конце пути — NNN это номер чанка * 30
-    const m1 = src.match(/\/(\d+)\/30\//);
-    if (m1) return parseInt(m1[1]) * 30;
+function renderLibFavTracks() {
+  if (!favourites.length) return `
+    <div class="section" style="margin-bottom:32px">
+      <div class="section-header"><h3 class="section-title" style="font-size:16px">Любимые треки</h3></div>
+      <div class="search-empty" style="padding:30px 0"><p style="color:var(--text-3)">Нажми ♥ на любом треке, чтобы добавить его сюда</p></div>
+    </div>`;
 
-    // альтернативный формат: ?start=NNN
-    const m2 = src.match(/[?&]start=(\d+)/);
-    if (m2) return parseInt(m2[1]);
-  } catch {}
-  return 0;
+  const fake = favourites.map(f => ({
+    id: f.id||0, title: f.title,
+    artist: { name: f.artist },
+    album: { cover_medium: f.cover, cover: f.cover },
+    duration: f.duration||0, preview: f.preview||null, fullTrack: f.fullTrack||false
+  }));
+  _src['favs'] = fake;
+
+  return `
+    <div class="section" style="margin-bottom:32px">
+      <div class="section-header">
+        <h3 class="section-title" style="font-size:16px">Любимые треки <span style="font-size:12px;color:var(--text-3);font-weight:400">${favourites.length}</span></h3>
+        <button class="btn-primary" style="padding:7px 14px;font-size:12px" onclick="playFromSrc('favs',0)">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><polygon points="5,3 19,12 5,21"/></svg>
+          Слушать всё
+        </button>
+      </div>
+      <div id="fav-list" class="track-list">${fake.map((t,i) => rowHTML(t,i,'favs')).join('')}</div>
+    </div>`;
 }
 
-// клик по строке — перемотка
-function seekTo2(time) {
-  if (audio.duration) audio.currentTime = time;
+function renderLibArtists() {
+  const artists = MOCK.followedArtists;
+  if (!artists.length) return '';
+  return `
+    <div class="section" style="margin-bottom:32px">
+      <div class="section-header"><h3 class="section-title" style="font-size:16px">Исполнители</h3></div>
+      <div class="artists-grid">
+        ${artists.map(a => `
+          <div class="artist-card" onclick="openArtist(${a.id},'${ejson(a.name)}')">
+            ${a.picture_medium
+              ? `<img class="artist-img" src="${a.picture_medium}" alt="" loading="lazy">`
+              : `<div class="artist-img-placeholder">${(a.name||'?')[0]}</div>`}
+            <div class="artist-name">${esc(a.name)}</div>
+            <div class="artist-listeners">${a.nb_fan ? (+a.nb_fan).toLocaleString('ru') + ' фанатов' : ''}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderLibAlbums() {
+  // BACKEND TODO: Получение сохранённых альбомов пользователя
+  return '';
+}
+
+/* ══════════════════════════════════
+   PLAYLIST PAGE
+══════════════════════════════════ */
+function openPlaylistPage(id) {
+  const pl = MOCK.playlists.find(p => p.id === id);
+  if (!pl) return;
+
+  showPage('search', qs('[data-page=search]'));
+  el('search-tabs').classList.add('hidden');
+
+  if (!pl.tracks.length) {
+    el('search-results').innerHTML = `
+      <div style="display:flex;gap:24px;align-items:flex-start;margin-bottom:28px">
+        <div style="width:160px;height:160px;border-radius:10px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;flex-shrink:0">${noteSVG()}</div>
+        <div style="display:flex;flex-direction:column;justify-content:center;gap:8px">
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:2px">Плейлист</div>
+          <h2 style="font-size:32px;font-weight:800">${esc(pl.name)}</h2>
+          ${pl.description ? `<p style="color:var(--text-3);font-size:13px">${esc(pl.description)}</p>` : ''}
+          <div style="color:var(--text-3);font-size:12px">${pl.trackCount} треков</div>
+        </div>
+      </div>
+      <div class="search-empty" style="padding:30px 0">
+        <p style="color:var(--text-3)">Плейлист пуст. Добавь треки через контекстное меню.</p>
+      </div>`;
+    return;
+  }
+
+  const key = `pl_${id}`;
+  _src[key] = pl.tracks;
+
+  el('search-results').innerHTML = `
+    <div style="display:flex;gap:24px;align-items:flex-start;margin-bottom:28px;flex-wrap:wrap">
+      ${pl.cover
+        ? `<img src="${pl.cover}" style="width:160px;height:160px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="">`
+        : `<div style="width:160px;height:160px;border-radius:10px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;flex-shrink:0">${noteSVG()}</div>`}
+      <div style="display:flex;flex-direction:column;justify-content:center;gap:8px">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:2px">Плейлист</div>
+        <h2 style="font-size:32px;font-weight:800">${esc(pl.name)}</h2>
+        ${pl.description ? `<p style="color:var(--text-3);font-size:13px">${esc(pl.description)}</p>` : ''}
+        <div style="color:var(--text-3);font-size:12px">${pl.tracks.length} треков</div>
+        <button class="btn-primary" onclick="playFromSrc('${esc(key)}',0)" style="padding:10px 20px;font-size:13px;width:fit-content;margin-top:4px">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
+          Слушать плейлист
+        </button>
+      </div>
+    </div>
+    <div class="track-list">${pl.tracks.map((t,i) => rowHTML(t,i,key)).join('')}</div>`;
+}
+
+/* ══════════════════════════════════
+   MODALS
+══════════════════════════════════ */
+let _pendingTrackForPlaylist = null;
+
+function showCreatePlaylist() {
+  el('modal-overlay').classList.remove('hidden');
+  el('modal-create-playlist').classList.remove('hidden');
+  setTimeout(() => el('playlist-name-input')?.focus(), 50);
+}
+
+function showAddToPlaylist(track) {
+  _pendingTrackForPlaylist = track;
+  const box = el('modal-playlist-list');
+  if (!box) return;
+  box.innerHTML = MOCK.playlists.map(pl => `
+    <div class="modal-playlist-item" onclick="confirmAddToPlaylist('${pl.id}')">
+      ${pl.cover
+        ? `<img src="${pl.cover}" class="modal-playlist-cover" alt="">`
+        : `<div class="modal-playlist-cover" style="display:flex;align-items:center;justify-content:center;border-radius:6px">${noteSVG()}</div>`}
+      <div>
+        <div class="modal-playlist-name">${esc(pl.name)}</div>
+        <div class="modal-playlist-count">${pl.trackCount} треков</div>
+      </div>
+    </div>`).join('') || '<p style="color:var(--text-3);font-size:13px;padding:8px 0">Плейлистов нет. Создай первый!</p>';
+
+  el('modal-overlay').classList.remove('hidden');
+  el('modal-add-to-playlist').classList.remove('hidden');
+}
+
+function closeModal() {
+  el('modal-overlay').classList.add('hidden');
+  el('modal-create-playlist').classList.add('hidden');
+  el('modal-add-to-playlist').classList.add('hidden');
+  _pendingTrackForPlaylist = null;
+}
+
+function confirmCreatePlaylist() {
+  const name = el('playlist-name-input')?.value.trim();
+  if (!name) return;
+  const pl = mockCreatePlaylist(name);
+  closeModal();
+  renderSidebarPlaylistsRefresh();
+  showNotification('Плейлист создан');
+}
+
+function confirmAddToPlaylist(playlistId) {
+  if (!_pendingTrackForPlaylist) return;
+  mockAddToPlaylist(playlistId, _pendingTrackForPlaylist);
+  closeModal();
+  showNotification('Добавлено в плейлист');
+}
+
+function confirmDeletePlaylist(id) {
+  mockDeletePlaylist(id);
+  renderLibrary(_libTab);
+  renderSidebarPlaylistsRefresh();
+  showNotification('Плейлист удалён');
+}
+
+function renderSidebarPlaylistsRefresh() {
+  // пересобираем плейлисты в сайдбаре
+  qsAll('.nav-item[data-playlist]').forEach(n => n.remove());
+}
+
+/* ══════════════════════════════════
+   CHARTS — переключение регионов/жанров
+══════════════════════════════════ */
+function switchChartRegion(btn, idx) {
+  qsAll('.charts-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // BACKEND TODO: Загрузка чарта для региона MOCK.chartRegions[idx]
+  loadChartsPage(); // пока грузим одни и те же данные
+}
+
+function switchChartGenre(btn) {
+  qsAll('.charts-genre-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // BACKEND TODO: Фильтрация чарта по жанру
+}
+
+/* ══════════════════════════════════
+   CONTEXT MENU
+══════════════════════════════════ */
+let _ctxMenu = null;
+
+function showTrackMenu(e, idx, key) {
+  e.preventDefault();
+  hideTrackMenu();
+
+  const t = _src[key]?.[idx]; if (!t) return;
+
+  const menu = document.createElement('div');
+  menu.className = 'ctx-menu';
+  menu.style.top  = e.clientY + 'px';
+  menu.style.left = e.clientX + 'px';
+
+  const fav = isFav(t.title||'', t.artist?.name||'');
+
+  menu.innerHTML = `
+    <div class="ctx-item" onclick="playFromSrc('${esc(key)}',${idx});hideTrackMenu()">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><polygon points="5,3 19,12 5,21"/></svg>
+      Слушать
+    </div>
+    <div class="ctx-item" onclick="toggleFavFromMenu(${idx},'${esc(key)}');hideTrackMenu()">
+      <svg viewBox="0 0 24 24" fill="${fav?'currentColor':'none'}" width="15" height="15">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/>
+      </svg>
+      ${fav ? 'Убрать из избранного' : 'В избранное'}
+    </div>
+    <div class="ctx-item" onclick="showAddToPlaylist(_src['${esc(key)}']?.[${idx}]);hideTrackMenu()">
+      <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Добавить в плейлист
+    </div>
+    ${t.artist?.id ? `<div class="ctx-item" onclick="openArtist(${t.artist.id},'${ejson(t.artist.name||'')}');hideTrackMenu()">
+      <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      К исполнителю
+    </div>` : ''}
+    <div class="ctx-divider"></div>
+    <div class="ctx-item ctx-item-danger" onclick="removeFromQueue(${idx},'${esc(key)}');hideTrackMenu()">
+      <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      Убрать из очереди
+    </div>`;
+
+  document.body.appendChild(menu);
+  _ctxMenu = menu;
+
+  // корректируем позицию если вылезает за экран
+  const r = menu.getBoundingClientRect();
+  if (r.right > window.innerWidth)  menu.style.left = (e.clientX - r.width)  + 'px';
+  if (r.bottom > window.innerHeight) menu.style.top = (e.clientY - r.height) + 'px';
+
+  setTimeout(() => document.addEventListener('click', hideTrackMenu, { once: true }), 0);
+}
+
+function hideTrackMenu() {
+  if (_ctxMenu) { _ctxMenu.remove(); _ctxMenu = null; }
+}
+
+function toggleFavFromMenu(idx, key) {
+  const t = _src[key]?.[idx]; if (!t) return;
+  const title = t.title||'', artist = t.artist?.name||'';
+  if (isFav(title, artist)) {
+    favourites = favourites.filter(f => !(f.title===title && f.artist===artist));
+  } else {
+    favourites.push({ id: t.id, title, artist, cover: t.album?.cover_medium||'', duration: t.duration||0, preview: t.preview||null, fullTrack: t.fullTrack||false });
+  }
+  localStorage.setItem('mrf_favs', JSON.stringify(favourites));
+  updateFavBadge();
+  syncFavIcons();
+}
+
+function removeFromQueue(idx, key) {
+  if (key === 'charts' || key === 'home' || key.startsWith('s-') || key.startsWith('art_') || key.startsWith('alb_')) return;
+  // убираем из плейлиста
+  const plId = key.replace('pl_', '');
+  mockRemoveFromPlaylist(plId, _src[key]?.[idx]?.id);
+  renderLibrary(_libTab);
 }
