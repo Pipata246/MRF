@@ -8,7 +8,7 @@
 </head>
 <body>
 <div id="sidebar-root"></div>
-<main class="main-content">
+<main class="main-content" id="main-content">
   <div id="topbar-root"></div>
   <div class="feed" id="album-feed">
     <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем альбом…</span></div>
@@ -21,22 +21,107 @@
 <script src="mrf-ready.js"></script>
 <script src="soft-nav.js"></script>
 <script>
-whenDomReady(() => {
+function bootAlbumPage() {
   initShared();
+  // Soft-nav will call loadAlbumPage(forced) with URL params — avoid double-load race
+  if (window.__mrfSoftNavigating) return;
   loadAlbumPage();
-});
+}
+window.bootAlbumPage = bootAlbumPage;
 
-async function loadAlbumPage() {
-  const params     = new URLSearchParams(location.search);
-  const id         = params.get('id');
-  const albumTitle = params.get('title') || '';
-  const artistName = params.get('artist') || '';
-  const feed       = document.getElementById('album-feed');
+if (typeof whenDomReady === 'function') whenDomReady(bootAlbumPage);
+else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootAlbumPage);
+else bootAlbumPage();
 
-  if (!id) { feed.innerHTML = `<p style="color:var(--text-3)">Альбом не найден</p>`; return; }
+async function loadAlbumPage(forced) {
+  const params = new URLSearchParams(location.search);
+  const rawId = forced && forced.id != null && String(forced.id) !== ''
+    ? String(forced.id)
+    : String(params.get('id') || '');
+  let albumTitle = forced && forced.title != null
+    ? String(forced.title)
+    : String(params.get('title') || '');
+  let artistName = forced && forced.artist != null
+    ? String(forced.artist)
+    : String(params.get('artist') || '');
+  const feed = document.getElementById('album-feed');
+  if (!feed) return;
+
+  let id = (typeof normalizeDeezerId === 'function' ? normalizeDeezerId(rawId) : rawId) || '';
+  if (!id || id === 'undefined' || id === 'null' || id === '0') id = '';
+
+  window.__albumLoadGen = (window.__albumLoadGen || 0) + 1;
+  const gen = window.__albumLoadGen;
+
+  // Resolve by title+artist if id missing/stale
+  if (!id && (albumTitle || artistName)) {
+    feed.innerHTML = `<div class="loading-placeholder"><div class="spinner"></div><span>Ищем альбом…</span></div>`;
+    try {
+      const q = [albumTitle, artistName].filter(Boolean).join(' ');
+      const found = await dzArr(`/search/album?q=${encodeURIComponent(q)}&limit=10`);
+      if (gen !== window.__albumLoadGen) return;
+      const exact = found.find(a =>
+        (!albumTitle || (a.title || '').toLowerCase() === albumTitle.toLowerCase()) &&
+        (!artistName || (a.artist?.name || '').toLowerCase() === artistName.toLowerCase())
+      ) || found[0];
+      if (exact?.id) {
+        id = String(exact.id);
+        albumTitle = exact.title || albumTitle;
+        artistName = exact.artist?.name || artistName;
+        try { history.replaceState({ mrfSoft: 1 }, '', mrfUrl('album', { id, title: albumTitle, artist: artistName })); } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  if (!id) {
+    if (gen !== window.__albumLoadGen) return;
+    feed.innerHTML = `
+      <div class="search-empty" style="padding:48px 0;text-align:center">
+        <p style="color:var(--text-3);margin-bottom:14px">Альбом не найден</p>
+        <button class="btn-primary" style="padding:10px 18px;font-size:13px" onclick="(window.mrfGo||function(u){location.href=u})('search.html')">К поиску</button>
+      </div>`;
+    return;
+  }
+
+  feed.innerHTML = `<div class="loading-placeholder"><div class="spinner"></div><span>Загружаем альбом…</span></div>`;
 
   // BACKEND TODO: Получение информации об альбоме
-  const album = await dzObj(`/album/${id}`);
+  let album = {};
+  try { album = await dzObj(`/album/${id}`); } catch (_) { album = {}; }
+  if (gen !== window.__albumLoadGen) return;
+  if (album && album.error) album = {};
+
+  if (!album || !album.id) {
+    // retry search
+    if (albumTitle || artistName) {
+      try {
+        const q = [albumTitle, artistName].filter(Boolean).join(' ');
+        const found = await dzArr(`/search/album?q=${encodeURIComponent(q)}&limit=10`);
+        if (gen !== window.__albumLoadGen) return;
+        const exact = found.find(a =>
+          (!albumTitle || (a.title || '').toLowerCase() === albumTitle.toLowerCase()) &&
+          (!artistName || (a.artist?.name || '').toLowerCase() === artistName.toLowerCase())
+        ) || found[0];
+        if (exact?.id) {
+          id = String(exact.id);
+          album = await dzObj(`/album/${id}`);
+          if (album && album.error) album = {};
+          try { history.replaceState({ mrfSoft: 1 }, '', mrfUrl('album', { id, title: album.title || albumTitle, artist: album.artist?.name || artistName })); } catch (_) {}
+        }
+      } catch (_) {}
+    }
+  }
+  if (gen !== window.__albumLoadGen) return;
+
+  if (!album || !album.id) {
+    feed.innerHTML = `
+      <div class="search-empty" style="padding:48px 0;text-align:center">
+        <p style="color:var(--text-3);margin-bottom:14px">Альбом не найден</p>
+        <button class="btn-primary" style="padding:10px 18px;font-size:13px" onclick="(window.mrfGo||function(u){location.href=u})('search.html')">К поиску</button>
+      </div>`;
+    return;
+  }
+
   const raw   = album.tracks?.data || [];
   const aName = album.artist?.name || artistName;
   const aTitle= album.title || albumTitle;
@@ -50,6 +135,7 @@ async function loadAlbumPage() {
   }));
 
   document.title = aTitle + ' — MRF';
+  const artistUrl = mrfUrl('artist', { id: album.artist?.id, name: aName });
 
   feed.innerHTML = `
     <div style="display:flex;gap:28px;align-items:flex-start;margin-bottom:32px;flex-wrap:wrap">
@@ -57,7 +143,7 @@ async function loadAlbumPage() {
       <div style="display:flex;flex-direction:column;justify-content:center;gap:8px">
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:2px">Альбом</div>
         <h2 style="font-size:32px;font-weight:800">${escHtml(aTitle)}</h2>
-        <div style="color:var(--text-3);font-size:14px;cursor:pointer" onclick="location.href='${mrfUrl('artist',{id:album.artist?.id,name:aName})}'">
+        <div style="color:var(--text-3);font-size:14px;cursor:pointer" onclick="(window.mrfGo||function(u){location.href=u})('${artistUrl}')">
           ${escHtml(aName)}
         </div>
         <div style="color:var(--text-3);font-size:12px">${_src[key].length} треков · ${album.release_date||''}</div>
@@ -82,15 +168,19 @@ async function loadAlbumPage() {
     trackCount: _src[key].length,
     key
   };
+  if (typeof syncPlayingRows === 'function') syncPlayingRows();
 }
+window.loadAlbumPage = loadAlbumPage;
 
 function toggleSaveAlbum() {
   const m = window._albumPageMeta; if (!m) return;
   const added = Store.toggleAlbum(m);
   const btn = document.getElementById('save-album-btn');
   if (btn) btn.textContent = added ? 'В библиотеке' : 'Сохранить';
+  if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
   showNotif(added ? 'Альбом сохранён' : 'Альбом удалён из библиотеки');
 }
+window.toggleSaveAlbum = toggleSaveAlbum;
 
 function addAlbumToQueue(key) {
   (_src[key] || []).forEach(t => addToQueue(t));

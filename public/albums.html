@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Альбомы — MRF</title>
+  <title>Альбомы и релизы — MRF</title>
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 <div id="sidebar-root"></div>
-<main class="main-content">
+<main class="main-content" id="main-content">
   <div id="topbar-root"></div>
   <div class="feed">
     <div style="margin-bottom:28px">
-      <h2 style="font-size:28px;font-weight:800">Сохранённые альбомы</h2>
-      <p style="color:var(--text-3);font-size:13px;margin-top:4px">Твоя коллекция альбомов</p>
+      <h2 style="font-size:28px;font-weight:800">Альбомы и релизы</h2>
+      <p style="color:var(--text-3);font-size:13px;margin-top:4px">Сохранённые альбомы и релизы</p>
     </div>
     <div id="albums-box"></div>
   </div>
@@ -29,7 +29,11 @@ whenDomReady(() => {
   initShared();
   renderSavedAlbums();
 });
-// BACKEND TODO: Сохранение и загрузка избранных альбомов
+
+function renderAlbumsPage() { renderSavedAlbums(); }
+window.renderAlbumsPage = renderAlbumsPage;
+window.renderSavedAlbums = renderSavedAlbums;
+
 function renderSavedAlbums() {
   const box = document.getElementById('albums-box');
   const albs = Store.getAlbums();
@@ -40,18 +44,23 @@ function renderSavedAlbums() {
         <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
       </svg>
       <p style="color:var(--text-3)">Сохраняй альбомы, чтобы они появились здесь</p>
-      <button class="btn-secondary" style="margin-top:16px;padding:10px 18px" onclick="location.href='search.html'">Найти альбомы</button>
+      <button class="btn-secondary" style="margin-top:16px;padding:10px 18px" onclick="(window.mrfGo||function(u){location.href=u})('search.html')">Найти альбомы</button>
     </div>`;
     return;
   }
-  box.innerHTML = `<div class="albums-grid">${albs.map(a => `
-    <div class="album-card" onclick="location.href='${mrfUrl('album',{id:a.id,title:a.title,artist:a.artistName||''})}'">
+  box.innerHTML = `<div class="albums-grid">${albs.map(a => {
+    const safeId = typeof jsStr === 'function' ? jsStr(a.id) : String(a.id ?? '').replace(/'/g, "\\'");
+    const safeTitle = typeof jsStr === 'function' ? jsStr(a.title) : String(a.title || '').replace(/'/g, "\\'");
+    const safeArtist = typeof jsStr === 'function' ? jsStr(a.artistName) : String(a.artistName || '').replace(/'/g, "\\'");
+    return `
+    <div class="album-card" onclick="openSavedAlbum('${safeId}','${safeTitle}','${safeArtist}')">
       ${a.cover ? `<img class="album-cover" src="${a.cover}" alt="">` : `<div class="album-cover-placeholder">${noteSVGShared()}</div>`}
       <div class="album-body">
-        <div class="album-title">${escHtml(a.title)}</div>
-        <div class="album-artist">${escHtml(a.artistName||'')}</div>
+        <div class="album-title">${escHtml(a.title || '')}</div>
+        <div class="album-artist">${escHtml(a.artistName || '')}</div>
       </div>
-    </div>`).join('')}</div>`;
+    </div>`;
+  }).join('')}</div>`;
 }
 </script>
 </body>

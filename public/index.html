@@ -12,134 +12,138 @@
   <div id="topbar-root"></div>
   <div class="feed" id="feed">
 
-    <!-- Hero -->
-    <section class="hero-section">
-      <div class="hero-info">
-        <span class="hero-tag">Добро пожаловать</span>
-        <h1 class="hero-title">Слушай музыку<br/><span>без границ</span></h1>
-        <p class="hero-desc">Миллионы треков, персональные рекомендации и чарты — всё в одном месте</p>
-        <div class="hero-actions">
-          <button class="btn-primary" onclick="location.href='search.html'">
-            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            Найти музыку
+    <!-- 1. Главный трек мира -->
+    <section class="home-feature" id="home-feature" aria-label="Главный трек">
+      <div class="home-feature-bg" id="home-feature-bg" aria-hidden="true"></div>
+      <div class="home-feature-shade" aria-hidden="true"></div>
+      <div class="home-feature-body">
+        <div class="home-feature-brand">MRF</div>
+        <p class="home-feature-kicker" id="home-feature-kicker">Топ мирового чарта</p>
+        <h1 class="home-feature-title" id="home-feature-title">Слушай то, что сейчас в тренде</h1>
+        <p class="home-feature-sub" id="home-feature-sub">Обложка и трек подтянутся из чарта Deezer</p>
+        <div class="home-feature-actions">
+          <button type="button" class="btn-primary" id="home-feature-play" onclick="playHomeFeature()">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>
+            Слушать
           </button>
-          <button class="btn-secondary" onclick="location.href='charts.html'">Мировые чарты →</button>
+          <button type="button" class="btn-secondary" onclick="(typeof mrfGo==='function'?mrfGo:function(u){location.href=u})('charts.html')">Открыть чарты</button>
         </div>
       </div>
-      <div class="hero-visual">
-        <div class="hero-disc">
-          <svg viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="48" fill="#111" stroke="#EE90B7" stroke-width="1.5"/>
-            <circle cx="50" cy="50" r="32" fill="#0a0a0a"/>
-            <circle cx="50" cy="50" r="16" fill="#EE90B722" stroke="#EE90B7" stroke-width="1"/>
-            <circle cx="50" cy="50" r="5" fill="#EE90B7"/>
-          </svg>
+      <img class="home-feature-cover" id="home-feature-cover" alt="" hidden/>
+    </section>
+
+    <!-- ===== МИР / ОБЗОР ===== -->
+    <div class="feed-zone">
+      <div class="feed-zone-head">
+        <h2 class="feed-zone-title">Сейчас в мире</h2>
+      </div>
+
+      <section class="section">
+        <div class="section-header">
+          <h3 class="section-title">Мировые чарты</h3>
+          <a href="charts.html" class="section-link">Все треки →</a>
         </div>
-      </div>
-    </section>
+        <div id="home-charts-list">
+          <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем чарты…</span></div>
+        </div>
+      </section>
 
-    <!-- Недавно прослушанное -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Недавно прослушанное</h2>
-        <a href="library.html" class="section-link">Вся библиотека →</a>
-      </div>
-      <div class="quick-access-grid" id="recent-grid">
-        <div class="loading-placeholder"><div class="spinner"></div></div>
-      </div>
-    </section>
+      <section class="section">
+        <div class="section-header">
+          <h3 class="section-title">Новые релизы</h3>
+          <div class="rail-nav" data-rail="new-releases-row"></div>
+        </div>
+        <div class="rail-wrap">
+          <div class="horiz-scroll" id="new-releases-row"></div>
+        </div>
+      </section>
 
-    <!-- Музыка для настроения -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Музыка для настроения</h2>
-      </div>
-      <div class="mood-grid" id="mood-grid"></div>
-    </section>
+      <section class="section">
+        <div class="section-header">
+          <h3 class="section-title">Популярные исполнители</h3>
+          <div class="section-header-actions">
+            <a href="artists.html" class="section-link">Все →</a>
+            <div class="rail-nav" data-rail="home-artists-row"></div>
+          </div>
+        </div>
+        <div class="rail-wrap">
+          <div class="home-artist-row" id="home-artists-row"></div>
+        </div>
+      </section>
+    </div>
 
-    <!-- Мировые чарты -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Мировые чарты</h2>
-        <a href="charts.html" class="section-link">Все треки →</a>
+    <!-- ===== НАВИГАЦИЯ ПО МУЗЫКЕ ===== -->
+    <div class="feed-zone">
+      <div class="feed-zone-head">
+        <h2 class="feed-zone-title">Найди своё</h2>
       </div>
-      <div id="home-charts-list">
-        <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем чарты…</span></div>
-      </div>
-    </section>
 
-    <!-- Жанры -->
-    <section class="section">
-      <div class="section-header"><h2 class="section-title">Жанры</h2></div>
-      <div class="genre-grid">
-        <div class="genre-tile" style="--gc:#EE90B7" onclick="goSearch('pop')">Поп</div>
-        <div class="genre-tile" style="--gc:#e74c3c" onclick="goSearch('rock')">Рок</div>
-        <div class="genre-tile" style="--gc:#9b59b6" onclick="goSearch('hip-hop')">Хип-хоп</div>
-        <div class="genre-tile" style="--gc:#27ae60" onclick="goSearch('electronic')">Электронная</div>
-        <div class="genre-tile" style="--gc:#f39c12" onclick="goSearch('jazz')">Джаз</div>
-        <div class="genre-tile" style="--gc:#e67e22" onclick="goSearch('rnb')">R&amp;B</div>
-        <div class="genre-tile" style="--gc:#1abc9c" onclick="goSearch('indie')">Инди</div>
-        <div class="genre-tile" style="--gc:#c0392b" onclick="goSearch('metal')">Метал</div>
-        <div class="genre-tile" style="--gc:#2980b9" onclick="goSearch('classical')">Классика</div>
-        <div class="genre-tile" style="--gc:#8e44ad" onclick="goSearch('soul')">Soul</div>
-      </div>
-    </section>
+      <section class="section">
+        <div class="section-header">
+          <h3 class="section-title">Жанры</h3>
+          <div class="rail-nav" data-rail="genre-catalog"></div>
+        </div>
+        <div class="rail-wrap">
+          <div class="genre-ribbon" id="genre-catalog"></div>
+        </div>
+      </section>
 
-    <!-- Для вас -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Для вас</h2>
-        <a href="search.html" class="section-link">Ещё →</a>
-      </div>
-      <div class="horiz-scroll" id="for-you-row">
-        <div class="skeleton-row" style="width:150px;height:150px;flex-shrink:0"></div>
-      </div>
-    </section>
+      <section class="section">
+        <div class="section-header">
+          <h3 class="section-title">Музыка для настроения</h3>
+        </div>
+        <div class="mood-grid" id="mood-grid"></div>
+      </section>
 
-    <!-- Популярное в России -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Популярное в России</h2>
-        <a href="charts.html" class="section-link">Чарты →</a>
-      </div>
-      <div id="ru-charts-list">
-        <div class="loading-placeholder"><div class="spinner"></div></div>
-      </div>
-    </section>
+    </div>
 
-    <!-- Новые релизы -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Новые релизы</h2>
+    <!-- ===== ЛИЧНОЕ ===== -->
+    <div class="feed-zone feed-zone-personal">
+      <div class="feed-zone-head">
+        <h2 class="feed-zone-title">Твоя музыка</h2>
       </div>
-      <div class="horiz-scroll" id="new-releases-row"></div>
-    </section>
 
-    <!-- Популярные исполнители -->
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">Популярные исполнители</h2>
-        <a href="artists.html" class="section-link">Все →</a>
-      </div>
-      <div class="home-artist-row" id="home-artists-row"></div>
-    </section>
+      <section class="section">
+        <div class="section-header">
+          <h3 class="section-title">Для вас</h3>
+          <div class="section-header-actions">
+            <a href="search.html" class="section-link">Ещё →</a>
+            <div class="rail-nav" data-rail="for-you-row"></div>
+          </div>
+        </div>
+        <div class="rail-wrap">
+          <div class="horiz-scroll" id="for-you-row">
+            <div class="skeleton-row" style="width:150px;height:150px;flex-shrink:0"></div>
+          </div>
+        </div>
+      </section>
 
-    <!-- Подборки MRF -->
-    <section class="section">
-      <div class="section-header"><h2 class="section-title">Подборки MRF</h2></div>
-      <div class="mood-grid" id="collections-grid"></div>
-    </section>
+      <section class="section">
+        <div class="section-header">
+          <h3 class="section-title">Недавно прослушанное</h3>
+          <div class="section-header-actions">
+            <a href="library.html" class="section-link">Вся библиотека →</a>
+            <div class="rail-nav" data-rail="recent-rail"></div>
+          </div>
+        </div>
+        <div class="rail-wrap">
+          <div class="recent-rail" id="recent-rail"></div>
+        </div>
+      </section>
 
-    <!-- Мои плейлисты -->
-    <section class="section" id="my-playlists-section" style="display:none">
-      <div class="section-header">
-        <h2 class="section-title">Мои плейлисты</h2>
-        <a href="library.html" class="section-link">Все плейлисты →</a>
-      </div>
-      <div class="horiz-scroll-wrap">
-        <div class="horiz-scroll" id="my-playlists-row"></div>
-      </div>
-    </section>
+      <section class="section" id="my-playlists-section" style="display:none">
+        <div class="section-header">
+          <h3 class="section-title">Мои плейлисты</h3>
+          <div class="section-header-actions">
+            <a href="library.html" class="section-link">Все плейлисты →</a>
+            <div class="rail-nav" data-rail="my-playlists-row"></div>
+          </div>
+        </div>
+        <div class="rail-wrap">
+          <div class="horiz-scroll" id="my-playlists-row"></div>
+        </div>
+      </section>
+    </div>
 
   </div>
 </main>
@@ -154,61 +158,158 @@
 whenDomReady(() => {
   initShared();
   loadHomePage();
-  applyAccentColor();
+  if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
+  else if (typeof applyAccentColor === 'function') applyAccentColor(Store.getSettings().accentColor);
 });
 
-function applyAccentColor() {
-  const color = Store.getSettings().accentColor;
-  if (color) document.documentElement.style.setProperty('--accent', color);
-}
-
 function goSearch(tag) {
-  location.href = mrfUrl('search', { q: tag });
+  const url = mrfUrl('search', { q: tag });
+  if (typeof mrfGo === 'function') mrfGo(url);
+  else location.href = url;
 }
 
 async function loadHomePage() {
   try {
+    bindHomeRails();
     renderHomeRecent();
     renderHomeMoods();
-    renderHomeCollections();
     await Promise.all([
+      renderHomeGenres(),
       renderHomeCharts(),
       renderForYou(),
-      renderRuCharts(),
       renderNewReleases(),
       renderHomeArtists()
     ]);
     renderHomePlaylists();
+    bindHomeRails();
   } catch (err) {
     console.error('[HOME] Error loading:', err);
   }
 }
 
 function renderHomeRecent() {
-  const box = document.getElementById('recent-grid');
+  const box = document.getElementById('recent-rail');
   if (!box) return;
   const recent = Store.getRecent();
-  const items = recent.length ? recent : MOCK.tracks.slice(0, 6).map(t => ({ id: t.id, title: t.title, artist: t.artistName, cover: t.cover }));
-  if (!items.length) { box.innerHTML = '<p style="color:var(--text-3);font-size:13px">Пока ничего нет</p>'; return; }
-  box.innerHTML = items.slice(0, 6).map(t => `
-    <div class="quick-item" onclick="playFromMockTrack('${t.id}')">
-      ${t.cover ? `<img src="${t.cover}" class="quick-cover" alt="" loading="lazy" onerror="this.style.display='none'">` : `<div class="quick-cover" style="display:flex;align-items:center;justify-content:center;color:var(--accent)">${noteSVGShared()}</div>`}
-      <div class="quick-item-info">
-        <div class="quick-item-title">${escHtml(t.title||'')}</div>
-        <div class="quick-item-sub">${escHtml(t.artist||'')}</div>
-      </div>
-    </div>`).join('');
+  const items = recent.length
+    ? recent
+    : MOCK.tracks.slice(0, 8).map(t => ({ id: t.id, title: t.title, artist: t.artistName, cover: t.cover }));
+  if (!items.length) {
+    box.innerHTML = '<p style="color:var(--text-3);font-size:13px">Пока ничего нет</p>';
+    if (typeof bindHomeRails === 'function') bindHomeRails();
+    return;
+  }
+  box.innerHTML = items.slice(0, 12).map(t => `
+    <button type="button" class="recent-card" onclick="playRecentTrack('${escHtml(String(t.id||''))}')">
+      ${t.cover
+        ? `<img src="${t.cover}" class="recent-card-cover" alt="" loading="lazy" onerror="this.style.display='none'">`
+        : `<span class="recent-card-cover recent-card-fallback">${noteSVGShared()}</span>`}
+      <span class="recent-card-title">${escHtml(t.title||'')}</span>
+      <span class="recent-card-sub">${escHtml(t.artist||'')}</span>
+    </button>`).join('');
+  if (typeof bindHomeRails === 'function') bindHomeRails();
+}
+window.renderHomeRecent = renderHomeRecent;
+
+function playRecentTrack(id) {
+  if (!id) return;
+  for (const key in _src) {
+    const idx = (_src[key] || []).findIndex(t => String(t.id) === String(id) || String(t.deezerId) === String(id));
+    if (idx >= 0) { playFromSrc(key, idx); return; }
+  }
+  const qIdx = (queue || []).findIndex(t => String(t.id) === String(id));
+  if (qIdx >= 0) { queueIndex = qIdx; playNow(); return; }
+  playFromMockTrack(id);
 }
 
 function renderHomeMoods() {
   const box = document.getElementById('mood-grid');
   if (!box) return;
-  const icons = ['<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="9" y1="9" x2="9.01" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="15" y1="9" x2="15.01" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>','<path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="1.8"/>','<path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>','<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>','<path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" stroke="currentColor" stroke-width="1.8"/><path d="M15 9h-3l-1 5h2l-2 7 7-9h-3l1-3z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>','<circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2m0 16v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M2 12h2m16 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'];
-  box.innerHTML = MOCK.moods.map((m, i) => `
-    <div class="mood-tile" onclick="location.href='${mrfUrl('search',{q:m.tag})}'" style="border-color:${m.color}20">
-      <svg viewBox="0 0 24 24" fill="none" width="28" height="28" style="color:${m.color};margin-bottom:8px">${icons[i]||icons[0]}</svg>
-      <div class="mood-tile-name">${escHtml(m.name)}</div>
-    </div>`).join('');
+  box.className = 'mood-rail';
+  box.innerHTML = MOCK.moods.map(m => `
+    <button type="button" class="mood-card" onclick="goSearch('${escHtml(m.tag)}')">
+      <span class="mood-card-media" style="background-image:url('${m.image}');background-color:${m.color}"></span>
+      <span class="mood-card-shade"></span>
+      <span class="mood-card-copy">
+        <span class="mood-card-name">${escHtml(m.name)}</span>
+        <span class="mood-card-hint">${escHtml(m.hint || '')}</span>
+      </span>
+    </button>`).join('');
+}
+
+async function renderHomeGenres() {
+  const box = document.getElementById('genre-catalog');
+  if (!box) return;
+
+  const wanted = [
+    { id: 132, name: 'Поп', tag: 'pop' },
+    { id: 152, name: 'Рок', tag: 'rock' },
+    { id: 116, name: 'Хип-хоп', tag: 'hip-hop' },
+    { id: 106, name: 'Электронная', tag: 'electronic' },
+    { id: 129, name: 'Джаз', tag: 'jazz' },
+    { id: 165, name: 'R&B', tag: 'rnb' },
+    { id: 85, name: 'Инди', tag: 'indie' },
+    { id: 464, name: 'Метал', tag: 'metal' },
+    { id: 98, name: 'Классика', tag: 'classical' },
+    { id: 169, name: 'Soul', tag: 'soul' },
+  ];
+
+  let byId = {};
+  try {
+    const list = await dzArr('/genre');
+    list.forEach(g => { byId[g.id] = g; });
+  } catch (_) {}
+
+  box.innerHTML = wanted.map(g => {
+    const src = byId[g.id]?.picture_medium || byId[g.id]?.picture || '';
+    return `
+    <button type="button" class="genre-poster" onclick="goSearch('${escHtml(g.tag)}')">
+      <span class="genre-poster-art">
+        ${src
+          ? `<img src="${src}" alt="" loading="lazy" decoding="async">`
+          : `<span class="genre-poster-fallback"></span>`}
+      </span>
+      <span class="genre-poster-name">${escHtml(g.name)}</span>
+    </button>`;
+  }).join('');
+
+  bindHomeRails();
+}
+
+function railNavHTML() {
+  return `
+    <button type="button" class="genre-nav-btn rail-prev" aria-label="Назад">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button type="button" class="genre-nav-btn rail-next" aria-label="Вперёд">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>`;
+}
+
+function bindHomeRails() {
+  document.querySelectorAll('.rail-nav[data-rail]').forEach(nav => {
+    const rail = document.getElementById(nav.dataset.rail);
+    if (!rail) return;
+    if (!nav.querySelector('.rail-prev')) nav.innerHTML = railNavHTML();
+    const prev = nav.querySelector('.rail-prev');
+    const next = nav.querySelector('.rail-next');
+    const step = () => Math.max(180, Math.floor(rail.clientWidth * 0.75));
+    const sync = () => {
+      const max = rail.scrollWidth - rail.clientWidth - 2;
+      const canScroll = max > 4;
+      prev.disabled = !canScroll || rail.scrollLeft <= 2;
+      next.disabled = !canScroll || rail.scrollLeft >= max;
+      nav.classList.toggle('is-idle', !canScroll);
+    };
+    prev.onclick = () => rail.scrollBy({ left: -step(), behavior: 'smooth' });
+    next.onclick = () => rail.scrollBy({ left: step(), behavior: 'smooth' });
+    rail.onscroll = sync;
+    requestAnimationFrame(sync);
+  });
+  if (!window._homeRailsResizeBound) {
+    window._homeRailsResizeBound = true;
+    window.addEventListener('resize', () => bindHomeRails(), { passive: true });
+  }
 }
 
 async function renderHomeCharts() {
@@ -217,50 +318,83 @@ async function renderHomeCharts() {
   
   try {
     console.log('[HOME] Loading charts...');
-    const tracks = (await dzArr('/chart/0/tracks?limit=10')).map(normDZ);
+    const tracks = (await dzArr('/chart/0/tracks?limit=5')).map(normDZ);
     console.log('[HOME] Charts loaded:', tracks.length);
     _src['home'] = tracks;
+    fillHomeFeature(tracks[0] || null);
     box.innerHTML = tracks.length
       ? `<div class="track-list">${tracks.map((t,i) => rowHTML(t,i,'home')).join('')}</div>`
       : `<p style="color:var(--text-3);padding:20px">Не удалось загрузить чарты</p>`;
+    if (typeof syncPlayingRows === 'function') syncPlayingRows();
   } catch (err) {
     console.error('[HOME] Charts error:', err);
+    fillHomeFeature(null);
     box.innerHTML = `<p style="color:var(--text-3);padding:20px">Ошибка загрузки: ${err.message}</p>`;
   }
+}
+
+function fillHomeFeature(track) {
+  const root = document.getElementById('home-feature');
+  const title = document.getElementById('home-feature-title');
+  const sub = document.getElementById('home-feature-sub');
+  const kicker = document.getElementById('home-feature-kicker');
+  const bg = document.getElementById('home-feature-bg');
+  const cover = document.getElementById('home-feature-cover');
+  if (!root || !title || !sub) return;
+
+  if (!track) {
+    root.classList.remove('is-ready');
+    title.textContent = 'Слушай то, что сейчас в тренде';
+    sub.textContent = 'Открой чарты или найди трек через поиск';
+    if (kicker) kicker.textContent = 'MRF сегодня';
+    if (cover) { cover.hidden = true; cover.removeAttribute('src'); }
+    if (bg) bg.style.backgroundImage = '';
+    return;
+  }
+
+  const art = track.album?.cover_xl || track.album?.cover_medium || track.album?.cover || '';
+  const artist = track.artist?.name || '';
+  title.textContent = track.title || 'Без названия';
+  sub.textContent = artist ? `${artist} · №1 в мировом чарте` : '№1 в мировом чарте';
+  if (kicker) kicker.textContent = 'Топ мирового чарта';
+  if (art) {
+    if (bg) bg.style.backgroundImage = `url("${art}")`;
+    if (cover) {
+      cover.hidden = false;
+      cover.src = art;
+      cover.alt = track.title || '';
+    }
+    root.classList.add('is-ready');
+  } else {
+    root.classList.remove('is-ready');
+    if (cover) cover.hidden = true;
+  }
+}
+
+function playHomeFeature() {
+  if (_src['home']?.length) playFromSrc('home', 0);
+  else (typeof mrfGo === 'function' ? mrfGo : (u) => { location.href = u; })('charts.html');
 }
 
 function renderHomePlaylists() {
   const pls = Store.getPlaylists();
   const section = document.getElementById('my-playlists-section');
   const row = document.getElementById('my-playlists-row');
-  if (!section || !row || !pls.length) return;
+  if (!section || !row) return;
+  if (!pls.length) { section.style.display = 'none'; row.innerHTML = ''; return; }
   section.style.display = '';
-  row.innerHTML = pls.map(pl => `
-    <div class="horiz-card" onclick="location.href='playlist.html?id=${pl.id}'">
-      ${pl.cover ? `<img src="${pl.cover}" class="horiz-card-cover" alt="">` : `<div class="horiz-card-cover-placeholder">${noteSVGShared()}</div>`}
-      <div class="horiz-card-title">${escHtml(pl.name)}</div>
-      <div class="horiz-card-sub">${pl.trackCount} треков</div>
-    </div>`).join('');
+  row.innerHTML = pls.map(pl => {
+    const href = typeof mrfUrl === 'function' ? mrfUrl('playlist', { id: pl.id }) : `playlist.html?id=${encodeURIComponent(pl.id)}`;
+    return `
+    <button type="button" class="cover-card" onclick="(window.mrfGo||function(u){location.href=u})('${href}')">
+      ${pl.cover ? `<img src="${pl.cover}" class="cover-card-art" alt="">` : `<span class="cover-card-art cover-card-fallback">${noteSVGShared()}</span>`}
+      <span class="cover-card-title">${escHtml(pl.name)}</span>
+      <span class="cover-card-sub">${pl.trackCount || pl.tracks?.length || 0} треков</span>
+    </button>`;
+  }).join('');
+  if (typeof bindHomeRails === 'function') bindHomeRails();
 }
-
-function renderHomeCollections() {
-  const box = document.getElementById('collections-grid');
-  if (!box) return;
-  const items = [
-    { name: 'Поп', tag: 'pop', color: '#EE90B7' },
-    { name: 'Рэп', tag: 'rap', color: '#e74c3c' },
-    { name: 'Хип-хоп', tag: 'hip-hop', color: '#9b59b6' },
-    { name: 'Электронная', tag: 'electronic', color: '#27ae60' },
-    { name: 'Рок', tag: 'rock', color: '#f39c12' },
-    { name: 'Для отдыха', tag: 'chill', color: '#1abc9c' },
-    { name: 'Для тренировок', tag: 'workout', color: '#e67e22' },
-    { name: 'Концентрация', tag: 'focus', color: '#2980b9' }
-  ];
-  box.innerHTML = items.map(m => `
-    <div class="mood-tile" onclick="goSearch('${m.tag}')" style="border-color:${m.color}33">
-      <div class="mood-tile-name" style="color:${m.color}">${escHtml(m.name)}</div>
-    </div>`).join('');
-}
+window.renderHomePlaylists = renderHomePlaylists;
 
 async function renderForYou() {
   const box = document.getElementById('for-you-row');
@@ -269,21 +403,11 @@ async function renderForYou() {
   const tracks = (await dzArr('/chart/0/tracks?limit=12')).map(normDZ).slice(0, 8);
   _src['foryou'] = tracks;
   box.innerHTML = tracks.map((t, i) => `
-    <div class="horiz-card" onclick="playFromSrc('foryou',${i})">
-      ${t.album?.cover_medium ? `<img src="${t.album.cover_medium}" class="horiz-card-cover" alt="">` : `<div class="horiz-card-cover-placeholder">${noteSVGShared()}</div>`}
-      <div class="horiz-card-title">${escHtml(t.title)}</div>
-      <div class="horiz-card-sub">${escHtml(t.artist?.name||'')}</div>
-    </div>`).join('') || '<p style="color:var(--text-3)">Нет рекомендаций</p>';
-}
-
-async function renderRuCharts() {
-  const box = document.getElementById('ru-charts-list');
-  if (!box) return;
-  const tracks = (await dzArr('/chart/116/tracks?limit=8')).map(normDZ);
-  _src['ru_home'] = tracks;
-  box.innerHTML = tracks.length
-    ? `<div class="track-list">${tracks.map((t,i) => rowHTML(t,i,'ru_home')).join('')}</div>`
-    : `<p style="color:var(--text-3)">Не удалось загрузить</p>`;
+    <button type="button" class="cover-card" onclick="playFromSrc('foryou',${i})">
+      ${t.album?.cover_medium ? `<img src="${t.album.cover_medium}" class="cover-card-art" alt="">` : `<span class="cover-card-art cover-card-fallback">${noteSVGShared()}</span>`}
+      <span class="cover-card-title">${escHtml(t.title)}</span>
+      <span class="cover-card-sub">${escHtml(t.artist?.name||'')}</span>
+    </button>`).join('') || '<p style="color:var(--text-3)">Нет рекомендаций</p>';
 }
 
 async function renderNewReleases() {
@@ -292,11 +416,11 @@ async function renderNewReleases() {
   // BACKEND TODO: Получение новых релизов
   const albums = await dzArr('/chart/0/albums?limit=10');
   box.innerHTML = albums.map(a => `
-    <div class="horiz-card" onclick="location.href='${mrfUrl('album',{id:a.id,title:a.title,artist:a.artist?.name||''})}'">
-      ${a.cover_medium ? `<img src="${a.cover_medium}" class="horiz-card-cover" alt="">` : `<div class="horiz-card-cover-placeholder">${noteSVGShared()}</div>`}
-      <div class="horiz-card-title">${escHtml(a.title)}</div>
-      <div class="horiz-card-sub">${escHtml(a.artist?.name||'')}</div>
-    </div>`).join('');
+    <button type="button" class="cover-card" onclick="location.href='${mrfUrl('album',{id:a.id,title:a.title,artist:a.artist?.name||''})}'">
+      ${a.cover_medium ? `<img src="${a.cover_medium}" class="cover-card-art" alt="">` : `<span class="cover-card-art cover-card-fallback">${noteSVGShared()}</span>`}
+      <span class="cover-card-title">${escHtml(a.title)}</span>
+      <span class="cover-card-sub">${escHtml(a.artist?.name||'')}</span>
+    </button>`).join('');
 }
 
 async function renderHomeArtists() {
@@ -304,10 +428,12 @@ async function renderHomeArtists() {
   if (!box) return;
   const artists = await dzArr('/chart/0/artists?limit=10');
   box.innerHTML = artists.map(a => `
-    <div class="artist-card" style="width:130px;flex-shrink:0" onclick="location.href='${mrfUrl('artist',{id:a.id,name:a.name})}'">
-      ${a.picture_medium ? `<img class="artist-img" src="${a.picture_medium}" alt="">` : `<div class="artist-img-placeholder">${(a.name||'?')[0]}</div>`}
-      <div class="artist-name">${escHtml(a.name)}</div>
-    </div>`).join('');
+    <button type="button" class="artist-chip" onclick="location.href='${mrfUrl('artist',{id:a.id,name:a.name})}'">
+      ${a.picture_medium
+        ? `<img class="artist-chip-img" src="${a.picture_medium}" alt="">`
+        : `<span class="artist-chip-img artist-chip-fallback">${escHtml((a.name||'?')[0])}</span>`}
+      <span class="artist-chip-name">${escHtml(a.name)}</span>
+    </button>`).join('');
 }
 
 async function playFromMockTrack(id) {

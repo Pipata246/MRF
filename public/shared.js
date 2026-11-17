@@ -19,6 +19,21 @@ function getPageId(href) {
 const PAGE = getPageId();
 window.getPageId = getPageId;
 
+/** Inline MRF mark — uses currentColor / --accent */
+function mrfLogoSVG(size = 52) {
+  const s = Number(size) || 52;
+  return `<svg class="logo-img" viewBox="0 0 1254 1254" width="${s}" height="${s}" role="img" aria-label="MRF" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="626" cy="615" r="603" fill="none" stroke="currentColor" stroke-width="38"/>
+    <rect x="429" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
+    <rect x="515" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
+    <rect x="600" y="193" width="54" height="287" rx="27" ry="27"/>
+    <rect x="686" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
+    <rect x="772" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
+    <text x="626" y="848" text-anchor="middle" font-family="Arial Black, Helvetica Neue, Impact, sans-serif" font-size="310" font-weight="900" font-style="italic" letter-spacing="-14">MRF</text>
+  </svg>`;
+}
+window.mrfLogoSVG = mrfLogoSVG;
+
 /* ══════════════════════════════════
    ИНЖЕКТ SIDEBAR
 ══════════════════════════════════ */
@@ -37,6 +52,7 @@ function injectSidebar() {
   // Soft-nav: keep existing sidebar DOM (audio continuity), just refresh active state
   if (root.querySelector('.sidebar')) {
     updateSidebarActive(getPageId());
+    ensureSidebarPlaylistsBox();
     renderSidebarPlaylists();
     if (typeof updateFavBadge === 'function') updateFavBadge();
     return;
@@ -52,7 +68,7 @@ function injectSidebar() {
   const libLinks = [
     { href: 'liked.html',     page: 'liked',     label: 'Любимые треки', icon: '<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/>' },
     { href: 'playlists.html', page: 'playlists', label: 'Плейлисты',     icon: '<path d="M3 6h18M3 12h12M3 18h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' },
-    { href: 'albums.html',    page: 'albums',    label: 'Альбомы',       icon: '<rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>' },
+    { href: 'albums.html',    page: 'albums',    label: 'Альбомы и релизы', icon: '<rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>' },
     { href: 'artists.html',   page: 'artists',   label: 'Исполнители',   icon: '<circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' },
   ];
 
@@ -63,7 +79,7 @@ function injectSidebar() {
   root.innerHTML = `
     <aside class="sidebar" id="sidebar">
       <div class="logo" id="sidebar-logo" onclick="(window.mrfGo||function(u){location.href=u})('index.html')" style="cursor:pointer">
-        <img src="img/logo.png" alt="MRF" class="logo-img" />
+        ${mrfLogoSVG(52)}
         <span class="logo-brand">Make Russia Free</span>
         <button class="sidebar-collapse-btn" onclick="event.stopPropagation();toggleSidebar()" title="Свернуть">
           <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
@@ -84,47 +100,101 @@ function injectSidebar() {
       </div>
 
       <nav class="nav">
+        <div class="nav-group nav-group-main">
         ${links.map(l => `
           <a href="${l.href}" class="nav-item${getPageId() === l.page ? ' active' : ''}" data-page="${l.page}">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none">${l.icon}</svg>
             <span class="nav-label">${l.label}</span>
             ${l.page === 'library' ? `<span class="nav-badge" id="fav-count">${favCount}</span>` : ''}
           </a>`).join('')}
+        </div>
 
-        <div class="nav-divider"></div>
+        <div class="nav-divider" role="separator"></div>
         <div class="nav-section-title">Моя музыка</div>
 
+        <div class="nav-group nav-group-lib">
         ${libLinks.map(l => `
           <a href="${l.href}" class="nav-item${getPageId() === l.page ? ' active' : ''}" data-page="${l.page}" style="font-size:12.5px;padding:8px 18px">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" width="16" height="16">${l.icon}</svg>
             <span class="nav-label">${l.label}</span>
           </a>`).join('')}
+        </div>
 
-        <div class="nav-divider"></div>
+        <div class="nav-divider" role="separator"></div>
         <div class="nav-section-title">Плейлисты</div>
-        <div id="sidebar-playlists"></div>
+        <div class="nav-group nav-group-pl" id="sidebar-playlists"></div>
       </nav>
     </aside>`;
 
   renderSidebarPlaylists();
 }
 
+function playlistCoverOf(pl) {
+  if (pl?.cover) return pl.cover;
+  const first = pl?.tracks?.[0];
+  return first?.cover || first?.album?.cover_medium || '';
+}
+
+function ensureSidebarPlaylistsBox() {
+  let box = document.getElementById('sidebar-playlists');
+  if (box) return box;
+  const nav = document.querySelector('#sidebar-root .nav, .sidebar .nav');
+  if (!nav) return null;
+  let title = [...nav.querySelectorAll('.nav-section-title')].find(el => /плейлист/i.test(el.textContent || ''));
+  if (!title) {
+    title = document.createElement('div');
+    title.className = 'nav-section-title';
+    title.textContent = 'Плейлисты';
+    nav.appendChild(title);
+  }
+  box = document.createElement('div');
+  box.id = 'sidebar-playlists';
+  box.className = 'nav-group nav-group-pl';
+  title.insertAdjacentElement('afterend', box);
+  return box;
+}
+
 function renderSidebarPlaylists() {
-  const box = document.getElementById('sidebar-playlists');
+  const box = ensureSidebarPlaylistsBox();
   if (!box) return;
-  const pls = Store.getPlaylists().slice(0, 6);
+  let pls = [];
+  try { pls = Store.getPlaylists() || []; } catch (_) { pls = []; }
   if (!pls.length) {
     box.innerHTML = `<div class="nav-placeholder"><span>Плейлисты появятся здесь</span></div>`;
     return;
   }
-  box.innerHTML = pls.map(pl => `
-    <a href="playlist.html?id=${pl.id}" class="nav-item" style="font-size:12px;padding:6px 18px">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M9 18V6l12-3v12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="15" r="3" stroke="currentColor" stroke-width="1.6"/></svg>
-      <span class="nav-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(pl.name)}</span>
-    </a>`).join('');
+  const page = typeof getPageId === 'function' ? getPageId() : '';
+  const currentId = page === 'playlist'
+    ? new URLSearchParams(location.search).get('id')
+    : null;
+
+  box.innerHTML = pls.map(pl => {
+    const href = typeof mrfUrl === 'function'
+      ? mrfUrl('playlist', { id: pl.id })
+      : `playlist.html?id=${encodeURIComponent(pl.id)}`;
+    const cover = playlistCoverOf(pl);
+    const active = currentId && String(currentId) === String(pl.id) ? ' active' : '';
+    const safeCover = String(cover || '').replace(/"/g, '&quot;');
+    const avatar = cover
+      ? `<img class="nav-icon nav-pl-avatar" src="${safeCover}" alt="" loading="lazy">`
+      : `<span class="nav-icon nav-pl-avatar nav-pl-avatar-ph">${escHtml((pl.name || '?')[0])}</span>`;
+    return `
+    <a href="${href}" class="nav-item nav-pl-item${active}" title="${escHtml(pl.name)}" data-playlist-id="${escHtml(String(pl.id))}">
+      ${avatar}
+      <span class="nav-label nav-pl-label">${escHtml(pl.name)}</span>
+    </a>`;
+  }).join('');
 }
 
 window.renderSidebarPlaylists = renderSidebarPlaylists;
+window.ensureSidebarPlaylistsBox = ensureSidebarPlaylistsBox;
+window.playlistCoverOf = playlistCoverOf;
+
+/** Escape a string for use inside a single-quoted JS literal in HTML onclick */
+function jsStr(s) {
+  return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+}
+window.jsStr = jsStr;
 
 function toggleSidebar() {
   const collapsed = document.body.classList.toggle('sidebar-collapsed');
@@ -142,65 +212,312 @@ function injectTopbar() {
 
   const profile = Store.getProfile();
   const initials = (profile.name || 'П')[0].toUpperCase();
+  const avatarInner = profile.avatar
+    ? `<img src="${profile.avatar}" alt="">`
+    : initials;
 
   root.innerHTML = `
     <header class="topbar">
       <div class="topbar-nav">
-        <button class="topbar-btn" id="btn-nav-back" onclick="history.back()" title="Назад" style="opacity:0.4">
+        <button class="topbar-btn is-disabled" id="btn-nav-back" onclick="(typeof mrfHistoryBack==='function'?mrfHistoryBack:history.back)()" title="Назад" aria-disabled="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
-        <button class="topbar-btn" id="btn-nav-fwd" onclick="history.forward()" title="Вперёд" style="opacity:0.4">
+        <button class="topbar-btn is-disabled" id="btn-nav-fwd" onclick="(typeof mrfHistoryForward==='function'?mrfHistoryForward:history.forward)()" title="Вперёд" aria-disabled="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
       </div>
 
       <div class="topbar-search" id="topbar-search-box">
-        <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <input type="text" id="main-search-input" placeholder="Артист, трек, альбом…" autocomplete="off"
-          onkeydown="if(event.key==='Enter'&&this.value.trim()){event.preventDefault();(typeof goSearchPage==='function'?goSearchPage:function(q){location.href=(typeof mrfUrl==='function'?mrfUrl('search',{q:q}):('search?q='+encodeURIComponent(q)));})(this.value.trim())}"
-          onclick="event.stopPropagation()"/>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input type="text" id="main-search-input" placeholder="Артист, трек, альбом…" autocomplete="off"/>
+        <button type="button" class="search-clear hidden" id="topbar-search-clear" title="Очистить" aria-label="Очистить">✕</button>
+        <div class="search-flyout hidden" id="search-flyout" role="listbox"></div>
       </div>
 
       <div class="topbar-actions">
-        <button class="btn-premium" onclick="location.href='profile.html'">MRF+</button>
-        <div class="topbar-avatar" id="topbar-avatar" onclick="toggleUserMenu(event)" title="Профиль">${initials}</div>
-        <div class="user-dropdown hidden" id="user-dropdown">
-          <a href="profile.html" class="user-menu-item">
-            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            Мой профиль
-          </a>
-          <a href="profile.html#settings" class="user-menu-item">
-            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.8"/></svg>
-            Настройки
-          </a>
-          <div class="user-menu-divider"></div>
-          <div class="user-menu-item" onclick="Store.reset();location.reload()">
-            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Выйти
-          </div>
-        </div>
+        <button type="button" class="topbar-avatar" id="topbar-avatar" onclick="goProfile()" title="Профиль" aria-label="Профиль">${avatarInner}</button>
       </div>
     </header>`;
+
+  updateSearchModeUI();
+  bindTopbarSearchFlyout();
+
+  // Restore back/forward active state after topbar rebuild (soft-nav)
+  if (typeof updateChromeNavButtons === 'function') updateChromeNavButtons();
+  else if (typeof updateNavBtns === 'function') updateNavBtns();
 }
 
-function toggleUserMenu(e) {
-  e.stopPropagation();
-  const menu = document.getElementById('user-dropdown');
-  if (!menu) return;
-  menu.classList.toggle('hidden');
-  if (!menu.classList.contains('hidden')) {
-    setTimeout(() => document.addEventListener('click', () => menu.classList.add('hidden'), { once: true }), 0);
+function updateTopbarAvatar() {
+  const btn = document.getElementById('topbar-avatar');
+  if (!btn) return;
+  const profile = Store.getProfile();
+  if (profile.avatar) {
+    btn.innerHTML = `<img src="${profile.avatar}" alt="">`;
+  } else {
+    btn.textContent = (profile.name || 'П')[0].toUpperCase();
+  }
+  btn.title = profile.name || 'Профиль';
+}
+window.updateTopbarAvatar = updateTopbarAvatar;
+
+function isSearchPage() {
+  const path = (location.pathname || '').replace(/\/+$/, '');
+  return /(?:^|\/)search(?:\.html)?$/i.test(path);
+}
+
+function updateSearchModeUI() {
+  document.body.classList.toggle('is-search-page', isSearchPage());
+  if (isSearchPage()) closeSearchFlyout();
+}
+
+function goProfile() {
+  const url = typeof mrfUrl === 'function' ? mrfUrl('profile') : 'profile.html';
+  if (typeof mrfGo === 'function') mrfGo(url);
+  else location.href = url;
+}
+
+function toggleUserMenu() { goProfile(); }
+
+let _flyoutTimer = null;
+let _flyoutGen = 0;
+
+function closeSearchFlyout() {
+  document.getElementById('search-flyout')?.classList.add('hidden');
+}
+
+function openSearchFlyout(q) {
+  if (isSearchPage()) { closeSearchFlyout(); return; }
+  const fly = document.getElementById('search-flyout');
+  if (!fly) return;
+  fly.classList.remove('hidden');
+  renderSearchFlyout(q || '');
+}
+
+async function renderSearchFlyout(q) {
+  const fly = document.getElementById('search-flyout');
+  if (!fly || isSearchPage()) return;
+  const query = (q || '').trim();
+  const gen = ++_flyoutGen;
+
+  if (!query) {
+    if (typeof Store?.pruneHistory === 'function') Store.pruneHistory();
+    const hist = Store.getHistory().filter(h => String(h || '').trim().length >= 2).slice(0, 6);
+    fly.innerHTML = `
+      <div class="search-flyout-hint"><span>Быстрый поиск</span><kbd>Enter</kbd><span>— вкладка Поиск</span></div>
+      ${hist.length
+        ? `<div class="search-flyout-label">Недавние</div>${hist.map(h => `
+          <button type="button" class="search-flyout-row" onclick="pickSearchFlyout('${escHtml(h).replace(/'/g, "\\'")}')">
+            <svg class="search-flyout-ico" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span>${escHtml(h)}</span>
+          </button>`).join('')}`
+        : `<div class="search-flyout-empty">Начни вводить трек или артиста</div>`}`;
+    return;
+  }
+
+  fly.innerHTML = `<div class="search-flyout-empty">Ищем…</div>`;
+  try {
+    const [tracks, artists] = await Promise.all([
+      dzArr(`/search/track?q=${encodeURIComponent(query)}&limit=5`),
+      dzArr(`/search/artist?q=${encodeURIComponent(query)}&limit=4`)
+    ]);
+    if (gen !== _flyoutGen) return;
+    const tNorm = (tracks || []).map(normDZ);
+    const aList = artists || [];
+    if (!tNorm.length && !aList.length) {
+      fly.innerHTML = `<div class="search-flyout-empty">Ничего не найдено</div>
+        <button type="button" class="search-flyout-row search-flyout-more" onclick="pickSearchFlyout('${escHtml(query).replace(/'/g, "\\'")}')">Искать «${escHtml(query)}» во вкладке Поиск</button>`;
+      return;
+    }
+    let html = `<div class="search-flyout-hint"><span>Результаты</span><kbd>Enter</kbd><span>— все результаты</span></div>`;
+    if (aList.length) {
+      html += `<div class="search-flyout-label">Артисты</div>` + aList.map(a => `
+        <button type="button" class="search-flyout-row" onclick="openArtistFromFlyout(${a.id ? Number(a.id) : 'null'},'${escHtml(a.name || '').replace(/'/g, "\\'")}')">
+          ${a.picture_medium ? `<img class="search-flyout-avatar" src="${a.picture_medium}" alt="">` : `<span class="search-flyout-avatar ph">${escHtml((a.name || '?')[0])}</span>`}
+          <span class="search-flyout-meta"><span class="search-flyout-title">${escHtml(a.name || '')}</span><span class="search-flyout-sub">Исполнитель</span></span>
+        </button>`).join('');
+    }
+    if (tNorm.length) {
+      _src['flyout_tracks'] = tNorm;
+      html += `<div class="search-flyout-label">Треки</div>` + tNorm.map((t, i) => `
+        <button type="button" class="search-flyout-row" onclick="playFlyoutTrack(${i})">
+          ${t.album?.cover_medium ? `<img class="search-flyout-cover" src="${t.album.cover_medium}" alt="">` : `<span class="search-flyout-cover ph"></span>`}
+          <span class="search-flyout-meta"><span class="search-flyout-title">${escHtml(t.title || '')}</span><span class="search-flyout-sub">${escHtml(t.artist?.name || '')}</span></span>
+        </button>`).join('');
+    }
+    html += `<button type="button" class="search-flyout-row search-flyout-more" onclick="pickSearchFlyout('${escHtml(query).replace(/'/g, "\\'")}')">Смотреть все по запросу «${escHtml(query)}»</button>`;
+    fly.innerHTML = html;
+  } catch {
+    if (gen !== _flyoutGen) return;
+    fly.innerHTML = `<div class="search-flyout-empty">Ошибка поиска</div>`;
+  }
+}
+
+function pickSearchFlyout(q) {
+  closeSearchFlyout();
+  if (typeof goSearchPage === 'function') goSearchPage(q);
+  else location.href = typeof mrfUrl === 'function' ? mrfUrl('search', { q }) : `search.html?q=${encodeURIComponent(q)}`;
+}
+
+function playFlyoutTrack(i) {
+  closeSearchFlyout();
+  if (typeof playFromSrc === 'function') playFromSrc('flyout_tracks', i);
+}
+
+function openArtistFromFlyout(id, name) {
+  closeSearchFlyout();
+  if (typeof openArtist === 'function') openArtist(id, name);
+  else {
+    const url = typeof mrfUrl === 'function' ? mrfUrl('artist', { id, name }) : `artist.html?id=${id}`;
+    if (typeof mrfGo === 'function') mrfGo(url); else location.href = url;
+  }
+}
+
+function syncSearchPageHiddenInput(q) {
+  const hidden = document.getElementById('search-input');
+  if (hidden) hidden.value = q || '';
+}
+
+function runSearchOnPage(q, opts) {
+  const query = (q || '').trim();
+  const save = !!(opts && opts.save);
+  syncSearchPageHiddenInput(query);
+  if (!query) {
+    if (typeof showSearchInitial === 'function') showSearchInitial();
+    return;
+  }
+  // Typing updates results live without polluting history
+  if (typeof doSearch === 'function') doSearch(query, { save });
+  else if (typeof pageRunSearch === 'function') pageRunSearch(query);
+}
+
+function bindTopbarSearchFlyout() {
+  const input = document.getElementById('main-search-input');
+  const clearBtn = document.getElementById('topbar-search-clear');
+  if (!input) return;
+
+  input.onfocus = () => {
+    if (isSearchPage()) { closeSearchFlyout(); return; }
+    openSearchFlyout(input.value.trim());
+  };
+  input.onclick = e => e.stopPropagation();
+  input.oninput = () => {
+    const q = input.value.trim();
+    clearBtn?.classList.toggle('hidden', !q);
+    if (isSearchPage()) {
+      closeSearchFlyout();
+      clearTimeout(_flyoutTimer);
+      _flyoutTimer = setTimeout(() => runSearchOnPage(q, { save: false }), 320);
+      return;
+    }
+    clearTimeout(_flyoutTimer);
+    _flyoutTimer = setTimeout(() => openSearchFlyout(q), 280);
+  };
+  input.onkeydown = e => {
+    if (e.key === 'Escape') { closeSearchFlyout(); input.blur(); return; }
+    if (e.key === 'Enter') {
+      const q = input.value.trim();
+      if (!q) return;
+      e.preventDefault();
+      closeSearchFlyout();
+      if (isSearchPage()) runSearchOnPage(q, { save: true });
+      else if (typeof goSearchPage === 'function') goSearchPage(q);
+    }
+  };
+  if (clearBtn) {
+    clearBtn.onclick = e => {
+      e.stopPropagation();
+      input.value = '';
+      clearBtn.classList.add('hidden');
+      if (isSearchPage()) runSearchOnPage('');
+      else openSearchFlyout('');
+      input.focus();
+    };
+  }
+  if (!window._searchFlyoutDocBound) {
+    window._searchFlyoutDocBound = true;
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#topbar-search-box')) closeSearchFlyout();
+    });
   }
 }
 
 /* ══════════════════════════════════
    ИНЖЕКТ PLAYER
 ══════════════════════════════════ */
+function playlistModalsHTML() {
+  return `
+    <div class="modal-overlay hidden" id="modal-overlay" onclick="closeModal()"></div>
+    <div class="modal hidden" id="modal-create-playlist">
+      <div class="modal-header"><span>Создать плейлист</span><button onclick="closeModal()">✕</button></div>
+      <div class="modal-body modal-create-pl-body">
+        <input type="text" class="modal-input" id="playlist-name-input" placeholder="Название плейлиста" maxlength="60"/>
+        <div class="modal-pl-add-block">
+          <label class="modal-pl-add-label">Из избранного</label>
+          <input type="text" class="modal-input" id="playlist-track-search" placeholder="Фильтр по избранному…" maxlength="80" oninput="renderFavPickerCreate()"/>
+          <div class="modal-pl-picked" id="playlist-picked-tracks"></div>
+          <div class="modal-pl-search-results" id="playlist-track-results"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal()">Отмена</button>
+        <button class="btn-primary" onclick="confirmCreatePlaylist()" style="padding:10px 20px;font-size:13px">Создать</button>
+      </div>
+    </div>
+    <div class="modal hidden" id="modal-add-tracks">
+      <div class="modal-header"><span>Добавить из избранного</span><button onclick="closeModal()">✕</button></div>
+      <div class="modal-body modal-create-pl-body">
+        <input type="text" class="modal-input" id="add-tracks-search" placeholder="Фильтр по избранному…" maxlength="80" oninput="renderFavPickerAdd()"/>
+        <div class="modal-pl-search-results" id="add-tracks-results"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" onclick="closeModal()" style="padding:10px 20px;font-size:13px">Готово</button>
+      </div>
+    </div>
+    <div class="modal hidden" id="modal-rename-playlist">
+      <div class="modal-header"><span>Переименовать</span><button onclick="closeModal()">✕</button></div>
+      <div class="modal-body">
+        <input type="text" class="modal-input" id="playlist-rename-input" placeholder="Новое название" maxlength="60"/>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal()">Отмена</button>
+        <button class="btn-primary" onclick="confirmRenamePlaylist()" style="padding:10px 20px;font-size:13px">Сохранить</button>
+      </div>
+    </div>
+    <div class="modal hidden" id="modal-add-to-playlist">
+      <div class="modal-header"><span>Добавить в плейлист</span><button onclick="closeModal()">✕</button></div>
+      <div class="modal-body" id="modal-playlist-list"></div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="showCreatePlaylist()">+ Новый плейлист</button>
+        <button class="btn-primary" onclick="closeModal()" style="padding:10px 20px;font-size:13px">Готово</button>
+      </div>
+    </div>`;
+}
+
+/** Keep playlist modals up to date even when player DOM is preserved across soft-nav */
+function ensurePlaylistModals() {
+  const needCreate = !document.getElementById('playlist-track-search')
+    || !document.getElementById('modal-add-tracks')
+    || !document.getElementById('modal-rename-playlist');
+  if (!needCreate) return;
+  document.getElementById('mrf-playlist-modals')?.remove();
+  ['modal-overlay', 'modal-create-playlist', 'modal-add-tracks', 'modal-rename-playlist', 'modal-add-to-playlist'].forEach(id => {
+    document.getElementById(id)?.remove();
+  });
+  const wrap = document.createElement('div');
+  wrap.id = 'mrf-playlist-modals';
+  wrap.innerHTML = playlistModalsHTML();
+  document.body.appendChild(wrap);
+}
+window.ensurePlaylistModals = ensurePlaylistModals;
+
 function injectPlayer() {
   const root = document.getElementById('player-root');
   if (!root) return;
   // Never rebuild player DOM while soft-navigating — that would glitch audio UX
-  if (root.querySelector('.player')) return;
+  if (root.querySelector('.player')) {
+    ensurePlaylistModals();
+    return;
+  }
 
   root.innerHTML = `
     <footer class="player" id="player">
@@ -302,28 +619,7 @@ function injectPlayer() {
 
     <!-- NOTIFICATION -->
     <div class="notification hidden" id="notification"></div>
-
-    <!-- MODALS -->
-    <div class="modal-overlay hidden" id="modal-overlay" onclick="closeModal()"></div>
-    <div class="modal hidden" id="modal-create-playlist">
-      <div class="modal-header"><span>Создать плейлист</span><button onclick="closeModal()">✕</button></div>
-      <div class="modal-body">
-        <input type="text" class="modal-input" id="playlist-name-input" placeholder="Название плейлиста" maxlength="60"/>
-        <input type="text" class="modal-input" id="playlist-desc-input" placeholder="Описание (необязательно)" maxlength="120"/>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeModal()">Отмена</button>
-        <button class="btn-primary" onclick="confirmCreatePlaylist()" style="padding:10px 20px;font-size:13px">Создать</button>
-      </div>
-    </div>
-    <div class="modal hidden" id="modal-add-to-playlist">
-      <div class="modal-header"><span>Добавить в плейлист</span><button onclick="closeModal()">✕</button></div>
-      <div class="modal-body" id="modal-playlist-list"></div>
-      <div class="modal-footer">
-        <button class="btn-secondary" onclick="showCreatePlaylist()">+ Новый плейлист</button>
-        <button class="btn-primary" onclick="closeModal()" style="padding:10px 20px;font-size:13px">Готово</button>
-      </div>
-    </div>
+    ${playlistModalsHTML()}
   `;
 }
 
@@ -343,6 +639,7 @@ function initShared() {
   injectSidebar();
   injectTopbar();
   injectPlayer();
+  ensurePlaylistModals();
 
   // bind progress/volume after player DOM exists
   if (typeof bindPlayerUIControls === 'function') bindPlayerUIControls();
@@ -366,18 +663,17 @@ function initShared() {
 const el = id => document.getElementById(id);
 const qs = sel => document.querySelector(sel);
 
-/** Build page URL without .html so serve cleanUrls won't strip ?query on redirect */
+/** Build page URL — always keep .html so soft-nav/static servers keep ?query */
 function mrfUrl(page, params) {
-  const base = String(page || '').replace(/\.html$/i, '');
-  if (!params) return base + '.html';
+  const base = String(page || '').replace(/\.html$/i, '') + '.html';
+  if (!params) return base;
   const qs = new URLSearchParams();
   Object.keys(params).forEach(k => {
     const v = params[k];
     if (v != null && v !== '') qs.set(k, v);
   });
   const q = qs.toString();
-  // Prefer extensionless path when params exist (works with cleanUrls on/off)
-  return q ? `${base}?${q}` : `${base}.html`;
+  return q ? `${base}?${q}` : base;
 }
 window.mrfUrl = mrfUrl;
 
@@ -409,50 +705,264 @@ function showNotif(msg, duration = 2500) {
    MODALS & PLAYLIST CREATION
 ══════════════════════════════════ */
 let _pendingTrackForPlaylist = null;
+let _createPlDraftTracks = [];
+let _createPlSearchTimer = null;
+let _addTracksPlaylistId = null;
+let _addTracksSearchTimer = null;
+
+function notifyLibraryChanged() {
+  try {
+    if (typeof favourites !== 'undefined') favourites = Store.getFavs();
+  } catch (_) {}
+  if (typeof updateFavBadge === 'function') updateFavBadge();
+  if (typeof syncFavIcons === 'function') syncFavIcons();
+  try { renderSidebarPlaylists(); } catch (_) {}
+
+  const page = typeof getPageId === 'function' ? getPageId() : (typeof PAGE !== 'undefined' ? PAGE : '');
+  if (page === 'library' && typeof renderLib === 'function') {
+    renderLib(typeof _pageLibTab !== 'undefined' ? _pageLibTab : 'all');
+  }
+  if (page === 'playlists' && typeof renderPlaylistsPage === 'function') renderPlaylistsPage();
+  if (page === 'liked' && typeof renderLikedPage === 'function') renderLikedPage();
+  if (page === 'playlist' && typeof renderPlaylist === 'function' && typeof _currentPlaylistId !== 'undefined' && _currentPlaylistId) {
+    renderPlaylist(_currentPlaylistId);
+  }
+  if (typeof renderHomePlaylists === 'function') renderHomePlaylists();
+}
+window.notifyLibraryChanged = notifyLibraryChanged;
+
+function favToTrack(f) {
+  return {
+    id: f.id,
+    title: f.title,
+    artistName: f.artist,
+    artist: { id: f.artistId || null, name: f.artist },
+    cover: f.cover,
+    album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
+    duration: f.duration || 0,
+    preview: f.preview || null
+  };
+}
+
+function filterFavsByQuery(q) {
+  const query = String(q || '').trim().toLowerCase();
+  const favs = Store.getFavs();
+  if (!query) return favs;
+  return favs.filter(f =>
+    String(f.title || '').toLowerCase().includes(query) ||
+    String(f.artist || '').toLowerCase().includes(query)
+  );
+}
 
 function showCreatePlaylist() {
+  ensurePlaylistModals();
   const modal = document.getElementById('modal-create-playlist');
   const overlay = document.getElementById('modal-overlay');
   const nameInput = document.getElementById('playlist-name-input');
-  const descInput = document.getElementById('playlist-desc-input');
-  
+  const searchInput = document.getElementById('playlist-track-search');
+  _createPlDraftTracks = [];
+  if (_pendingTrackForPlaylist) {
+    _createPlDraftTracks.push(_pendingTrackForPlaylist);
+  }
   if (nameInput) nameInput.value = '';
-  if (descInput) descInput.value = '';
-  
+  if (searchInput) searchInput.value = '';
+  renderCreatePlaylistPicked();
+  renderFavPickerCreate();
   if (modal) modal.classList.remove('hidden');
   if (overlay) overlay.classList.remove('hidden');
   if (nameInput) setTimeout(() => nameInput.focus(), 50);
 }
 
+function renderCreatePlaylistPicked() {
+  const box = document.getElementById('playlist-picked-tracks');
+  if (!box) return;
+  if (!_createPlDraftTracks.length) {
+    box.innerHTML = `<div class="modal-pl-picked-empty">Выбери треки из избранного ниже</div>`;
+    return;
+  }
+  box.innerHTML = _createPlDraftTracks.map((t, i) => {
+    const cover = t.cover || t.album?.cover_medium || '';
+    const artist = t.artistName || t.artist?.name || t.artist || '';
+    return `<div class="modal-pl-picked-row">
+      ${cover ? `<img src="${cover}" alt="">` : `<span class="modal-pl-picked-ph"></span>`}
+      <span class="modal-pl-picked-meta">
+        <span class="modal-pl-picked-title">${escHtml(t.title || '')}</span>
+        <span class="modal-pl-picked-artist">${escHtml(artist)}</span>
+      </span>
+      <button type="button" class="modal-pl-picked-x" onclick="removeCreatePlaylistDraft(${i})" title="Убрать">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function removeCreatePlaylistDraft(i) {
+  _createPlDraftTracks.splice(i, 1);
+  renderCreatePlaylistPicked();
+  renderFavPickerCreate();
+}
+
+function renderFavPickerCreate() {
+  const box = document.getElementById('playlist-track-results');
+  if (!box) return;
+  const q = document.getElementById('playlist-track-search')?.value || '';
+  const favs = filterFavsByQuery(q);
+  if (!Store.getFavs().length) {
+    box.innerHTML = `<div class="modal-pl-search-hint">В избранном пока пусто — добавь треки сердечком</div>`;
+    return;
+  }
+  if (!favs.length) {
+    box.innerHTML = `<div class="modal-pl-search-hint">Ничего не найдено в избранном</div>`;
+    return;
+  }
+  _src['create_pl_favs'] = favs.map(favToTrack);
+  box.innerHTML = _src['create_pl_favs'].map((t, i) => {
+    const cover = t.cover || '';
+    const picked = _createPlDraftTracks.some(x => String(x.id) === String(t.id));
+    return `<button type="button" class="modal-pl-search-row${picked ? ' is-picked' : ''}" onclick="pickCreatePlaylistTrack(${i})">
+      ${cover ? `<img src="${cover}" alt="">` : `<span class="modal-pl-picked-ph"></span>`}
+      <span class="modal-pl-picked-meta">
+        <span class="modal-pl-picked-title">${escHtml(t.title || '')}</span>
+        <span class="modal-pl-picked-artist">${escHtml(t.artist?.name || '')}</span>
+      </span>
+      <span class="modal-pl-search-add">${picked ? '✓' : '+'}</span>
+    </button>`;
+  }).join('');
+}
+window.renderFavPickerCreate = renderFavPickerCreate;
+
+function pickCreatePlaylistTrack(i) {
+  const t = _src['create_pl_favs']?.[i];
+  if (!t) return;
+  const idx = _createPlDraftTracks.findIndex(x => String(x.id) === String(t.id));
+  if (idx >= 0) _createPlDraftTracks.splice(idx, 1);
+  else _createPlDraftTracks.push(t);
+  renderCreatePlaylistPicked();
+  renderFavPickerCreate();
+}
+
 function confirmCreatePlaylist() {
   const name = document.getElementById('playlist-name-input')?.value.trim();
   if (!name) { showNotif('Введи название'); return; }
-  
-  const desc = document.getElementById('playlist-desc-input')?.value.trim() || '';
-  const pl = Store.createPlaylist(name, desc);
-  
-  if (_pendingTrackForPlaylist) {
-    Store.addTrackToPlaylist(pl.id, _pendingTrackForPlaylist);
-    _pendingTrackForPlaylist = null;
+
+  const pl = Store.createPlaylist(name, '');
+  _createPlDraftTracks.forEach(t => Store.addTrackToPlaylist(pl.id, t));
+  if (window._bulkPending?.length) {
+    window._bulkPending.forEach(f => Store.addTrackToPlaylist(pl.id, favToTrack(f)));
+    window._bulkPending = [];
   }
-  
+
+  _pendingTrackForPlaylist = null;
+  _createPlDraftTracks = [];
   closeModal();
   renderSidebarPlaylists();
+  notifyLibraryChanged();
   showNotif('Плейлист создан');
-  
-  // обновляем страницу плейлистов если она открыта
-  if (PAGE === 'playlists' && typeof renderPlaylistsPage === 'function') renderPlaylistsPage();
-  if (PAGE === 'library' && typeof renderLib === 'function') renderLib(_libTab || 'all');
+
+  const url = typeof mrfUrl === 'function' ? mrfUrl('playlist', { id: pl.id }) : `playlist.html?id=${encodeURIComponent(pl.id)}`;
+  if (typeof mrfGo === 'function') mrfGo(url);
+  else location.href = url;
 }
+
+function showAddTracksToPlaylist(playlistId) {
+  ensurePlaylistModals();
+  _addTracksPlaylistId = playlistId;
+  const modal = document.getElementById('modal-add-tracks');
+  const overlay = document.getElementById('modal-overlay');
+  const input = document.getElementById('add-tracks-search');
+  if (input) input.value = '';
+  renderFavPickerAdd();
+  if (modal) modal.classList.remove('hidden');
+  if (overlay) overlay.classList.remove('hidden');
+  if (input) setTimeout(() => input.focus(), 50);
+}
+window.showAddTracksToPlaylist = showAddTracksToPlaylist;
+
+function renderFavPickerAdd() {
+  const box = document.getElementById('add-tracks-results');
+  if (!box || !_addTracksPlaylistId) return;
+  const q = document.getElementById('add-tracks-search')?.value || '';
+  const pl = Store.getPlaylist(_addTracksPlaylistId);
+  const favs = filterFavsByQuery(q);
+  if (!Store.getFavs().length) {
+    box.innerHTML = `<div class="modal-pl-search-hint">В избранном пока пусто</div>`;
+    return;
+  }
+  if (!favs.length) {
+    box.innerHTML = `<div class="modal-pl-search-hint">Ничего не найдено в избранном</div>`;
+    return;
+  }
+  _src['add_pl_favs'] = favs.map(favToTrack);
+  box.innerHTML = _src['add_pl_favs'].map((t, i) => {
+    const cover = t.cover || '';
+    const inPl = pl?.tracks?.some(x => String(x.id) === String(t.id));
+    return `<button type="button" class="modal-pl-search-row${inPl ? ' is-picked' : ''}" onclick="pickAddPlaylistTrack(${i})">
+      ${cover ? `<img src="${cover}" alt="">` : `<span class="modal-pl-picked-ph"></span>`}
+      <span class="modal-pl-picked-meta">
+        <span class="modal-pl-picked-title">${escHtml(t.title || '')}</span>
+        <span class="modal-pl-picked-artist">${escHtml(t.artist?.name || '')}</span>
+      </span>
+      <span class="modal-pl-search-add">${inPl ? '✓' : '+'}</span>
+    </button>`;
+  }).join('');
+}
+window.renderFavPickerAdd = renderFavPickerAdd;
+
+function pickAddPlaylistTrack(i) {
+  const t = _src['add_pl_favs']?.[i];
+  if (!t || !_addTracksPlaylistId) return;
+  const pl = Store.getPlaylist(_addTracksPlaylistId);
+  const inPl = pl?.tracks?.some(x => String(x.id) === String(t.id));
+  if (inPl) {
+    Store.removeTrackFromPlaylist(_addTracksPlaylistId, t.id);
+    showNotif('Убрано из плейлиста');
+  } else {
+    Store.addTrackToPlaylist(_addTracksPlaylistId, t);
+    showNotif('Добавлено в плейлист');
+  }
+  notifyLibraryChanged();
+  renderFavPickerAdd();
+}
+
+let _renamePlaylistId = null;
+function showRenamePlaylist(id) {
+  ensurePlaylistModals();
+  const pl = Store.getPlaylist(id);
+  if (!pl) return;
+  _renamePlaylistId = String(id);
+  const modal = document.getElementById('modal-rename-playlist');
+  const overlay = document.getElementById('modal-overlay');
+  const input = document.getElementById('playlist-rename-input');
+  if (input) {
+    input.value = pl.name || '';
+    setTimeout(() => { input.focus(); input.select(); }, 40);
+  }
+  if (modal) modal.classList.remove('hidden');
+  if (overlay) overlay.classList.remove('hidden');
+}
+window.showRenamePlaylist = showRenamePlaylist;
+
+function confirmRenamePlaylist() {
+  const name = document.getElementById('playlist-rename-input')?.value.trim();
+  if (!name) { showNotif('Введи название'); return; }
+  if (!_renamePlaylistId) return;
+  Store.updatePlaylist(_renamePlaylistId, { name });
+  const id = _renamePlaylistId;
+  _renamePlaylistId = null;
+  closeModal();
+  if (typeof renderPlaylist === 'function') renderPlaylist(id);
+  notifyLibraryChanged();
+  renderSidebarPlaylists();
+  showNotif('Плейлист переименован');
+}
+window.confirmRenamePlaylist = confirmRenamePlaylist;
 
 function showAddToPlaylist(track) {
   _pendingTrackForPlaylist = track;
   const modal = document.getElementById('modal-add-to-playlist');
   const overlay = document.getElementById('modal-overlay');
   const list = document.getElementById('modal-playlist-list');
-  
+
   const pls = Store.getPlaylists();
-  
+
   if (!pls.length) {
     if (list) list.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px">
       <p>Нет плейлистов</p>
@@ -460,12 +970,12 @@ function showAddToPlaylist(track) {
     </div>`;
   } else {
     if (list) list.innerHTML = pls.map(pl => {
-      const inPlaylist = pl.tracks?.some(t => t.id === track.id);
+      const inPlaylist = pl.tracks?.some(t => String(t.id) === String(track.id));
       return `<div class="modal-playlist-item${inPlaylist?' added':''}" onclick="toggleTrackInPlaylist('${pl.id}','${track.id}',this)">
         ${pl.cover ? `<img src="${pl.cover}" class="modal-pl-cover" alt="">` : `<div class="modal-pl-cover">${noteSVGShared()}</div>`}
         <div class="modal-pl-info">
           <div class="modal-pl-name">${escHtml(pl.name)}</div>
-          <div class="modal-pl-count">${pl.trackCount} треков</div>
+          <div class="modal-pl-count">${pl.trackCount || pl.tracks?.length || 0} треков</div>
         </div>
         <div class="modal-pl-check">
           <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
@@ -475,7 +985,7 @@ function showAddToPlaylist(track) {
       </div>`;
     }).join('') + `<button class="btn-secondary" onclick="closeModal();showCreatePlaylist()" style="margin-top:12px;width:100%;padding:10px;font-size:12px">+ Новый плейлист</button>`;
   }
-  
+
   if (modal) modal.classList.remove('hidden');
   if (overlay) overlay.classList.remove('hidden');
 }
@@ -483,22 +993,26 @@ function showAddToPlaylist(track) {
 function toggleTrackInPlaylist(playlistId, trackId, el) {
   const pl = Store.getPlaylist(playlistId);
   if (!pl) return;
-  
-  const inPlaylist = pl.tracks?.some(t => t.id === trackId);
-  
+
+  const inPlaylist = pl.tracks?.some(t => String(t.id) === String(trackId));
+
   if (inPlaylist) {
     Store.removeTrackFromPlaylist(playlistId, trackId);
     el.classList.remove('added');
     showNotif('Убрано из плейлиста');
-  } else {
-    if (_pendingTrackForPlaylist) {
-      Store.addTrackToPlaylist(playlistId, _pendingTrackForPlaylist);
-      el.classList.add('added');
-      showNotif('Добавлено в плейлист');
+  } else if (_pendingTrackForPlaylist) {
+    Store.addTrackToPlaylist(playlistId, _pendingTrackForPlaylist);
+    if (window._bulkPending?.length) {
+      window._bulkPending.forEach(f => Store.addTrackToPlaylist(playlistId, {
+        id: f.id, title: f.title, artistName: f.artist, cover: f.cover, duration: f.duration, preview: f.preview
+      }));
+      window._bulkPending = [];
     }
+    el.classList.add('added');
+    showNotif('Добавлено в плейлист');
   }
-  
-  renderSidebarPlaylists();
+
+  notifyLibraryChanged();
 }
 
 function closeModal() {
@@ -506,6 +1020,8 @@ function closeModal() {
   const overlay = document.getElementById('modal-overlay');
   if (overlay) overlay.classList.add('hidden');
   _pendingTrackForPlaylist = null;
+  _addTracksPlaylistId = null;
+  _renamePlaylistId = null;
 }
 
 /* ══════════════════════════════════
@@ -555,56 +1071,43 @@ function closeNowPlaying() {
   if (panel) panel.classList.add('hidden');
 }
 
-function updateNowPlayingPanel() {
+function updateNowPlayingPanel(track) {
   if (typeof queue === 'undefined' || typeof queueIndex === 'undefined') return;
-  const t = queue[queueIndex];
+  const t = track || queue[queueIndex];
   if (!t) return;
-  
-  const cover = t.album?.cover_xl || t.album?.cover_medium || '';
+
+  const cover = t.album?.cover_xl || t.album?.cover_medium || t.cover || '';
   const title = t.title || '';
-  const artist = t.artist?.name || '';
-  
+  const artist = t.artist?.name || t.artist || '';
+
   const npCover = document.getElementById('np-cover');
   const npTitle = document.getElementById('np-title');
   const npArtist = document.getElementById('np-artist-name');
   const npArtistCover = document.getElementById('np-artist-cover');
   const npArtistNameBig = document.getElementById('np-artist-name-big');
-  
-  if (npCover) npCover.style.backgroundImage = cover ? `url(${cover})` : 'none';
+
+  if (npCover) {
+    npCover.style.backgroundImage = cover ? `url("${cover}")` : 'none';
+    npCover.style.backgroundSize = 'cover';
+    npCover.style.backgroundPosition = 'center';
+  }
   if (npTitle) npTitle.textContent = title;
   if (npArtist) npArtist.textContent = artist;
-  if (npArtistCover) npArtistCover.style.backgroundImage = t.artist?.picture_xl ? `url(${t.artist.picture_xl})` : 'none';
+  if (npArtistCover) {
+    const pic = t.artist?.picture_xl || t.artist?.picture_medium || '';
+    npArtistCover.style.backgroundImage = pic ? `url("${pic}")` : 'none';
+    npArtistCover.style.backgroundSize = 'cover';
+    npArtistCover.style.backgroundPosition = 'center top';
+  }
   if (npArtistNameBig) npArtistNameBig.textContent = artist;
+
+  if (typeof syncRightPanel === 'function') syncRightPanel();
 }
 
 /* ══════════════════════════════════
    PLAYER HELPERS
 ══════════════════════════════════ */
-function toggleFavPlayer() {
-  if (typeof queue === 'undefined' || typeof queueIndex === 'undefined') return;
-  const t = queue[queueIndex];
-  if (!t) return;
-  
-  const artist = t.artist?.name || '';
-  const added = Store.toggleFav({
-    id: t.id,
-    title: t.title,
-    artistName: artist,
-    cover: t.album?.cover_medium || '',
-    duration: t.duration || 0,
-    preview: t.preview || null
-  });
-  
-  const btn = document.getElementById('player-like-btn');
-  if (btn) {
-    btn.classList.toggle('liked', added);
-    const path = btn.querySelector('path');
-    if (path) path.setAttribute('fill', added ? 'currentColor' : 'none');
-  }
-  
-  updateFavBadge();
-  showNotif(added ? 'Добавлено в избранное' : 'Убрано из избранного');
-}
+/* toggleFavPlayer is defined in app.js — do not shadow here */
 
 /* ══════════════════════════════════
    END OF SHARED.JS

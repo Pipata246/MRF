@@ -21,15 +21,8 @@ const MOCK = {
   settings: {
     autoplay: true,
     shuffleOnPlay: false,
-    quality: 'normal',
     rememberPosition: true,
     defaultVolume: 70,
-    notifyReleases: true,
-    notifyPlaylist: false,
-    notifyNews: true,
-    publicPlaylists: false,
-    publicLiked: false,
-    publicActivity: false,
     accentColor: '#EE90B7',
     theme: 'dark'
   },
@@ -92,25 +85,42 @@ const MOCK = {
   followedArtists: [],
 
   /* ── Чарты ─────────────────────────────────────── */
-  // BACKEND TODO: Получение чартов по регионам
-  chartRegions: [
-    { id: 0, label: 'Мировой', dzId: 0 },
-    { id: 1, label: 'Россия', dzId: 116 },
-    { id: 2, label: 'США', dzId: 23 },
-    { id: 3, label: 'Великобритания', dzId: 1316 },
-    { id: 4, label: 'Европа', dzId: 0 },
-  ],
+  // BACKEND TODO: Получение мировых чартов
   chartPeriods: ['За неделю', 'За месяц'],
   chartGenres: ['Все жанры', 'Поп', 'Рэп', 'Хип-хоп', 'Электронная', 'Рок'],
 
   /* ── Настроения / Жанровые подборки ───────────── */
   moods: [
-    { id: 'mood1', name: 'Для работы',    tag: 'focus work',       color: '#6C63FF' },
-    { id: 'mood2', name: 'Расслабиться',  tag: 'chill relax',      color: '#43B89C' },
-    { id: 'mood3', name: 'Тренировка',    tag: 'workout sport',    color: '#FF6B6B' },
-    { id: 'mood4', name: 'Вечеринка',     tag: 'party dance',      color: '#F7B731' },
-    { id: 'mood5', name: 'Грустить',      tag: 'sad emotional',    color: '#778CA3' },
-    { id: 'mood6', name: 'Утро',          tag: 'morning acoustic', color: '#FD9644' },
+    {
+      id: 'mood1', name: 'В работу', tag: 'focus work', color: '#3d4a5c',
+      hint: 'Спокойный фокус без отвлечений',
+      image: 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?auto=format&fit=crop&w=640&q=80'
+    },
+    {
+      id: 'mood2', name: 'Отдохнуть', tag: 'chill relax', color: '#2f4f45',
+      hint: 'Мягкий саунд для вечера дома',
+      image: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?auto=format&fit=crop&w=640&q=80'
+    },
+    {
+      id: 'mood3', name: 'Тренировка', tag: 'workout sport', color: '#5a3030',
+      hint: 'Темп и драйв на разгон',
+      image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=640&q=80'
+    },
+    {
+      id: 'mood4', name: 'Вечеринка', tag: 'party dance', color: '#5a4520',
+      hint: 'Громче, быстрее, в движение',
+      image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=640&q=80'
+    },
+    {
+      id: 'mood5', name: 'Погрустить', tag: 'sad emotional', color: '#2e3a48',
+      hint: 'Тихие треки, когда нужно побыть с собой',
+      image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=640&q=80'
+    },
+    {
+      id: 'mood6', name: 'С добрым утром', tag: 'morning acoustic', color: '#5a4028',
+      hint: 'Лёгкий старт дня',
+      image: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=640&q=80'
+    },
   ],
 
   /* ── История поиска ────────────────────────────── */
@@ -149,20 +159,43 @@ const Store = {
   /* Избранное */
   getFavs()       { return this._get(this.keys.favs, []); },
   setFavs(v)      { this._set(this.keys.favs, v); },
-  isFav(title, artist) {
-    return this.getFavs().some(f => f.title === title && f.artist === artist);
+  isFav(titleOrTrack, artist) {
+    const favs = this.getFavs();
+    if (titleOrTrack && typeof titleOrTrack === 'object') {
+      const t = titleOrTrack;
+      const tid = t.id != null ? String(t.id) : '';
+      const title = t.title || '';
+      const art = t.artistName || t.artist?.name || t.artist || '';
+      return favs.some(f =>
+        (tid && f.id != null && String(f.id) === tid) ||
+        (f.title === title && f.artist === art)
+      );
+    }
+    const title = titleOrTrack || '';
+    return favs.some(f => f.title === title && f.artist === (artist || ''));
   },
   toggleFav(track) {
     let favs = this.getFavs();
+    const tid = track.id != null ? String(track.id) : '';
     const key = { title: track.title, artist: track.artistName || track.artist?.name || track.artist || '' };
-    const exists = favs.some(f => f.title === key.title && f.artist === key.artist);
+    const exists = favs.some(f =>
+      (tid && f.id != null && String(f.id) === tid) ||
+      (f.title === key.title && f.artist === key.artist)
+    );
     if (exists) {
-      favs = favs.filter(f => !(f.title === key.title && f.artist === key.artist));
+      favs = favs.filter(f => {
+        if (tid && f.id != null && String(f.id) === tid) return false;
+        if (f.title === key.title && f.artist === key.artist) return false;
+        return true;
+      });
     } else {
       favs.push({
         id: track.id, title: track.title,
         artist: key.artist,
+        artistId: track.artist?.id || track.artistId || null,
         cover: track.cover || track.album?.cover_medium || '',
+        albumId: track.album?.id || track.albumId || null,
+        albumTitle: track.album?.title || '',
         duration: track.duration || 0,
         preview: track.preview || null,
         addedAt: Date.now()
@@ -188,44 +221,73 @@ const Store = {
     return pl;
   },
   updatePlaylist(id, data) {
-    const pls = this.getPlaylists().map(p => p.id === id ? { ...p, ...data } : p);
+    const sid = String(id);
+    const pls = this.getPlaylists().map(p => String(p.id) === sid ? { ...p, ...data } : p);
     this.setPlaylists(pls);
   },
   deletePlaylist(id) {
-    this.setPlaylists(this.getPlaylists().filter(p => p.id !== id));
+    const sid = String(id);
+    this.setPlaylists(this.getPlaylists().filter(p => String(p.id) !== sid));
   },
   addTrackToPlaylist(playlistId, track) {
+    if (!track) return;
+    const sid = String(playlistId);
     const pls = this.getPlaylists();
-    const pl = pls.find(p => p.id === playlistId);
+    const pl = pls.find(p => String(p.id) === sid);
     if (!pl) return;
-    if (!pl.tracks.some(t => t.id === track.id)) {
-      pl.tracks.push({ ...track, addedAt: Date.now() });
-      pl.trackCount = pl.tracks.length;
-      if (!pl.cover && (track.cover || track.album?.cover_medium))
-        pl.cover = track.cover || track.album?.cover_medium;
+    const tid = track.id != null ? String(track.id) : '';
+    const norm = {
+      id: track.id,
+      title: track.title || '',
+      artistName: track.artistName || track.artist?.name || track.artist || '',
+      artist: track.artist?.name || track.artistName || track.artist || '',
+      cover: track.cover || track.album?.cover_medium || '',
+      album: track.album || { cover_medium: track.cover || '' },
+      duration: track.duration || 0,
+      preview: track.preview || null,
+      addedAt: Date.now()
+    };
+    if (!pl.tracks) pl.tracks = [];
+    if (tid && pl.tracks.some(t => String(t.id) === tid)) {
+      this.setPlaylists(pls);
+      return;
     }
+    pl.tracks.push(norm);
+    pl.trackCount = pl.tracks.length;
+    if (!pl.cover && norm.cover) pl.cover = norm.cover;
     this.setPlaylists(pls);
   },
   removeTrackFromPlaylist(playlistId, trackId) {
+    const sid = String(playlistId);
+    const tid = String(trackId);
     const pls = this.getPlaylists();
-    const pl = pls.find(p => p.id === playlistId);
+    const pl = pls.find(p => String(p.id) === sid);
     if (!pl) return;
-    pl.tracks = pl.tracks.filter(t => t.id !== trackId);
+    pl.tracks = (pl.tracks || []).filter(t => String(t.id) !== tid);
     pl.trackCount = pl.tracks.length;
     this.setPlaylists(pls);
   },
-  getPlaylist(id) { return this.getPlaylists().find(p => p.id === id); },
+  getPlaylist(id) {
+    const sid = String(id || '');
+    return this.getPlaylists().find(p => String(p.id) === sid) || null;
+  },
 
   /* Подписки */
   getFollowed()   { return this._get(this.keys.followed, []); },
-  setFollowed(v)  { this._set(this.keys.followed, v); },
-  isFollowing(id) { return this.getFollowed().some(a => a.id === String(id)); },
+  setFollowed(v)  { this._set(this.keys.followed, v); MOCK.followedArtists = v; },
+  isFollowing(id) { return this.getFollowed().some(a => String(a.id) === String(id)); },
   toggleFollow(artist) {
     let arr = this.getFollowed();
     const id = String(artist.id || artist.deezerId || '');
-    const exists = arr.some(a => a.id === id);
-    if (exists) arr = arr.filter(a => a.id !== id);
-    else arr.unshift({ id, name: artist.name, picture: artist.picture || artist.picture_medium || '', fans: artist.nb_fan || artist.fans || 0 });
+    if (!id || id === 'undefined' || id === 'null') return false;
+    const exists = arr.some(a => String(a.id) === id);
+    if (exists) arr = arr.filter(a => String(a.id) !== id);
+    else arr.unshift({
+      id,
+      name: artist.name || '',
+      picture: artist.picture || artist.picture_medium || '',
+      fans: artist.nb_fan || artist.fans || 0
+    });
     this.setFollowed(arr);
     return !exists;
   },
@@ -251,13 +313,38 @@ const Store = {
   /* История поиска */
   getHistory()    { return this._get(this.keys.history, []); },
   addHistory(q)   {
-    if (!q?.trim()) return;
-    let arr = this.getHistory().filter(h => h !== q.trim());
-    arr.unshift(q.trim());
-    if (arr.length > 20) arr = arr.slice(0, 20);
+    const t = (q || '').trim();
+    if (t.length < 2) return;
+    const tl = t.toLowerCase();
+    // Drop prefix/incomplete siblings so "pla" / "play" don't sit next to "playboi carti"
+    let arr = this.getHistory().filter(h => {
+      const hl = String(h || '').trim().toLowerCase();
+      if (!hl || hl === tl) return false;
+      if (tl.startsWith(hl) || hl.startsWith(tl)) return false;
+      return true;
+    });
+    arr.unshift(t);
+    if (arr.length > 12) arr = arr.slice(0, 12);
     this._set(this.keys.history, arr);
   },
   clearHistory()  { this._set(this.keys.history, []); },
+  pruneHistory()  {
+    const raw = this.getHistory();
+    const kept = [];
+    raw.forEach(h => {
+      const t = String(h || '').trim();
+      if (t.length < 2) return;
+      const tl = t.toLowerCase();
+      const worse = kept.findIndex(x => {
+        const xl = x.toLowerCase();
+        return xl.startsWith(tl) || tl.startsWith(xl);
+      });
+      if (worse === -1) kept.push(t);
+      else if (t.length > kept[worse].length) kept[worse] = t;
+    });
+    this._set(this.keys.history, kept.slice(0, 12));
+    return kept;
+  },
 
   /* Очередь и плеер */
   getQueue()      { return this._get(this.keys.queue, { queue: [], index: -1 }); },
@@ -296,6 +383,7 @@ const Store = {
     Object.values(this.keys).forEach(k => localStorage.removeItem(k));
     MOCK.playlists = [];
     MOCK.followedArtists = [];
+    MOCK.searchHistory = [];
   }
 };
 

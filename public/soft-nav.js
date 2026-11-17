@@ -20,6 +20,67 @@
   let rawReplace = null;
   let rawHrefSet = null;
 
+  function normUrl(href) {
+    try {
+      const u = new URL(href, location.href);
+      let path = u.pathname.replace(/\/index\.html$/i, '/').replace(/\.html$/i, '');
+      if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+      if (!path) path = '/';
+      return path + u.search;
+    } catch {
+      return String(href || '');
+    }
+  }
+
+  // Soft-nav history for back/forward button chrome (browser History API has no canGoBack)
+  const hist = window.__mrfSoftHist || {
+    stack: [normUrl(location.href)],
+    index: 0
+  };
+  window.__mrfSoftHist = hist;
+
+  function updateChromeNavButtons() {
+    const back = document.getElementById('btn-nav-back');
+    const fwd = document.getElementById('btn-nav-fwd');
+    const canBack = hist.index > 0;
+    const canFwd = hist.index < hist.stack.length - 1;
+    if (back) {
+      back.style.opacity = canBack ? '1' : '0.4';
+      back.classList.toggle('is-disabled', !canBack);
+      back.setAttribute('aria-disabled', canBack ? 'false' : 'true');
+    }
+    if (fwd) {
+      fwd.style.opacity = canFwd ? '1' : '0.4';
+      fwd.classList.toggle('is-disabled', !canFwd);
+      fwd.setAttribute('aria-disabled', canFwd ? 'false' : 'true');
+    }
+  }
+  window.updateChromeNavButtons = updateChromeNavButtons;
+
+  function recordHistory(url, { replace = false, fromPop = false } = {}) {
+    const n = normUrl(url);
+    if (fromPop) {
+      const found = hist.stack.lastIndexOf(n);
+      if (found >= 0) hist.index = found;
+      else {
+        hist.stack = hist.stack.slice(0, hist.index + 1);
+        hist.stack.push(n);
+        hist.index = hist.stack.length - 1;
+      }
+    } else if (replace) {
+      hist.stack[hist.index] = n;
+    } else {
+      if (hist.stack[hist.index] === n) {
+        updateChromeNavButtons();
+        return;
+      }
+      hist.stack = hist.stack.slice(0, hist.index + 1);
+      hist.stack.push(n);
+      hist.index = hist.stack.length - 1;
+    }
+    updateChromeNavButtons();
+  }
+
   function pageName(url) {
     return (typeof getPageId === 'function' ? getPageId(url) : 'index');
   }
@@ -94,14 +155,39 @@
       if (typeof initSearchPage === 'function') initSearchPage();
       const q = absUrl.searchParams.get('q');
       if (q && typeof doSearch === 'function') doSearch(q);
+      else if (typeof resetSearchHome === 'function') resetSearchHome({ replaceUrl: false });
       else if (typeof showSearchInitial === 'function') showSearchInitial();
     } else if (pname === 'library' && typeof bootLibrary === 'function' && !justLoadedLib) {
       bootLibrary();
+    } else if (pname === 'playlist' && typeof loadPlaylistPage === 'function') {
+      loadPlaylistPage();
+    } else if (pname === 'playlists' && typeof renderPlaylistsPage === 'function') {
+      renderPlaylistsPage();
+    } else if (pname === 'liked' && typeof renderLikedPage === 'function') {
+      renderLikedPage();
+    } else if (pname === 'artist' && typeof window.loadArtistPage === 'function') {
+      await window.loadArtistPage({
+        id: absUrl.searchParams.get('id') || '',
+        name: absUrl.searchParams.get('name') || ''
+      });
+    } else if (pname === 'album' && typeof window.loadAlbumPage === 'function') {
+      await window.loadAlbumPage({
+        id: absUrl.searchParams.get('id') || '',
+        title: absUrl.searchParams.get('title') || '',
+        artist: absUrl.searchParams.get('artist') || ''
+      });
+    } else if (pname === 'artists' && typeof window.renderArtistsPage === 'function') {
+      window.renderArtistsPage();
+    } else if (pname === 'albums' && typeof window.renderAlbumsPage === 'function') {
+      window.renderAlbumsPage();
+    } else if (pname === 'profile' && typeof window.loadProfilePage === 'function') {
+      window.loadProfilePage();
     }
   }
 
   async function softNavigate(url, opts = {}) {
     const replace = !!opts.replace;
+    const fromPop = !!opts.fromPop;
     let abs;
     try { abs = new URL(url, location.href); } catch { location.assign(url); return; }
 
@@ -110,9 +196,17 @@
       return;
     }
 
-    // same document
-    if (abs.pathname === location.pathname && abs.search === location.search) {
+    // Same URL in address bar: skip only for ordinary navigations.
+    // On popstate (back/forward) location already changed, but main content is still the old page — must fetch.
+    // Exception: re-clicking Search while already there resets to search home.
+    if (!fromPop && abs.pathname === location.pathname && abs.search === location.search) {
+      if (pageName(abs) === 'search') {
+        if (typeof resetSearchHome === 'function') resetSearchHome({ replaceUrl: true });
+        else if (typeof clearSearchInput === 'function') clearSearchInput();
+        else if (typeof showSearchInitial === 'function') showSearchInitial();
+      }
       if (abs.hash) location.hash = abs.hash;
+      updateChromeNavButtons();
       return;
     }
 
@@ -132,8 +226,11 @@
 
       // Keep sidebar-root + player-root untouched — Audio keeps playing
       document.title = doc.title || document.title;
-      if (replace) history.replaceState({ mrfSoft: 1 }, '', abs.href);
-      else history.pushState({ mrfSoft: 1 }, '', abs.href);
+      if (!fromPop) {
+        if (replace) history.replaceState({ mrfSoft: 1 }, '', abs.href);
+        else history.pushState({ mrfSoft: 1 }, '', abs.href);
+      }
+      recordHistory(abs.href, { replace: replace && !fromPop, fromPop });
 
       curMain.innerHTML = newMain.innerHTML;
 
@@ -143,13 +240,19 @@
         if (typeof injectTopbar === 'function') injectTopbar();
         if (typeof updateSidebarActive === 'function') updateSidebarActive(pageName(abs.href));
       }
+      if (typeof window.renderSidebarPlaylists === 'function') window.renderSidebarPlaylists();
+      updateChromeNavButtons();
 
       await bootFetchedPage(doc, abs);
+      if (typeof window.renderSidebarPlaylists === 'function') window.renderSidebarPlaylists();
 
       curMain.scrollTop = 0;
       window.scrollTo(0, 0);
       if (typeof updateFavBadge === 'function') updateFavBadge();
       if (typeof syncFavIcons === 'function') syncFavIcons();
+      if (typeof syncPlayingRows === 'function') syncPlayingRows();
+      if (typeof updateSearchModeUI === 'function') updateSearchModeUI();
+      updateChromeNavButtons();
     } catch (err) {
       console.warn('[MRF soft-nav] fallback hard nav', err);
       window.__mrfSoftNavigating = false;
@@ -166,6 +269,32 @@
 
   window.mrfGo = softNavigate;
   window.softNavigate = softNavigate;
+
+  /** Topbar back/forward — browser history triggers popstate; fallback if no-op */
+  window.mrfHistoryBack = function () {
+    if (hist.index <= 0) return;
+    const before = normUrl(location.href);
+    history.back();
+    setTimeout(() => {
+      // popstate already handled navigation if URL changed
+      if (normUrl(location.href) === before && hist.index > 0) {
+        hist.index--;
+        softNavigate(hist.stack[hist.index], { replace: true, fromPop: true });
+      }
+    }, 40);
+  };
+
+  window.mrfHistoryForward = function () {
+    if (hist.index >= hist.stack.length - 1) return;
+    const before = normUrl(location.href);
+    history.forward();
+    setTimeout(() => {
+      if (normUrl(location.href) === before && hist.index < hist.stack.length - 1) {
+        hist.index++;
+        softNavigate(hist.stack[hist.index], { replace: true, fromPop: true });
+      }
+    }, 40);
+  };
 
   function shouldInterceptAnchor(a, e) {
     if (!a || !a.getAttribute('href')) return false;
@@ -187,8 +316,15 @@
   }, true);
 
   window.addEventListener('popstate', () => {
-    softNavigate(location.href, { replace: true });
+    softNavigate(location.href, { replace: true, fromPop: true });
   });
+
+  // Initial chrome state
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateChromeNavButtons);
+  } else {
+    updateChromeNavButtons();
+  }
 
   // Catch location.href = '…' / assign / replace used by onclick handlers
   function installLocationPatch() {

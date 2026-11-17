@@ -12,24 +12,26 @@
   <div id="topbar-root"></div>
   <div class="feed">
 
-    <div class="liked-header">
-      <div class="liked-cover-placeholder">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="64" height="64" style="color:#fff">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
+    <section class="liked-hero" id="liked-hero">
+      <div class="liked-mosaic" id="liked-mosaic" aria-hidden="true"></div>
+      <div class="liked-hero-scrim" aria-hidden="true"></div>
+      <div class="liked-hero-main">
+        <h1 class="liked-hero-title">Любимые треки</h1>
+        <p class="liked-hero-sub" id="liked-count">Пока пусто — отмечай треки сердечком</p>
+        <div class="liked-hero-actions">
+          <button class="btn-primary liked-play-btn" id="play-all-btn" onclick="playAllLiked()" style="display:none">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
+            Слушать
+          </button>
+          <button class="btn-secondary" id="shuffle-liked-btn" onclick="shuffleLiked()" style="display:none">Вразброс</button>
+        </div>
       </div>
-      <div style="display:flex;flex-direction:column;justify-content:center;gap:8px">
-        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:2px">Плейлист</div>
-        <h2 style="font-size:36px;font-weight:800">Любимые треки</h2>
-        <div style="color:var(--text-3);font-size:13px" id="liked-count">0 треков</div>
-        <button class="btn-primary" id="play-all-btn" onclick="playAllLiked()" style="padding:10px 20px;font-size:13px;margin-top:8px;width:fit-content;display:none">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
-          Слушать всё
-        </button>
-      </div>
-    </div>
+    </section>
 
-    <div id="liked-list"></div>
+    <div class="liked-list-wrap">
+      <div class="liked-list-label" id="liked-list-label" hidden>Все треки</div>
+      <div id="liked-list"></div>
+    </div>
 
   </div>
 </main>
@@ -50,33 +52,77 @@ function renderLikedPage() {
   const box = document.getElementById('liked-list');
   const countEl = document.getElementById('liked-count');
   const playBtn = document.getElementById('play-all-btn');
+  const shuffleBtn = document.getElementById('shuffle-liked-btn');
+  const mosaic = document.getElementById('liked-mosaic');
+  const listLabel = document.getElementById('liked-list-label');
+  const hero = document.getElementById('liked-hero');
 
-  if (countEl) countEl.textContent = favs.length + ' ' + (favs.length === 1 ? 'трек' : 'треков');
-  if (playBtn) playBtn.style.display = favs.length ? '' : 'none';
+  const n = favs.length;
+  if (countEl) {
+    countEl.textContent = n
+      ? (n + ' ' + (n === 1 ? 'трек' : n < 5 ? 'трека' : 'треков') + ' в твоей подборке')
+      : 'Пока пусто — отмечай треки сердечком';
+  }
+  if (playBtn) playBtn.style.display = n ? '' : 'none';
+  if (shuffleBtn) shuffleBtn.style.display = n ? '' : 'none';
+  if (listLabel) listLabel.hidden = !n;
+  if (hero) hero.classList.toggle('is-empty', !n);
+
+  if (mosaic) {
+    const covers = favs.map(f => f.cover).filter(Boolean).slice(0, 10);
+    if (!covers.length) {
+      mosaic.innerHTML = '';
+      mosaic.hidden = true;
+    } else {
+      mosaic.hidden = false;
+      mosaic.innerHTML = covers.map((src, i) =>
+        `<img class="liked-mosaic-cell" src="${src}" alt="" style="--i:${i}" loading="lazy">`
+      ).join('');
+    }
+  }
 
   if (!favs.length) {
-    box.innerHTML = `<div class="search-empty" style="padding:60px 0">
-      <svg viewBox="0 0 24 24" fill="none" width="48" height="48" style="color:var(--text-3);margin-bottom:12px">
-        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/>
-      </svg>
-      <p style="color:var(--text-3)">Добавляй треки в избранное сердечком</p>
+    box.innerHTML = `<div class="liked-empty">
+      <div class="liked-empty-line"></div>
+      <p>Сердечко у трека — и он появится здесь</p>
+      <button class="btn-secondary" style="margin-top:8px;padding:10px 16px" onclick="(window.mrfGo||function(u){location.href=u})('search.html')">Найти музыку</button>
     </div>`;
     return;
   }
 
-  const fake = favs.map(f => ({
-    id: f.id||0, title: f.title,
-    artist: { name: f.artist },
-    album: { cover_medium: f.cover },
-    duration: f.duration||0,
-    preview: f.preview||null
-  }));
+  const fake = favs.map(f => {
+    const primary = { id: f.artistId || null, name: f.artist || '' };
+    const feats = typeof parseFeatNames === 'function' ? parseFeatNames(f.title || '') : [];
+    const artists = typeof uniqArtists === 'function'
+      ? uniqArtists([primary, ...feats.map(n => ({ name: n, id: null }))])
+      : [primary, ...feats.map(n => ({ name: n, id: null }))];
+    return {
+      id: f.id||0, title: f.title,
+      artist: primary,
+      artists,
+      artistId: f.artistId || null,
+      album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
+      duration: f.duration||0,
+      preview: f.preview||null
+    };
+  });
   _src['liked'] = fake;
-  box.innerHTML = `<div class="track-list">${fake.map((t,i) => rowHTML(t,i,'liked')).join('')}</div>`;
+  box.innerHTML = `<div class="track-list liked-track-list">${fake.map((t,i) => rowHTML(t,i,'liked')).join('')}</div>`;
+  if (typeof syncPlayingRows === 'function') syncPlayingRows();
 }
+window.renderLikedPage = renderLikedPage;
 
 function playAllLiked() {
   if (_src['liked']?.length) playFromSrc('liked', 0);
+}
+
+function shuffleLiked() {
+  const tracks = _src['liked'];
+  if (!tracks?.length) return;
+  if (typeof isShuffle !== 'undefined') isShuffle = true;
+  playFromSrc('liked', Math.floor(Math.random() * tracks.length));
+  if (typeof updateShuffleBtn === 'function') updateShuffleBtn();
+  showNotif('Перемешивание включено');
 }
 </script>
 </body>

@@ -21,7 +21,7 @@
         <button class="lib-view-btn" id="lib-view-list" onclick="setLibView('list')" title="Список">
           <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </button>
-        <button class="btn-secondary" style="padding:8px 12px;font-size:12px" onclick="toggleSelectMode()">Выбрать</button>
+        <button type="button" class="btn-secondary lib-select-btn" id="lib-select-btn" onclick="toggleSelectMode()" aria-pressed="false">Выбрать</button>
         <button class="btn-primary" style="padding:8px 16px;font-size:12px" onclick="showCreatePlaylist()">
           <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           Плейлист
@@ -31,12 +31,6 @@
 
     <div class="lib-toolbar">
       <input class="lib-search" id="lib-search" placeholder="Поиск в библиотеке…" oninput="onLibSearch()"/>
-      <select class="lib-sort" id="lib-sort" onchange="onLibSort()">
-        <option value="date">По дате</option>
-        <option value="title">По названию</option>
-        <option value="artist">По исполнителю</option>
-        <option value="duration">По длительности</option>
-      </select>
     </div>
 
     <div class="lib-bulk-bar" id="lib-bulk">
@@ -51,7 +45,7 @@
       <button class="lib-filter active" onclick="switchLibTab('all',this)">Всё</button>
       <button class="lib-filter" onclick="switchLibTab('tracks',this)">Любимые треки</button>
       <button class="lib-filter" onclick="switchLibTab('playlists',this)">Плейлисты</button>
-      <button class="lib-filter" onclick="switchLibTab('albums',this)">Альбомы</button>
+      <button class="lib-filter" onclick="switchLibTab('albums',this)">Альбомы и релизы</button>
       <button class="lib-filter" onclick="switchLibTab('artists',this)">Исполнители</button>
     </div>
 

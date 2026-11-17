@@ -4,7 +4,7 @@
   "description": "MRF — Music Streaming",
   "private": true,
   "scripts": {
-    "dev": "npx serve public",
+    "dev": "npx serve public -l 3000",
     "build": "echo 'Static site, no build step'"
   },
   "devDependencies": {

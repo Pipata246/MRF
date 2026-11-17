@@ -56,12 +56,14 @@ function renderPlaylistsPage() {
     return;
   }
 
-  box.innerHTML = '<div class="lib-grid">' + pls.map(pl => `
-    <div class="lib-card" onclick="location.href='playlist.html?id=${pl.id}'">
+  box.innerHTML = '<div class="lib-grid">' + pls.map(pl => {
+    const href = typeof mrfUrl === 'function' ? mrfUrl('playlist', { id: pl.id }) : `playlist.html?id=${encodeURIComponent(pl.id)}`;
+    return `
+    <div class="lib-card" onclick="(window.mrfGo||function(u){location.href=u})('${href}')">
       ${pl.cover ? `<img src="${pl.cover}" class="lib-card-cover" alt="">` : `<div class="lib-card-cover-placeholder">${noteSVGShared()}</div>`}
       <div class="lib-card-body">
         <div class="lib-card-title">${escHtml(pl.name)}</div>
-        <div class="lib-card-sub">${pl.trackCount} треков</div>
+        <div class="lib-card-sub">${pl.trackCount || pl.tracks?.length || 0} треков</div>
       </div>
       <div class="lib-card-actions">
         <button class="lib-card-btn" onclick="event.stopPropagation();editPlaylistFromList('${pl.id}')" title="Переименовать">
@@ -71,25 +73,30 @@ function renderPlaylistsPage() {
           <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </button>
       </div>
-    </div>`).join('') + '</div>';
+    </div>`;
+  }).join('') + '</div>';
 }
+window.renderPlaylistsPage = renderPlaylistsPage;
 
 function editPlaylistFromList(id) {
-  const pl = Store.getPlaylist(id);
-  if (!pl) return;
-  const name = prompt('Новое название плейлиста:', pl.name);
-  if (!name?.trim()) return;
-  Store.updatePlaylist(id, { name: name.trim() });
-  renderPlaylistsPage();
-  renderSidebarPlaylists();
-  showNotif('Плейлист переименован');
+  if (typeof showRenamePlaylist === 'function') showRenamePlaylist(id);
+  else {
+    const pl = Store.getPlaylist(id);
+    if (!pl) return;
+    const name = window.prompt('Новое название плейлиста:', pl.name);
+    if (!name?.trim()) return;
+    Store.updatePlaylist(id, { name: name.trim() });
+    if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
+    else { renderPlaylistsPage(); renderSidebarPlaylists(); }
+    showNotif('Плейлист переименован');
+  }
 }
 
 function deletePlaylistFromList(id) {
   if (!confirm('Удалить плейлист?')) return;
   Store.deletePlaylist(id);
-  renderPlaylistsPage();
-  renderSidebarPlaylists();
+  if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
+  else { renderPlaylistsPage(); renderSidebarPlaylists(); }
   showNotif('Плейлист удалён');
 }
 </script>

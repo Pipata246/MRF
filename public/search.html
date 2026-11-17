@@ -12,55 +12,68 @@
   <div id="topbar-root"></div>
   <div class="feed" id="feed">
 
-    <div id="search-initial">
-      <div class="search-hero" style="margin-bottom:32px">
-        <h2 style="font-size:28px;font-weight:700;margin-bottom:16px">Поиск</h2>
-        <div class="search-bar-big" id="search-bar-big-wrap">
-          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          <input type="text" id="search-input" placeholder="Введи название трека, артиста или альбома…" autocomplete="off"/>
-          <button class="search-clear hidden" id="search-clear" onclick="clearSearchInput()">
-            <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          </button>
-        </div>
-      </div>
+    <div id="search-initial" class="search-home">
+      <input type="hidden" id="search-input" value=""/>
 
-      <div id="search-history-section" class="section" style="display:none">
+      <header class="search-home-head">
+        <h2 class="search-home-title">Поиск</h2>
+        <p class="search-home-sub">Пиши в поле сверху — результаты появятся здесь</p>
+      </header>
+
+      <section id="search-history-section" class="section search-history-section" style="display:none">
         <div class="section-header">
-          <h3 class="section-title" style="font-size:16px">Последние запросы</h3>
-          <button class="section-link" onclick="clearSearchHistory()">Очистить</button>
+          <h3 class="section-title">Недавние запросы</h3>
+          <button type="button" class="section-link" onclick="clearSearchHistory()">Очистить</button>
         </div>
-        <div id="search-history-list"></div>
-      </div>
+        <div class="search-history-chips" id="search-history-list"></div>
+      </section>
 
-      <div class="section">
-        <div class="section-header"><h3 class="section-title" style="font-size:16px">Жанры</h3></div>
-        <div class="genre-grid">
-          <div class="genre-tile" style="--gc:#EE90B7" onclick="doSearch('pop')">Поп</div>
-          <div class="genre-tile" style="--gc:#e74c3c" onclick="doSearch('rock')">Рок</div>
-          <div class="genre-tile" style="--gc:#9b59b6" onclick="doSearch('hip-hop')">Хип-хоп</div>
-          <div class="genre-tile" style="--gc:#27ae60" onclick="doSearch('electronic')">Электронная</div>
-          <div class="genre-tile" style="--gc:#f39c12" onclick="doSearch('jazz')">Джаз</div>
-          <div class="genre-tile" style="--gc:#e67e22" onclick="doSearch('rnb')">R&amp;B</div>
-          <div class="genre-tile" style="--gc:#1abc9c" onclick="doSearch('indie')">Инди</div>
-          <div class="genre-tile" style="--gc:#c0392b" onclick="doSearch('metal')">Метал</div>
-          <div class="genre-tile" style="--gc:#2980b9" onclick="doSearch('classical')">Классика</div>
-          <div class="genre-tile" style="--gc:#8e44ad" onclick="doSearch('soul')">Soul</div>
+      <section class="section search-vibe-section">
+        <div class="section-header">
+          <h3 class="section-title">Быстрый вайб</h3>
         </div>
-      </div>
+        <div class="search-vibe-row" id="search-vibe-row">
+          <button type="button" class="search-vibe-chip" style="--vibe:#3a2433" onclick="doSearch('love songs')">Любовь</button>
+          <button type="button" class="search-vibe-chip" style="--vibe:#1f322e" onclick="doSearch('night drive')">Ночная дорога</button>
+          <button type="button" class="search-vibe-chip" style="--vibe:#2a3040" onclick="doSearch('workout')">Зал</button>
+          <button type="button" class="search-vibe-chip" style="--vibe:#2e3a48" onclick="doSearch('sad songs')">Тишина</button>
+          <button type="button" class="search-vibe-chip" style="--vibe:#3a2c24" onclick="doSearch('party hits')">Вечеринка</button>
+          <button type="button" class="search-vibe-chip" style="--vibe:#2c2618" onclick="doSearch('focus study')">Фокус</button>
+          <button type="button" class="search-vibe-chip" style="--vibe:#24302c" onclick="doSearch('chill acoustic')">Акустика</button>
+          <button type="button" class="search-vibe-chip" style="--vibe:#332028" onclick="doSearch('summer hits')">Лето</button>
+        </div>
+      </section>
 
-      <div class="section">
-        <div class="section-header"><h3 class="section-title" style="font-size:16px">Популярные запросы</h3></div>
-        <div class="search-popular-tags">
-          <button class="search-tag" onclick="doSearch('The Weeknd')">The Weeknd</button>
-          <button class="search-tag" onclick="doSearch('Taylor Swift')">Taylor Swift</button>
-          <button class="search-tag" onclick="doSearch('Dua Lipa')">Dua Lipa</button>
-          <button class="search-tag" onclick="doSearch('Drake')">Drake</button>
-          <button class="search-tag" onclick="doSearch('Bad Bunny')">Bad Bunny</button>
-          <button class="search-tag" onclick="doSearch('Harry Styles')">Harry Styles</button>
-          <button class="search-tag" onclick="doSearch('Billie Eilish')">Billie Eilish</button>
-          <button class="search-tag" onclick="doSearch('Post Malone')">Post Malone</button>
+      <section class="section search-popular-section">
+        <div class="section-header">
+          <h3 class="section-title">Популярные артисты</h3>
         </div>
-      </div>
+        <div class="search-popular-grid" id="search-popular-grid">
+          <div class="loading-placeholder"><div class="spinner"></div></div>
+        </div>
+      </section>
+
+      <section class="section search-trend-section">
+        <div class="section-header">
+          <h3 class="section-title">Слушают прямо сейчас</h3>
+          <a href="charts.html" class="section-link">Чарт →</a>
+        </div>
+        <div class="search-trend-grid" id="search-trend-grid">
+          <div class="loading-placeholder"><div class="spinner"></div></div>
+        </div>
+      </section>
+
+      <section class="section search-albums-section">
+        <div class="section-header">
+          <h3 class="section-title">Альбомы в фокусе</h3>
+          <div class="rail-nav" data-rail="search-albums-rail"></div>
+        </div>
+        <div class="rail-wrap">
+          <div class="search-albums-rail" id="search-albums-rail">
+            <div class="loading-placeholder"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <div id="search-results-section" style="display:none">
