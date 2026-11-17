@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Чарты — MRF</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div id="sidebar-root"></div>
+<main class="main-content" id="main-content">
+  <div id="topbar-root"></div>
+  <div class="feed" id="feed">
+
+    <div class="charts-header">
+      <div>
+        <h2 class="section-title" style="font-size:28px">Мировые чарты</h2>
+        <p style="color:var(--text-3);font-size:13px;margin-top:4px">Обновляется каждую неделю</p>
+      </div>
+      <div class="charts-periods" style="display:flex;gap:8px">
+        <button class="charts-genre-btn active" id="period-week" onclick="switchPeriod('week',this)">Топ недели</button>
+        <button class="charts-genre-btn" id="period-month" onclick="switchPeriod('month',this)">Топ месяца</button>
+      </div>
+    </div>
+
+    <div class="charts-tabs" id="charts-regions">
+      <button class="charts-tab active" onclick="switchRegion(this,0)">Мировой</button>
+      <button class="charts-tab" onclick="switchRegion(this,1)">Россия</button>
+      <button class="charts-tab" onclick="switchRegion(this,2)">США</button>
+      <button class="charts-tab" onclick="switchRegion(this,3)">Великобритания</button>
+      <button class="charts-tab" onclick="switchRegion(this,4)">Европа</button>
+    </div>
+
+    <div class="charts-genres" id="charts-genres">
+      <button class="charts-genre-btn active" data-genre="all" onclick="switchGenre(this,'all')">Все жанры</button>
+      <button class="charts-genre-btn" data-genre="pop" onclick="switchGenre(this,'pop')">Поп</button>
+      <button class="charts-genre-btn" data-genre="rap" onclick="switchGenre(this,'rap')">Рэп</button>
+      <button class="charts-genre-btn" data-genre="hip-hop" onclick="switchGenre(this,'hip-hop')">Хип-хоп</button>
+      <button class="charts-genre-btn" data-genre="electro" onclick="switchGenre(this,'electro')">Электронная</button>
+      <button class="charts-genre-btn" data-genre="rock" onclick="switchGenre(this,'rock')">Рок</button>
+    </div>
+
+    <div id="charts-list">
+      <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем чарты…</span></div>
+    </div>
+
+    <section class="section" style="margin-top:36px">
+      <div class="section-header"><h2 class="section-title">Быстрорастущие</h2></div>
+      <div id="rising-list"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-header"><h2 class="section-title">Популярные исполнители</h2></div>
+      <div class="artists-grid" id="chart-artists"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-header"><h2 class="section-title">Популярные альбомы</h2></div>
+      <div class="albums-grid" id="chart-albums"></div>
+    </section>
+
+  </div>
+</main>
+<div id="player-root"></div>
+<script src="mock.js"></script>
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="mrf-ready.js"></script>
+<script src="soft-nav.js"></script>
+<script>
+let _regionIdx = 0;
+let _genre = 'all';
+let _period = 'week';
+let _rawCharts = [];
+
+whenDomReady(() => {
+  initShared();
+  loadCharts();
+  loadExtras();
+});
+
+async function loadCharts() {
+  const box = document.getElementById('charts-list');
+  if (box) box.innerHTML = `<div class="loading-placeholder"><div class="spinner"></div><span>Загружаем чарты…</span></div>`;
+  // BACKEND TODO: Получение чартов
+  const region = MOCK.chartRegions[_regionIdx] || MOCK.chartRegions[0];
+  const dzId = region.dzId || 0;
+  const limit = _period === 'month' ? 100 : 50;
+  let all = (await dzArr(`/chart/${dzId}/tracks?limit=${limit}`)).map(normDZ);
+  if (_genre !== 'all') {
+    const q = encodeURIComponent(_genre);
+    const genreTracks = (await dzArr(`/search/track?q=${q}&limit=40`)).map(normDZ);
+    if (genreTracks.length) all = genreTracks;
+  }
+  _rawCharts = all;
+  _src['charts'] = all;
+  renderChartsList(all);
+}
+
+function renderChartsList(all) {
+  const box = document.getElementById('charts-list');
+  if (!box) return;
+  box.innerHTML = all.length
+    ? `<div class="track-list">${all.map((t,i) => rowHTMLChart(t,i)).join('')}</div>`
+    : `<p style="color:var(--text-3)">Не удалось загрузить</p>`;
+}
+
+function rowHTMLChart(t, i) {
+  const cover  = t.album?.cover_medium || '';
+  const fav    = Store.isFav(t.title||'', t.artist?.name||'');
+  const playing= typeof queueIndex !== 'undefined' && queueIndex >= 0 && queue[queueIndex]?.id === t.id;
+  const topCls = i===0?' top-1':i===1?' top-2':i===2?' top-3':'';
+  const delta = i % 5 === 0
+    ? `<span class="track-delta delta-same">—</span>`
+    : (i % 2 === 0
+      ? `<span class="track-delta delta-up">+${(i % 7) + 1}</span>`
+      : `<span class="track-delta delta-down">-${(i % 4) + 1}</span>`);
+  const playIco = `<svg class="play-hover" viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>`;
+  return `
+  <div class="track-item${playing?' playing':''}${topCls}" onclick="playFromSrc('charts',${i})" oncontextmenu="showTrackMenu(event,${i},'charts');return false">
+    <div class="track-num">
+      <span class="num-text">${playing ? '' : (i + 1)}</span>
+      ${playIco}
+    </div>
+    ${delta}
+    ${cover ? `<img class="track-cover" src="${cover}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<div class="track-cover-placeholder">${noteSVGShared()}</div>`}
+    <div class="track-info">
+      <div class="track-title">${escHtml(t.title||'')}</div>
+      <div class="track-artist">${escHtml(t.artist?.name||'')} · ${escHtml(t.album?.title||'')}</div>
+    </div>
+    <div class="track-duration">${fmtDur(t.duration)}</div>
+    <button class="track-like-btn${fav?' liked':''}" onclick="event.stopPropagation();toggleFavChart(${i},this)" title="${fav?'Убрать':'В избранное'}">
+      <svg viewBox="0 0 24 24" fill="${fav?'currentColor':'none'}"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/></svg>
+    </button>
+    <button class="track-menu-btn" onclick="event.stopPropagation();showTrackMenu(event,${i},'charts')" title="Ещё">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+    </button>
+  </div>`;
+}
+
+function toggleFavChart(idx, btn) {
+  const t = _src['charts']?.[idx]; if (!t) return;
+  const added = Store.toggleFav({ id: t.id, title: t.title, artistName: t.artist?.name, cover: t.album?.cover_medium, duration: t.duration, preview: t.preview });
+  btn.classList.toggle('liked', added);
+  btn.querySelector('path')?.setAttribute('fill', added ? 'currentColor' : 'none');
+  updateFavBadge();
+}
+
+function switchRegion(btn, idx) {
+  document.querySelectorAll('.charts-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _regionIdx = idx;
+  loadCharts();
+}
+
+function switchGenre(btn, genre) {
+  document.querySelectorAll('#charts-genres .charts-genre-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _genre = genre;
+  loadCharts();
+}
+
+function switchPeriod(period, btn) {
+  document.querySelectorAll('.charts-periods .charts-genre-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _period = period;
+  loadCharts();
+}
+
+async function loadExtras() {
+  const rising = (await dzArr('/chart/0/tracks?limit=20')).map(normDZ).slice(10, 18);
+  _src['rising'] = rising;
+  const rbox = document.getElementById('rising-list');
+  if (rbox) rbox.innerHTML = rising.length
+    ? `<div class="track-list">${rising.map((t,i) => rowHTML(t,i,'rising')).join('')}</div>`
+    : '';
+
+  const artists = await dzArr('/chart/0/artists?limit=10');
+  const abox = document.getElementById('chart-artists');
+  if (abox) abox.innerHTML = artists.map(a => `
+    <div class="artist-card" onclick="location.href='${mrfUrl('artist',{id:a.id,name:a.name})}'">
+      ${a.picture_medium ? `<img class="artist-img" src="${a.picture_medium}" alt="">` : `<div class="artist-img-placeholder">${(a.name||'?')[0]}</div>`}
+      <div class="artist-name">${escHtml(a.name)}</div>
+    </div>`).join('');
+
+  const albums = await dzArr('/chart/0/albums?limit=10');
+  const albBox = document.getElementById('chart-albums');
+  if (albBox) albBox.innerHTML = albums.map(a => `
+    <div class="album-card" onclick="location.href='${mrfUrl('album',{id:a.id,title:a.title,artist:a.artist?.name||''})}'">
+      ${a.cover_medium ? `<img class="album-cover" src="${a.cover_medium}" alt="">` : `<div class="album-cover-placeholder">${noteSVGShared()}</div>`}
+      <div class="album-body"><div class="album-title">${escHtml(a.title)}</div><div class="album-artist">${escHtml(a.artist?.name||'')}</div></div>
+    </div>`).join('');
+}
+</script>
+</body>
+</html>

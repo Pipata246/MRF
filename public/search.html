@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Поиск — MRF</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div id="sidebar-root"></div>
+<main class="main-content" id="main-content">
+  <div id="topbar-root"></div>
+  <div class="feed" id="feed">
+
+    <div id="search-initial">
+      <div class="search-hero" style="margin-bottom:32px">
+        <h2 style="font-size:28px;font-weight:700;margin-bottom:16px">Поиск</h2>
+        <div class="search-bar-big" id="search-bar-big-wrap">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input type="text" id="search-input" placeholder="Введи название трека, артиста или альбома…" autocomplete="off"/>
+          <button class="search-clear hidden" id="search-clear" onclick="clearSearchInput()">
+            <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="search-history-section" class="section" style="display:none">
+        <div class="section-header">
+          <h3 class="section-title" style="font-size:16px">Последние запросы</h3>
+          <button class="section-link" onclick="clearSearchHistory()">Очистить</button>
+        </div>
+        <div id="search-history-list"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-header"><h3 class="section-title" style="font-size:16px">Жанры</h3></div>
+        <div class="genre-grid">
+          <div class="genre-tile" style="--gc:#EE90B7" onclick="doSearch('pop')">Поп</div>
+          <div class="genre-tile" style="--gc:#e74c3c" onclick="doSearch('rock')">Рок</div>
+          <div class="genre-tile" style="--gc:#9b59b6" onclick="doSearch('hip-hop')">Хип-хоп</div>
+          <div class="genre-tile" style="--gc:#27ae60" onclick="doSearch('electronic')">Электронная</div>
+          <div class="genre-tile" style="--gc:#f39c12" onclick="doSearch('jazz')">Джаз</div>
+          <div class="genre-tile" style="--gc:#e67e22" onclick="doSearch('rnb')">R&amp;B</div>
+          <div class="genre-tile" style="--gc:#1abc9c" onclick="doSearch('indie')">Инди</div>
+          <div class="genre-tile" style="--gc:#c0392b" onclick="doSearch('metal')">Метал</div>
+          <div class="genre-tile" style="--gc:#2980b9" onclick="doSearch('classical')">Классика</div>
+          <div class="genre-tile" style="--gc:#8e44ad" onclick="doSearch('soul')">Soul</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header"><h3 class="section-title" style="font-size:16px">Популярные запросы</h3></div>
+        <div class="search-popular-tags">
+          <button class="search-tag" onclick="doSearch('The Weeknd')">The Weeknd</button>
+          <button class="search-tag" onclick="doSearch('Taylor Swift')">Taylor Swift</button>
+          <button class="search-tag" onclick="doSearch('Dua Lipa')">Dua Lipa</button>
+          <button class="search-tag" onclick="doSearch('Drake')">Drake</button>
+          <button class="search-tag" onclick="doSearch('Bad Bunny')">Bad Bunny</button>
+          <button class="search-tag" onclick="doSearch('Harry Styles')">Harry Styles</button>
+          <button class="search-tag" onclick="doSearch('Billie Eilish')">Billie Eilish</button>
+          <button class="search-tag" onclick="doSearch('Post Malone')">Post Malone</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="search-results-section" style="display:none">
+      <div class="search-tabs" id="search-tabs">
+        <button class="tab-btn active" onclick="switchSearchTab('all',this)">Всё</button>
+        <button class="tab-btn" onclick="switchSearchTab('tracks',this)">Треки</button>
+        <button class="tab-btn" onclick="switchSearchTab('artists',this)">Артисты</button>
+        <button class="tab-btn" onclick="switchSearchTab('albums',this)">Альбомы</button>
+        <button class="tab-btn" onclick="switchSearchTab('playlists',this)">Плейлисты</button>
+      </div>
+      <div id="search-results"></div>
+    </div>
+
+  </div>
+</main>
+<div id="player-root"></div>
+
+<script src="mock.js"></script>
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="mrf-ready.js"></script>
+<script src="soft-nav.js"></script>
+<script src="search-page.js"></script>
+</body>
+</html>

@@ -1,7 +1,6 @@
 /* =====================================================
-   MRF — Mock Data
-   Все демонстрационные данные для frontend.
-   BACKEND TODO: Заменить на реальные API-запросы.
+   MRF — Mock Data v2
+   BACKEND TODO: Заменить все данные на реальные API-запросы
    ===================================================== */
 
 const MOCK = {
@@ -11,155 +10,315 @@ const MOCK = {
   user: {
     id: 'user_demo',
     name: 'Пользователь',
+    username: '@mrf_user',
+    description: 'Любитель хорошей музыки',
     plan: 'MRF Free',
     avatar: null,
     joinedAt: '2024-01-01'
   },
 
+  /* ── Настройки ─────────────────────────────────── */
+  settings: {
+    autoplay: true,
+    shuffleOnPlay: false,
+    quality: 'normal',
+    rememberPosition: true,
+    defaultVolume: 70,
+    notifyReleases: true,
+    notifyPlaylist: false,
+    notifyNews: true,
+    publicPlaylists: false,
+    publicLiked: false,
+    publicActivity: false,
+    accentColor: '#EE90B7',
+    theme: 'dark'
+  },
+
   /* ── Треки ─────────────────────────────────────── */
-  // BACKEND TODO: Получение рекомендаций с сервера
-  recentlyPlayed: [
-    { id: 'm1', title: 'Blinding Lights', artist: { name: 'The Weeknd' }, album: { title: 'After Hours', cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/1a4fb4c9e854cfb7d4d44ba6c0f7c27d/250x250-000000-80-0-0.jpg' }, duration: 200, preview: null },
-    { id: 'm2', title: 'Levitating', artist: { name: 'Dua Lipa' }, album: { title: 'Future Nostalgia', cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/8a63a62bdfd5ca61d3b4c79aa30f0a0a/250x250-000000-80-0-0.jpg' }, duration: 203, preview: null },
-    { id: 'm3', title: 'Stay', artist: { name: 'The Kid LAROI' }, album: { title: 'F*CK LOVE 3', cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/3a52c7b3f06d87d0a6023bcd08d3a99c/250x250-000000-80-0-0.jpg' }, duration: 141, preview: null },
-    { id: 'm4', title: 'Heat Waves', artist: { name: 'Glass Animals' }, album: { title: 'Dreamland', cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/1e6b8fa97e77da7e8e3461af37b7a3e8/250x250-000000-80-0-0.jpg' }, duration: 238, preview: null },
-    { id: 'm5', title: 'As It Was', artist: { name: 'Harry Styles' }, album: { title: "Harry's House", cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/fa0d57c4ccbc6f39cc56d5be9f98b82c/250x250-000000-80-0-0.jpg' }, duration: 167, preview: null },
-    { id: 'm6', title: 'Unholy', artist: { name: 'Sam Smith' }, album: { title: 'Gloria', cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/b8a2ae90b9c97e63c5bd63fd1e8e01fe/250x250-000000-80-0-0.jpg' }, duration: 156, preview: null },
+  tracks: [
+    { id: 't001', title: 'Blinding Lights', artistId: 'a001', artistName: 'The Weeknd', albumId: 'al001', albumTitle: 'After Hours', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1a4fb4c9e854cfb7d4d44ba6c0f7c27d/250x250-000000-80-0-0.jpg', duration: 200, preview: null, year: 2019, genre: 'Pop' },
+    { id: 't002', title: 'Save Your Tears', artistId: 'a001', artistName: 'The Weeknd', albumId: 'al001', albumTitle: 'After Hours', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1a4fb4c9e854cfb7d4d44ba6c0f7c27d/250x250-000000-80-0-0.jpg', duration: 215, preview: null, year: 2020, genre: 'Pop' },
+    { id: 't003', title: 'Levitating', artistId: 'a002', artistName: 'Dua Lipa', albumId: 'al002', albumTitle: 'Future Nostalgia', cover: 'https://e-cdns-images.dzcdn.net/images/cover/8a63a62bdfd5ca61d3b4c79aa30f0a0a/250x250-000000-80-0-0.jpg', duration: 203, preview: null, year: 2020, genre: 'Pop' },
+    { id: 't004', title: "Don't Start Now", artistId: 'a002', artistName: 'Dua Lipa', albumId: 'al002', albumTitle: 'Future Nostalgia', cover: 'https://e-cdns-images.dzcdn.net/images/cover/8a63a62bdfd5ca61d3b4c79aa30f0a0a/250x250-000000-80-0-0.jpg', duration: 183, preview: null, year: 2019, genre: 'Pop' },
+    { id: 't005', title: 'Stay', artistId: 'a003', artistName: 'The Kid LAROI', albumId: 'al003', albumTitle: 'F*CK LOVE 3', cover: 'https://e-cdns-images.dzcdn.net/images/cover/3a52c7b3f06d87d0a6023bcd08d3a99c/250x250-000000-80-0-0.jpg', duration: 141, preview: null, year: 2021, genre: 'Hip-Hop' },
+    { id: 't006', title: 'Heat Waves', artistId: 'a004', artistName: 'Glass Animals', albumId: 'al004', albumTitle: 'Dreamland', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1e6b8fa97e77da7e8e3461af37b7a3e8/250x250-000000-80-0-0.jpg', duration: 238, preview: null, year: 2020, genre: 'Indie' },
+    { id: 't007', title: 'As It Was', artistId: 'a005', artistName: 'Harry Styles', albumId: 'al005', albumTitle: "Harry's House", cover: 'https://e-cdns-images.dzcdn.net/images/cover/fa0d57c4ccbc6f39cc56d5be9f98b82c/250x250-000000-80-0-0.jpg', duration: 167, preview: null, year: 2022, genre: 'Pop' },
+    { id: 't008', title: 'Unholy', artistId: 'a006', artistName: 'Sam Smith', albumId: 'al006', albumTitle: 'Gloria', cover: 'https://e-cdns-images.dzcdn.net/images/cover/b8a2ae90b9c97e63c5bd63fd1e8e01fe/250x250-000000-80-0-0.jpg', duration: 156, preview: null, year: 2022, genre: 'Pop' },
+    { id: 't009', title: 'Flowers', artistId: 'a007', artistName: 'Miley Cyrus', albumId: 'al007', albumTitle: 'Endless Summer Vacation', cover: 'https://e-cdns-images.dzcdn.net/images/cover/9c6e8ed4c0bfbe8b8b24b2b6c55d7de8/250x250-000000-80-0-0.jpg', duration: 200, preview: null, year: 2023, genre: 'Pop' },
+    { id: 't010', title: 'Cruel Summer', artistId: 'a008', artistName: 'Taylor Swift', albumId: 'al008', albumTitle: 'Lover', cover: 'https://e-cdns-images.dzcdn.net/images/cover/4f9f2673c50d47f21cca5bc0e3dbc697/250x250-000000-80-0-0.jpg', duration: 178, preview: null, year: 2019, genre: 'Pop' },
+    { id: 't011', title: 'Anti-Hero', artistId: 'a008', artistName: 'Taylor Swift', albumId: 'al009', albumTitle: 'Midnights', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1b9b2b3f4c5d6e7f8a9b0c1d2e3f4a5b/250x250-000000-80-0-0.jpg', duration: 200, preview: null, year: 2022, genre: 'Pop' },
+    { id: 't012', title: 'Good 4 U', artistId: 'a009', artistName: 'Olivia Rodrigo', albumId: 'al010', albumTitle: 'SOUR', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1a4fb4c9e854cfb7d4d44ba6c0f7c27d/250x250-000000-80-0-0.jpg', duration: 178, preview: null, year: 2021, genre: 'Pop' },
+    { id: 't013', title: 'Montero', artistId: 'a010', artistName: 'Lil Nas X', albumId: 'al011', albumTitle: 'Montero', cover: 'https://e-cdns-images.dzcdn.net/images/cover/8a63a62bdfd5ca61d3b4c79aa30f0a0a/250x250-000000-80-0-0.jpg', duration: 137, preview: null, year: 2021, genre: 'Hip-Hop' },
+    { id: 't014', title: 'Shivers', artistId: 'a011', artistName: 'Ed Sheeran', albumId: 'al012', albumTitle: '=', cover: 'https://e-cdns-images.dzcdn.net/images/cover/fa0d57c4ccbc6f39cc56d5be9f98b82c/250x250-000000-80-0-0.jpg', duration: 207, preview: null, year: 2021, genre: 'Pop' },
+    { id: 't015', title: 'Easy On Me', artistId: 'a012', artistName: 'Adele', albumId: 'al013', albumTitle: '30', cover: 'https://e-cdns-images.dzcdn.net/images/cover/4f9f2673c50d47f21cca5bc0e3dbc697/250x250-000000-80-0-0.jpg', duration: 224, preview: null, year: 2021, genre: 'Pop' },
+    { id: 't016', title: 'Enemy', artistId: 'a013', artistName: 'Imagine Dragons', albumId: 'al014', albumTitle: 'Mercury', cover: 'https://e-cdns-images.dzcdn.net/images/cover/9c6e8ed4c0bfbe8b8b24b2b6c55d7de8/250x250-000000-80-0-0.jpg', duration: 173, preview: null, year: 2021, genre: 'Rock' },
+    { id: 't017', title: 'Industry Baby', artistId: 'a010', artistName: 'Lil Nas X', albumId: 'al011', albumTitle: 'Montero', cover: 'https://e-cdns-images.dzcdn.net/images/cover/8a63a62bdfd5ca61d3b4c79aa30f0a0a/250x250-000000-80-0-0.jpg', duration: 212, preview: null, year: 2021, genre: 'Hip-Hop' },
+    { id: 't018', title: 'Cold Heart', artistId: 'a014', artistName: 'Elton John', albumId: 'al015', albumTitle: 'The Lockdown Sessions', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1b9b2b3f4c5d6e7f8a9b0c1d2e3f4a5b/250x250-000000-80-0-0.jpg', duration: 219, preview: null, year: 2021, genre: 'Pop' },
+    { id: 't019', title: 'Butter', artistId: 'a015', artistName: 'BTS', albumId: 'al016', albumTitle: 'Butter', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1a4fb4c9e854cfb7d4d44ba6c0f7c27d/250x250-000000-80-0-0.jpg', duration: 164, preview: null, year: 2021, genre: 'K-Pop' },
+    { id: 't020', title: 'Peaches', artistId: 'a016', artistName: 'Justin Bieber', albumId: 'al017', albumTitle: 'Justice', cover: 'https://e-cdns-images.dzcdn.net/images/cover/fa0d57c4ccbc6f39cc56d5be9f98b82c/250x250-000000-80-0-0.jpg', duration: 198, preview: null, year: 2021, genre: 'Pop' },
+  ],
+
+  /* ── Исполнители ───────────────────────────────── */
+  artists: [
+    { id: 'a001', name: 'The Weeknd', picture: 'https://e-cdns-images.dzcdn.net/images/artist/4f9f2673c50d47f21cca5bc0e3dbc697/250x250-000000-80-0-0.jpg', fans: 42000000, bio: 'Канадский певец, автор песен и продюсер. Известен своим уникальным стилем, сочетающим R&B, поп и электронику.', genre: 'R&B' },
+    { id: 'a002', name: 'Dua Lipa', picture: 'https://e-cdns-images.dzcdn.net/images/artist/9c6e8ed4c0bfbe8b8b24b2b6c55d7de8/250x250-000000-80-0-0.jpg', fans: 38000000, bio: 'Британская певица и автор песен, покорившая мир своими хитами в стиле поп и диско.', genre: 'Pop' },
+    { id: 'a003', name: 'The Kid LAROI', picture: 'https://e-cdns-images.dzcdn.net/images/artist/9b2cc87ccddc7b75d94c0e4e3a4e3e23/250x250-000000-80-0-0.jpg', fans: 15000000, bio: 'Австралийский рэпер и певец, стремительно завоевавший мировую популярность.', genre: 'Hip-Hop' },
+    { id: 'a004', name: 'Glass Animals', picture: 'https://e-cdns-images.dzcdn.net/images/artist/4f9f2673c50d47f21cca5bc0e3dbc697/250x250-000000-80-0-0.jpg', fans: 12000000, bio: 'Британская инди-поп группа, известная психоделическим звучанием и необычными текстами.', genre: 'Indie' },
+    { id: 'a005', name: 'Harry Styles', picture: 'https://e-cdns-images.dzcdn.net/images/artist/9c6e8ed4c0bfbe8b8b24b2b6c55d7de8/250x250-000000-80-0-0.jpg', fans: 29000000, bio: 'Британский певец, бывший участник One Direction, сольная карьера которого охватывает поп, рок и соул.', genre: 'Pop' },
+    { id: 'a006', name: 'Sam Smith', picture: 'https://e-cdns-images.dzcdn.net/images/artist/4f9f2673c50d47f21cca5bc0e3dbc697/250x250-000000-80-0-0.jpg', fans: 22000000, bio: 'Британский певец, известный своим пронзительным голосом и эмоциональными балладами.', genre: 'Pop' },
+    { id: 'a007', name: 'Miley Cyrus', picture: 'https://e-cdns-images.dzcdn.net/images/artist/9b2cc87ccddc7b75d94c0e4e3a4e3e23/250x250-000000-80-0-0.jpg', fans: 31000000, bio: 'Американская певица и актриса, прошедшая путь от Disney-звезды до рок-иконы.', genre: 'Pop' },
+    { id: 'a008', name: 'Taylor Swift', picture: 'https://e-cdns-images.dzcdn.net/images/artist/9c6e8ed4c0bfbe8b8b24b2b6c55d7de8/250x250-000000-80-0-0.jpg', fans: 65000000, bio: 'Американская певица и автор песен, одна из самых продаваемых музыкальных артистов всех времён.', genre: 'Pop' },
+    { id: 'a009', name: 'Olivia Rodrigo', picture: 'https://e-cdns-images.dzcdn.net/images/artist/4f9f2673c50d47f21cca5bc0e3dbc697/250x250-000000-80-0-0.jpg', fans: 25000000, bio: 'Молодая американская певица, дебютный альбом которой стал культурным феноменом.', genre: 'Pop' },
+    { id: 'a010', name: 'Lil Nas X', picture: 'https://e-cdns-images.dzcdn.net/images/artist/9b2cc87ccddc7b75d94c0e4e3a4e3e23/250x250-000000-80-0-0.jpg', fans: 18000000, bio: 'Американский рэпер и певец, известный провокационным стилем и хитами Old Town Road и Montero.', genre: 'Hip-Hop' },
+  ],
+
+  /* ── Альбомы ───────────────────────────────────── */
+  albums: [
+    { id: 'al001', title: 'After Hours', artistId: 'a001', artistName: 'The Weeknd', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1a4fb4c9e854cfb7d4d44ba6c0f7c27d/250x250-000000-80-0-0.jpg', year: 2020, trackCount: 14, duration: 2860, genre: 'R&B' },
+    { id: 'al002', title: 'Future Nostalgia', artistId: 'a002', artistName: 'Dua Lipa', cover: 'https://e-cdns-images.dzcdn.net/images/cover/8a63a62bdfd5ca61d3b4c79aa30f0a0a/250x250-000000-80-0-0.jpg', year: 2020, trackCount: 11, duration: 2340, genre: 'Pop' },
+    { id: 'al003', title: 'F*CK LOVE 3', artistId: 'a003', artistName: 'The Kid LAROI', cover: 'https://e-cdns-images.dzcdn.net/images/cover/3a52c7b3f06d87d0a6023bcd08d3a99c/250x250-000000-80-0-0.jpg', year: 2021, trackCount: 16, duration: 2200, genre: 'Hip-Hop' },
+    { id: 'al004', title: 'Dreamland', artistId: 'a004', artistName: 'Glass Animals', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1e6b8fa97e77da7e8e3461af37b7a3e8/250x250-000000-80-0-0.jpg', year: 2020, trackCount: 12, duration: 2560, genre: 'Indie' },
+    { id: 'al005', title: "Harry's House", artistId: 'a005', artistName: 'Harry Styles', cover: 'https://e-cdns-images.dzcdn.net/images/cover/fa0d57c4ccbc6f39cc56d5be9f98b82c/250x250-000000-80-0-0.jpg', year: 2022, trackCount: 13, duration: 2220, genre: 'Pop' },
+    { id: 'al008', title: 'Lover', artistId: 'a008', artistName: 'Taylor Swift', cover: 'https://e-cdns-images.dzcdn.net/images/cover/4f9f2673c50d47f21cca5bc0e3dbc697/250x250-000000-80-0-0.jpg', year: 2019, trackCount: 18, duration: 3360, genre: 'Pop' },
+    { id: 'al009', title: 'Midnights', artistId: 'a008', artistName: 'Taylor Swift', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1b9b2b3f4c5d6e7f8a9b0c1d2e3f4a5b/250x250-000000-80-0-0.jpg', year: 2022, trackCount: 13, duration: 2470, genre: 'Pop' },
+    { id: 'al010', title: 'SOUR', artistId: 'a009', artistName: 'Olivia Rodrigo', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1a4fb4c9e854cfb7d4d44ba6c0f7c27d/250x250-000000-80-0-0.jpg', year: 2021, trackCount: 11, duration: 1890, genre: 'Pop' },
+    { id: 'al011', title: 'Montero', artistId: 'a010', artistName: 'Lil Nas X', cover: 'https://e-cdns-images.dzcdn.net/images/cover/8a63a62bdfd5ca61d3b4c79aa30f0a0a/250x250-000000-80-0-0.jpg', year: 2021, trackCount: 15, duration: 2520, genre: 'Hip-Hop' },
   ],
 
   /* ── Плейлисты ─────────────────────────────────── */
-  // BACKEND TODO: Получение плейлистов пользователя
-  playlists: [
-    { id: 'pl1', name: 'Утренний драйв', description: 'Для бодрого начала дня', trackCount: 24, cover: 'https://e-cdns-images.dzcdn.net/images/cover/1a4fb4c9e854cfb7d4d44ba6c0f7c27d/250x250-000000-80-0-0.jpg', createdAt: '2024-03-15', tracks: [] },
-    { id: 'pl2', name: 'Вечерняя атмосфера', description: 'Расслабляющие треки', trackCount: 18, cover: 'https://e-cdns-images.dzcdn.net/images/cover/8a63a62bdfd5ca61d3b4c79aa30f0a0a/250x250-000000-80-0-0.jpg', createdAt: '2024-02-20', tracks: [] },
-    { id: 'pl3', name: 'Тренировка', description: 'Максимальная энергия', trackCount: 32, cover: 'https://e-cdns-images.dzcdn.net/images/cover/fa0d57c4ccbc6f39cc56d5be9f98b82c/250x250-000000-80-0-0.jpg', createdAt: '2024-01-10', tracks: [] },
-  ],
+  playlists: [],
 
-  /* ── Артисты ───────────────────────────────────── */
-  // BACKEND TODO: Получение подписок на артистов
-  followedArtists: [
-    { id: 'a1', name: 'The Weeknd', picture_medium: 'https://e-cdns-images.dzcdn.net/images/artist/4f9f2673c50d47f21cca5bc0e3dbc697/250x250-000000-80-0-0.jpg', nb_fan: 42000000 },
-    { id: 'a2', name: 'Drake', picture_medium: 'https://e-cdns-images.dzcdn.net/images/artist/9c6e8ed4c0bfbe8b8b24b2b6c55d7de8/250x250-000000-80-0-0.jpg', nb_fan: 56000000 },
-    { id: 'a3', name: 'Billie Eilish', picture_medium: 'https://e-cdns-images.dzcdn.net/images/artist/9b2cc87ccddc7b75d94c0e4e3a4e3e23/250x250-000000-80-0-0.jpg', nb_fan: 38000000 },
-    { id: 'a4', name: 'Post Malone', picture_medium: 'https://e-cdns-images.dzcdn.net/images/artist/1b9b2b3f4c5d6e7f8a9b0c1d2e3f4a5b/250x250-000000-80-0-0.jpg', nb_fan: 29000000 },
-  ],
+  /* ── Подписки на артистов ──────────────────────── */
+  followedArtists: [],
 
-  /* ── Рекомендации ──────────────────────────────── */
-  // BACKEND TODO: Персональные рекомендации на основе истории прослушиваний
-  recommendations: [
-    { id: 'r1', title: 'Flowers', artist: { name: 'Miley Cyrus' }, album: { title: 'Endless Summer Vacation', cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/9c6e8ed4c0bfbe8b8b24b2b6c55d7de8/250x250-000000-80-0-0.jpg' }, duration: 200, preview: null },
-    { id: 'r2', title: 'Cruel Summer', artist: { name: 'Taylor Swift' }, album: { title: 'Lover', cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/4f9f2673c50d47f21cca5bc0e3dbc697/250x250-000000-80-0-0.jpg' }, duration: 178, preview: null },
-    { id: 'r3', title: 'Anti-Hero', artist: { name: 'Taylor Swift' }, album: { title: 'Midnights', cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/1b9b2b3f4c5d6e7f8a9b0c1d2e3f4a5b/250x250-000000-80-0-0.jpg' }, duration: 200, preview: null },
-    { id: 'r4', title: 'Montero', artist: { name: 'Lil Nas X' }, album: { title: 'Montero', cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/8a63a62bdfd5ca61d3b4c79aa30f0a0a/250x250-000000-80-0-0.jpg' }, duration: 137, preview: null },
-    { id: 'r5', title: 'Industry Baby', artist: { name: 'Lil Nas X' }, album: { title: 'Montero', cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/fa0d57c4ccbc6f39cc56d5be9f98b82c/250x250-000000-80-0-0.jpg' }, duration: 212, preview: null },
-    { id: 'r6', title: 'Good 4 U', artist: { name: 'Olivia Rodrigo' }, album: { title: 'SOUR', cover_medium: 'https://e-cdns-images.dzcdn.net/images/cover/1a4fb4c9e854cfb7d4d44ba6c0f7c27d/250x250-000000-80-0-0.jpg' }, duration: 178, preview: null },
-  ],
-
-  /* ── Новинки ───────────────────────────────────── */
-  // BACKEND TODO: Получение новых релизов
-  newReleases: [
-    { id: 'nr1', title: 'New Album 1', artist: 'Artist One', cover: 'https://e-cdns-images.dzcdn.net/images/cover/9c6e8ed4c0bfbe8b8b24b2b6c55d7de8/250x250-000000-80-0-0.jpg', year: 2026, type: 'album' },
-    { id: 'nr2', title: 'Single Drop', artist: 'Artist Two', cover: 'https://e-cdns-images.dzcdn.net/images/cover/4f9f2673c50d47f21cca5bc0e3dbc697/250x250-000000-80-0-0.jpg', year: 2026, type: 'single' },
-    { id: 'nr3', title: 'Fresh Beats', artist: 'Artist Three', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1b9b2b3f4c5d6e7f8a9b0c1d2e3f4a5b/250x250-000000-80-0-0.jpg', year: 2026, type: 'album' },
-    { id: 'nr4', title: 'Deep Cuts', artist: 'Artist Four', cover: 'https://e-cdns-images.dzcdn.net/images/cover/8a63a62bdfd5ca61d3b4c79aa30f0a0a/250x250-000000-80-0-0.jpg', year: 2026, type: 'ep' },
-    { id: 'nr5', title: 'Neon Lights', artist: 'Artist Five', cover: 'https://e-cdns-images.dzcdn.net/images/cover/fa0d57c4ccbc6f39cc56d5be9f98b82c/250x250-000000-80-0-0.jpg', year: 2026, type: 'album' },
-    { id: 'nr6', title: 'Midnight Run', artist: 'Artist Six', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1a4fb4c9e854cfb7d4d44ba6c0f7c27d/250x250-000000-80-0-0.jpg', year: 2026, type: 'single' },
-  ],
-
-  /* ── Настроения ────────────────────────────────── */
-  // BACKEND TODO: Получение подборок по настроению
-  moods: [
-    { id: 'mood1', name: 'Для работы', tag: 'focus work', color: '#6C63FF', icon: '<path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' },
-    { id: 'mood2', name: 'Расслабиться', tag: 'chill relax', color: '#43B89C', icon: '<path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" stroke="currentColor" stroke-width="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' },
-    { id: 'mood3', name: 'Тренировка', tag: 'workout sport', color: '#FF6B6B', icon: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11M5 12h2m10 0h2M12 5v2m0 10v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' },
-    { id: 'mood4', name: 'Вечеринка', tag: 'party dance', color: '#F7B731', icon: '<polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2" stroke="currentColor" stroke-width="1.8" fill="none"/>' },
-    { id: 'mood5', name: 'Грустить', tag: 'sad emotional', color: '#778CA3', icon: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" stroke="currentColor" stroke-width="1.8" fill="none"/>' },
-    { id: 'mood6', name: 'Утро', tag: 'morning acoustic', color: '#FD9644', icon: '<circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2m0 16v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M2 12h2m16 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' },
-  ],
-
-  /* ── Чарты mock ────────────────────────────────── */
+  /* ── Чарты ─────────────────────────────────────── */
   // BACKEND TODO: Получение чартов по регионам
-  chartRegions: ['Мировой', 'Россия', 'США', 'Великобритания', 'Европа'],
-  chartPeriods: ['За неделю', 'За месяц', 'За год'],
+  chartRegions: [
+    { id: 0, label: 'Мировой', dzId: 0 },
+    { id: 1, label: 'Россия', dzId: 116 },
+    { id: 2, label: 'США', dzId: 23 },
+    { id: 3, label: 'Великобритания', dzId: 1316 },
+    { id: 4, label: 'Европа', dzId: 0 },
+  ],
+  chartPeriods: ['За неделю', 'За месяц'],
   chartGenres: ['Все жанры', 'Поп', 'Рэп', 'Хип-хоп', 'Электронная', 'Рок'],
+
+  /* ── Настроения / Жанровые подборки ───────────── */
+  moods: [
+    { id: 'mood1', name: 'Для работы',    tag: 'focus work',       color: '#6C63FF' },
+    { id: 'mood2', name: 'Расслабиться',  tag: 'chill relax',      color: '#43B89C' },
+    { id: 'mood3', name: 'Тренировка',    tag: 'workout sport',    color: '#FF6B6B' },
+    { id: 'mood4', name: 'Вечеринка',     tag: 'party dance',      color: '#F7B731' },
+    { id: 'mood5', name: 'Грустить',      tag: 'sad emotional',    color: '#778CA3' },
+    { id: 'mood6', name: 'Утро',          tag: 'morning acoustic', color: '#FD9644' },
+  ],
+
+  /* ── История поиска ────────────────────────────── */
+  searchHistory: [],
 };
 
-/* ── Helpers ──────────────────────────────────────── */
+/* ══════════════════════════════════
+   STORAGE — единый механизм
+══════════════════════════════════ */
+const Store = {
+  keys: {
+    favs:      'mrf_favs',
+    playlists: 'mrf_playlists',
+    followed:  'mrf_followed',
+    recent:    'mrf_recent',
+    profile:   'mrf_profile',
+    settings:  'mrf_settings',
+    history:   'mrf_search_history',
+    queue:     'mrf_queue',
+    player:    'mrf_player',
+    albums:    'mrf_albums',
+    panel:     'mrf_right_panel',
+  },
+
+  _get(key, def) {
+    try {
+      const v = localStorage.getItem(key);
+      return v ? JSON.parse(v) : def;
+    } catch { return def; }
+  },
+
+  _set(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+  },
+
+  /* Избранное */
+  getFavs()       { return this._get(this.keys.favs, []); },
+  setFavs(v)      { this._set(this.keys.favs, v); },
+  isFav(title, artist) {
+    return this.getFavs().some(f => f.title === title && f.artist === artist);
+  },
+  toggleFav(track) {
+    let favs = this.getFavs();
+    const key = { title: track.title, artist: track.artistName || track.artist?.name || track.artist || '' };
+    const exists = favs.some(f => f.title === key.title && f.artist === key.artist);
+    if (exists) {
+      favs = favs.filter(f => !(f.title === key.title && f.artist === key.artist));
+    } else {
+      favs.push({
+        id: track.id, title: track.title,
+        artist: key.artist,
+        cover: track.cover || track.album?.cover_medium || '',
+        duration: track.duration || 0,
+        preview: track.preview || null,
+        addedAt: Date.now()
+      });
+    }
+    this.setFavs(favs);
+    return !exists;
+  },
+
+  /* Плейлисты */
+  getPlaylists()  { return this._get(this.keys.playlists, []); },
+  setPlaylists(v) { this._set(this.keys.playlists, v); MOCK.playlists = v; },
+  createPlaylist(name, desc = '') {
+    const pl = {
+      id: 'pl_' + Date.now(),
+      name, description: desc,
+      cover: null, trackCount: 0,
+      createdAt: Date.now(), tracks: []
+    };
+    const pls = this.getPlaylists();
+    pls.unshift(pl);
+    this.setPlaylists(pls);
+    return pl;
+  },
+  updatePlaylist(id, data) {
+    const pls = this.getPlaylists().map(p => p.id === id ? { ...p, ...data } : p);
+    this.setPlaylists(pls);
+  },
+  deletePlaylist(id) {
+    this.setPlaylists(this.getPlaylists().filter(p => p.id !== id));
+  },
+  addTrackToPlaylist(playlistId, track) {
+    const pls = this.getPlaylists();
+    const pl = pls.find(p => p.id === playlistId);
+    if (!pl) return;
+    if (!pl.tracks.some(t => t.id === track.id)) {
+      pl.tracks.push({ ...track, addedAt: Date.now() });
+      pl.trackCount = pl.tracks.length;
+      if (!pl.cover && (track.cover || track.album?.cover_medium))
+        pl.cover = track.cover || track.album?.cover_medium;
+    }
+    this.setPlaylists(pls);
+  },
+  removeTrackFromPlaylist(playlistId, trackId) {
+    const pls = this.getPlaylists();
+    const pl = pls.find(p => p.id === playlistId);
+    if (!pl) return;
+    pl.tracks = pl.tracks.filter(t => t.id !== trackId);
+    pl.trackCount = pl.tracks.length;
+    this.setPlaylists(pls);
+  },
+  getPlaylist(id) { return this.getPlaylists().find(p => p.id === id); },
+
+  /* Подписки */
+  getFollowed()   { return this._get(this.keys.followed, []); },
+  setFollowed(v)  { this._set(this.keys.followed, v); },
+  isFollowing(id) { return this.getFollowed().some(a => a.id === String(id)); },
+  toggleFollow(artist) {
+    let arr = this.getFollowed();
+    const id = String(artist.id || artist.deezerId || '');
+    const exists = arr.some(a => a.id === id);
+    if (exists) arr = arr.filter(a => a.id !== id);
+    else arr.unshift({ id, name: artist.name, picture: artist.picture || artist.picture_medium || '', fans: artist.nb_fan || artist.fans || 0 });
+    this.setFollowed(arr);
+    return !exists;
+  },
+
+  /* Недавно прослушанное */
+  getRecent()     { return this._get(this.keys.recent, []); },
+  addRecent(track) {
+    let arr = this.getRecent();
+    arr = arr.filter(t => t.id !== track.id);
+    arr.unshift({ id: track.id, title: track.title, artist: track.artistName || track.artist?.name || '', cover: track.cover || track.album?.cover_medium || '', addedAt: Date.now() });
+    if (arr.length > 20) arr = arr.slice(0, 20);
+    this._set(this.keys.recent, arr);
+  },
+
+  /* Профиль */
+  getProfile()    { return { ...MOCK.user, ...this._get(this.keys.profile, {}) }; },
+  setProfile(v)   { this._set(this.keys.profile, v); },
+
+  /* Настройки */
+  getSettings()   { return { ...MOCK.settings, ...this._get(this.keys.settings, {}) }; },
+  setSettings(v)  { this._set(this.keys.settings, { ...this.getSettings(), ...v }); },
+
+  /* История поиска */
+  getHistory()    { return this._get(this.keys.history, []); },
+  addHistory(q)   {
+    if (!q?.trim()) return;
+    let arr = this.getHistory().filter(h => h !== q.trim());
+    arr.unshift(q.trim());
+    if (arr.length > 20) arr = arr.slice(0, 20);
+    this._set(this.keys.history, arr);
+  },
+  clearHistory()  { this._set(this.keys.history, []); },
+
+  /* Очередь и плеер */
+  getQueue()      { return this._get(this.keys.queue, { queue: [], index: -1 }); },
+  setQueue(queue, index) { this._set(this.keys.queue, { queue, index }); },
+  getPlayerState(){ return this._get(this.keys.player, { volume: 70, muted: false }); },
+  setPlayerState(v){ this._set(this.keys.player, { ...this.getPlayerState(), ...v }); },
+
+  /* Сохранённые альбомы */
+  getAlbums() { return this._get(this.keys.albums, []); },
+  setAlbums(v){ this._set(this.keys.albums, v); },
+  isAlbumSaved(id) { return this.getAlbums().some(a => String(a.id) === String(id)); },
+  toggleAlbum(album) {
+    let arr = this.getAlbums();
+    const id = String(album.id);
+    const exists = arr.some(a => String(a.id) === id);
+    if (exists) arr = arr.filter(a => String(a.id) !== id);
+    else arr.unshift({
+      id: album.id,
+      title: album.title || album.name || '',
+      artistName: album.artistName || album.artist?.name || '',
+      cover: album.cover || album.cover_medium || album.album?.cover_medium || '',
+      year: album.year || album.release_date || '',
+      trackCount: album.trackCount || album.nb_tracks || 0,
+      savedAt: Date.now()
+    });
+    this.setAlbums(arr);
+    return !exists;
+  },
+
+  /* Правая панель */
+  getPanelState() { return this._get(this.keys.panel, { open: false, tab: 'now' }); },
+  setPanelState(v){ this._set(this.keys.panel, { ...this.getPanelState(), ...v }); },
+
+  /* Сброс */
+  reset() {
+    Object.values(this.keys).forEach(k => localStorage.removeItem(k));
+    MOCK.playlists = [];
+    MOCK.followedArtists = [];
+  }
+};
+
+/* ── Инициализация ──────────────────────────────── */
+(function initStore() {
+  MOCK.playlists       = Store.getPlaylists();
+  MOCK.followedArtists = Store.getFollowed();
+  MOCK.searchHistory   = Store.getHistory();
+})();
+
+/* ── Утилиты ────────────────────────────────────── */
+function mockGetTrack(id)   { return MOCK.tracks.find(t => t.id === id); }
+function mockGetArtist(id)  { return MOCK.artists.find(a => a.id === id); }
+function mockGetAlbum(id)   { return MOCK.albums.find(a => a.id === id); }
+function mockGetAlbumTracks(albumId) { return MOCK.tracks.filter(t => t.albumId === albumId); }
+function mockGetArtistTracks(artistId) { return MOCK.tracks.filter(t => t.artistId === artistId); }
+function mockGetArtistAlbums(artistId) { return MOCK.albums.filter(a => a.artistId === artistId); }
 
 // BACKEND TODO: Создание нового плейлиста
-function mockCreatePlaylist(name) {
-  const pl = {
-    id: 'pl_' + Date.now(),
-    name,
-    description: '',
-    trackCount: 0,
-    cover: null,
-    createdAt: new Date().toISOString().split('T')[0],
-    tracks: []
-  };
-  MOCK.playlists.unshift(pl);
-  savePlaylists();
-  return pl;
-}
-
+function mockCreatePlaylist(name, desc) { return Store.createPlaylist(name, desc); }
 // BACKEND TODO: Удаление плейлиста
-function mockDeletePlaylist(id) {
-  MOCK.playlists = MOCK.playlists.filter(p => p.id !== id);
-  savePlaylists();
-}
-
+function mockDeletePlaylist(id) { Store.deletePlaylist(id); }
 // BACKEND TODO: Добавление трека в плейлист
-function mockAddToPlaylist(playlistId, track) {
-  const pl = MOCK.playlists.find(p => p.id === playlistId);
-  if (!pl) return;
-  if (!pl.tracks.some(t => t.id === track.id)) {
-    pl.tracks.push(track);
-    pl.trackCount = pl.tracks.length;
-    if (!pl.cover && track.album?.cover_medium) pl.cover = track.album.cover_medium;
-    savePlaylists();
-  }
-}
-
+function mockAddToPlaylist(playlistId, track) { Store.addTrackToPlaylist(playlistId, track); }
 // BACKEND TODO: Удаление трека из плейлиста
-function mockRemoveFromPlaylist(playlistId, trackId) {
-  const pl = MOCK.playlists.find(p => p.id === playlistId);
-  if (!pl) return;
-  pl.tracks = pl.tracks.filter(t => t.id !== trackId);
-  pl.trackCount = pl.tracks.length;
-  savePlaylists();
-}
-
-function savePlaylists() {
-  localStorage.setItem('mrf_playlists', JSON.stringify(MOCK.playlists));
-}
-
-function loadPlaylists() {
-  const saved = localStorage.getItem('mrf_playlists');
-  if (saved) MOCK.playlists = JSON.parse(saved);
-}
-
-// подписка на артиста (toggle)
-function mockToggleFollowArtist(artist) {
-  const idx = MOCK.followedArtists.findIndex(a => a.id === String(artist.id));
-  if (idx >= 0) {
-    MOCK.followedArtists.splice(idx, 1);
-  } else {
-    MOCK.followedArtists.unshift({ id: String(artist.id), name: artist.name, picture_medium: artist.picture_medium || '', nb_fan: artist.nb_fan || 0 });
-  }
-  localStorage.setItem('mrf_followed', JSON.stringify(MOCK.followedArtists));
-}
-
-function isFollowingArtist(artistId) {
-  return MOCK.followedArtists.some(a => a.id === String(artistId));
-}
-
-function loadFollowed() {
-  const saved = localStorage.getItem('mrf_followed');
-  if (saved) MOCK.followedArtists = JSON.parse(saved);
-}
-
-// Инициализация mock при загрузке
-(function initMock() {
-  loadPlaylists();
-  loadFollowed();
-})();
+function mockRemoveFromPlaylist(playlistId, trackId) { Store.removeTrackFromPlaylist(playlistId, trackId); }

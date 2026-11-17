@@ -1,432 +1,342 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MRF</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MRF — Главная</title>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-
-<!-- ===================== SIDEBAR ===================== -->
-<aside class="sidebar" id="sidebar">
-  <div class="logo" id="sidebar-logo" onclick="showPage('home', document.querySelector('[data-page=home]'))" style="cursor:pointer">
-    <img src="img/logo.png" alt="MRF" class="logo-img" />
-    <span class="logo-brand">Make Russia Free</span>
-    <button class="sidebar-collapse-btn" onclick="event.stopPropagation();toggleSidebar()" title="Свернуть">
-      <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-        <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/>
-        <path d="M9 3v18" stroke="currentColor" stroke-width="1.8"/>
-        <path d="M12 9l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </button>
-  </div>
-  <div class="logo-collapsed hidden" id="logo-collapsed">
-    <button class="sidebar-expand-btn" onclick="toggleSidebar()" title="Развернуть">
-      <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-        <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/>
-        <path d="M9 3v18" stroke="currentColor" stroke-width="1.8"/>
-        <path d="M12 9l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </button>
-  </div>
-
-  <nav class="nav">
-    <a href="#" class="nav-item active" data-page="home" onclick="showPage('home', this); return false">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M3 12L12 3L21 12V20H15V14H9V20H3V12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-      <span class="nav-label">Главная</span>
-    </a>
-    <a href="#" class="nav-item" data-page="search" onclick="showPage('search', this); return false">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      <span class="nav-label">Поиск</span>
-    </a>
-    <a href="#" class="nav-item" data-page="charts" onclick="showPage('charts', this); return false">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span class="nav-label">Чарты</span>
-    </a>
-    <a href="#" class="nav-item" data-page="library" onclick="showFavourites(); return false">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M9 18V6l12-3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="15" r="3" stroke="currentColor" stroke-width="1.8"/></svg>
-      <span class="nav-label">Моя библиотека</span>
-      <span class="nav-badge" id="fav-count">0</span>
-    </a>
-    <div class="nav-divider"></div>
-    <div class="nav-section-title">Мне нравится</div>
-    <div class="nav-placeholder">
-      <span>Плейлисты, артисты<br/>и подписки появятся здесь</span>
-    </div>
-  </nav>
-
-  <div class="sidebar-user">
-    <div class="user-avatar">П</div>
-    <div class="user-info">
-      <span class="user-name">Пользователь</span>
-      <span class="user-plan">MRF Free</span>
-    </div>
-  </div>
-</aside>
-
-<!-- ===================== MAIN ===================== -->
+<div id="sidebar-root"></div>
 <main class="main-content">
-
-  <!-- TOPBAR -->
-  <header class="topbar">
-    <div class="topbar-nav">
-      <button class="topbar-btn" id="btn-nav-back" onclick="historyBack()" title="Назад" style="opacity:0.3">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
-      <button class="topbar-btn" id="btn-nav-fwd" onclick="historyFwd()" title="Вперёд" style="opacity:0.3">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
-    </div>
-
-    <div class="topbar-search" id="topbar-search-box">
-      <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      <input type="text" id="main-search-input" placeholder="Артист, трек, альбом…" autocomplete="off" />
-      <span class="search-clear" id="search-clear" onclick="clearSearch()" style="display:none">✕</span>
-    </div>
-
-    <div class="topbar-actions">
-      <button class="btn-premium" onclick="alert('MRF+ скоро!')">MRF+</button>
-      <div class="topbar-avatar" title="MRF">М</div>
-    </div>
-  </header>
-
-  <!-- ============ PAGES ============ -->
+  <div id="topbar-root"></div>
   <div class="feed" id="feed">
 
-    <!-- === PAGE: HOME === -->
-    <div class="page" id="page-home">
-
-      <!-- Hero -->
-      <section class="hero-section">
-        <div class="hero-info">
-          <span class="hero-tag">Добро пожаловать</span>
-          <h1 class="hero-title">Слушай музыку<br/><span>без границ</span></h1>
-          <p class="hero-desc">Миллионы треков, персональные рекомендации и чарты — всё в одном месте</p>
-          <div class="hero-actions">
-            <button class="btn-primary" onclick="showPage('search', document.querySelector('[data-page=search]')); setTimeout(()=>document.getElementById('main-search-input').focus(),100)">
-              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-              Найти музыку
-            </button>
-            <button class="btn-secondary" onclick="showPage('charts', document.querySelector('[data-page=charts]'))">Мировые чарты →</button>
-          </div>
-        </div>
-        <div class="hero-visual">
-          <div class="hero-disc">
-            <svg viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="48" fill="#111" stroke="#EE90B7" stroke-width="1.5"/>
-              <circle cx="50" cy="50" r="32" fill="#0a0a0a"/>
-              <circle cx="50" cy="50" r="16" fill="#EE90B722" stroke="#EE90B7" stroke-width="1"/>
-              <circle cx="50" cy="50" r="5" fill="#EE90B7"/>
-            </svg>
-          </div>
-        </div>
-      </section>
-
-      <!-- Быстрый доступ — недавно прослушанное -->
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">Недавно прослушанное</h2>
-          <button class="section-link" onclick="showFavourites()">Вся библиотека →</button>
-        </div>
-        <div class="quick-access-grid" id="recent-grid"></div>
-      </section>
-
-      <!-- Настроения -->
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">Музыка для настроения</h2>
-        </div>
-        <div class="mood-grid" id="mood-grid"></div>
-      </section>
-
-      <!-- Рекомендации -->
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">Рекомендовано для вас</h2>
-          <span class="section-subtitle">На основе ваших прослушиваний</span>
-        </div>
-        <div class="horiz-scroll-wrap">
-          <div class="horiz-scroll" id="recommendations-row"></div>
-        </div>
-      </section>
-
-      <!-- Мировые чарты превью -->
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">Мировые чарты</h2>
-          <button class="section-link" onclick="showPage('charts', document.querySelector('[data-page=charts]'))">Все треки →</button>
-        </div>
-        <div id="home-charts-list" class="track-list">
-          <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем чарты…</span></div>
-        </div>
-      </section>
-
-      <!-- Жанры -->
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">Жанры</h2>
-        </div>
-        <div class="genre-grid">
-          <div class="genre-tile" style="--gc:#EE90B7" onclick="searchByTag('pop')">Поп</div>
-          <div class="genre-tile" style="--gc:#e74c3c" onclick="searchByTag('rock')">Рок</div>
-          <div class="genre-tile" style="--gc:#9b59b6" onclick="searchByTag('hip-hop')">Хип-хоп</div>
-          <div class="genre-tile" style="--gc:#27ae60" onclick="searchByTag('electronic')">Электронная</div>
-          <div class="genre-tile" style="--gc:#f39c12" onclick="searchByTag('jazz')">Джаз</div>
-          <div class="genre-tile" style="--gc:#e67e22" onclick="searchByTag('rnb')">R&B</div>
-          <div class="genre-tile" style="--gc:#1abc9c" onclick="searchByTag('indie')">Инди</div>
-          <div class="genre-tile" style="--gc:#c0392b" onclick="searchByTag('metal')">Метал</div>
-          <div class="genre-tile" style="--gc:#2980b9" onclick="searchByTag('classical')">Классика</div>
-          <div class="genre-tile" style="--gc:#8e44ad" onclick="searchByTag('soul')">Soul</div>
-        </div>
-      </section>
-
-      <!-- Новинки -->
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">Новинки недели</h2>
-        </div>
-        <div class="horiz-scroll-wrap">
-          <div class="horiz-scroll" id="new-releases-row"></div>
-        </div>
-      </section>
-
-    </div>
-
-    <!-- === PAGE: SEARCH === -->
-    <div class="page hidden" id="page-search">
-      <div class="search-hero">
-        <h2>Поиск</h2>
-        <div class="search-bar-big">
-          <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          <input type="text" id="big-search-input" placeholder="Введи название трека или артиста…" autocomplete="off" />
+    <!-- Hero -->
+    <section class="hero-section">
+      <div class="hero-info">
+        <span class="hero-tag">Добро пожаловать</span>
+        <h1 class="hero-title">Слушай музыку<br/><span>без границ</span></h1>
+        <p class="hero-desc">Миллионы треков, персональные рекомендации и чарты — всё в одном месте</p>
+        <div class="hero-actions">
+          <button class="btn-primary" onclick="location.href='search.html'">
+            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            Найти музыку
+          </button>
+          <button class="btn-secondary" onclick="location.href='charts.html'">Мировые чарты →</button>
         </div>
       </div>
-      <div id="search-tabs" class="search-tabs hidden">
-        <button class="tab-btn active" onclick="switchTab('tracks')">Треки</button>
-        <button class="tab-btn" onclick="switchTab('artists')">Артисты</button>
-        <button class="tab-btn" onclick="switchTab('albums')">Альбомы</button>
-      </div>
-      <div id="search-results" class="search-results">
-        <div class="search-empty">
-          <svg viewBox="0 0 24 24" fill="none" width="64" height="64"><circle cx="11" cy="11" r="7" stroke="#EE90B7" stroke-width="1.5"/><path d="M20 20L16.5 16.5" stroke="#EE90B7" stroke-width="1.5" stroke-linecap="round"/></svg>
-          <p>Начни вводить название трека или артиста</p>
+      <div class="hero-visual">
+        <div class="hero-disc">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="48" fill="#111" stroke="#EE90B7" stroke-width="1.5"/>
+            <circle cx="50" cy="50" r="32" fill="#0a0a0a"/>
+            <circle cx="50" cy="50" r="16" fill="#EE90B722" stroke="#EE90B7" stroke-width="1"/>
+            <circle cx="50" cy="50" r="5" fill="#EE90B7"/>
+          </svg>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- === PAGE: CHARTS === -->
-    <div class="page hidden" id="page-charts">
-      <div class="charts-header">
-        <div>
-          <h2 class="section-title" style="font-size:28px">Мировые чарты</h2>
-          <p style="color:var(--text-3);font-size:13px;margin-top:4px">Обновляется каждую неделю</p>
-        </div>
+    <!-- Недавно прослушанное -->
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">Недавно прослушанное</h2>
+        <a href="library.html" class="section-link">Вся библиотека →</a>
       </div>
-
-      <!-- Регионы -->
-      <div class="charts-tabs" id="charts-regions">
-        <button class="charts-tab active" onclick="switchChartRegion(this, 0)">Мировой</button>
-        <button class="charts-tab" onclick="switchChartRegion(this, 1)">Россия</button>
-        <button class="charts-tab" onclick="switchChartRegion(this, 2)">США</button>
-        <button class="charts-tab" onclick="switchChartRegion(this, 3)">Великобритания</button>
-        <button class="charts-tab" onclick="switchChartRegion(this, 4)">Европа</button>
+      <div class="quick-access-grid" id="recent-grid">
+        <div class="loading-placeholder"><div class="spinner"></div></div>
       </div>
+    </section>
 
-      <!-- Жанры -->
-      <div class="charts-genres" id="charts-genres">
-        <button class="charts-genre-btn active" onclick="switchChartGenre(this)">Все жанры</button>
-        <button class="charts-genre-btn" onclick="switchChartGenre(this)">Поп</button>
-        <button class="charts-genre-btn" onclick="switchChartGenre(this)">Рэп</button>
-        <button class="charts-genre-btn" onclick="switchChartGenre(this)">Хип-хоп</button>
-        <button class="charts-genre-btn" onclick="switchChartGenre(this)">Электронная</button>
-        <button class="charts-genre-btn" onclick="switchChartGenre(this)">Рок</button>
+    <!-- Музыка для настроения -->
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">Музыка для настроения</h2>
       </div>
+      <div class="mood-grid" id="mood-grid"></div>
+    </section>
 
-      <div id="charts-list" class="track-list">
+    <!-- Мировые чарты -->
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">Мировые чарты</h2>
+        <a href="charts.html" class="section-link">Все треки →</a>
+      </div>
+      <div id="home-charts-list">
         <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем чарты…</span></div>
       </div>
-    </div>
+    </section>
 
-    <!-- === PAGE: LIBRARY === -->
-    <div class="page hidden" id="page-library">
-      <div class="library-header">
-        <h2 class="section-title">Моя библиотека</h2>
-        <div class="library-controls">
-          <button class="lib-view-btn active" id="lib-view-grid" onclick="setLibView('grid')" title="Сетка">
-            <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/></svg>
-          </button>
-          <button class="lib-view-btn" id="lib-view-list" onclick="setLibView('list')" title="Список">
-            <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          </button>
-          <button class="btn-primary" style="padding:8px 16px;font-size:12px" onclick="showCreatePlaylist()">
-            <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            Создать плейлист
-          </button>
-        </div>
+    <!-- Жанры -->
+    <section class="section">
+      <div class="section-header"><h2 class="section-title">Жанры</h2></div>
+      <div class="genre-grid">
+        <div class="genre-tile" style="--gc:#EE90B7" onclick="goSearch('pop')">Поп</div>
+        <div class="genre-tile" style="--gc:#e74c3c" onclick="goSearch('rock')">Рок</div>
+        <div class="genre-tile" style="--gc:#9b59b6" onclick="goSearch('hip-hop')">Хип-хоп</div>
+        <div class="genre-tile" style="--gc:#27ae60" onclick="goSearch('electronic')">Электронная</div>
+        <div class="genre-tile" style="--gc:#f39c12" onclick="goSearch('jazz')">Джаз</div>
+        <div class="genre-tile" style="--gc:#e67e22" onclick="goSearch('rnb')">R&amp;B</div>
+        <div class="genre-tile" style="--gc:#1abc9c" onclick="goSearch('indie')">Инди</div>
+        <div class="genre-tile" style="--gc:#c0392b" onclick="goSearch('metal')">Метал</div>
+        <div class="genre-tile" style="--gc:#2980b9" onclick="goSearch('classical')">Классика</div>
+        <div class="genre-tile" style="--gc:#8e44ad" onclick="goSearch('soul')">Soul</div>
       </div>
+    </section>
 
-      <!-- Фильтры -->
-      <div class="lib-filters">
-        <button class="lib-filter active" onclick="switchLibTab('all', this)">Всё</button>
-        <button class="lib-filter" onclick="switchLibTab('playlists', this)">Плейлисты</button>
-        <button class="lib-filter" onclick="switchLibTab('tracks', this)">Любимые треки</button>
-        <button class="lib-filter" onclick="switchLibTab('artists', this)">Исполнители</button>
-        <button class="lib-filter" onclick="switchLibTab('albums', this)">Альбомы</button>
+    <!-- Для вас -->
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">Для вас</h2>
+        <a href="search.html" class="section-link">Ещё →</a>
       </div>
+      <div class="horiz-scroll" id="for-you-row">
+        <div class="skeleton-row" style="width:150px;height:150px;flex-shrink:0"></div>
+      </div>
+    </section>
 
-      <!-- Контент библиотеки -->
-      <div id="library-content"></div>
-    </div>
+    <!-- Популярное в России -->
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">Популярное в России</h2>
+        <a href="charts.html" class="section-link">Чарты →</a>
+      </div>
+      <div id="ru-charts-list">
+        <div class="loading-placeholder"><div class="spinner"></div></div>
+      </div>
+    </section>
 
-  </div><!-- /feed -->
+    <!-- Новые релизы -->
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">Новые релизы</h2>
+      </div>
+      <div class="horiz-scroll" id="new-releases-row"></div>
+    </section>
+
+    <!-- Популярные исполнители -->
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">Популярные исполнители</h2>
+        <a href="artists.html" class="section-link">Все →</a>
+      </div>
+      <div class="home-artist-row" id="home-artists-row"></div>
+    </section>
+
+    <!-- Подборки MRF -->
+    <section class="section">
+      <div class="section-header"><h2 class="section-title">Подборки MRF</h2></div>
+      <div class="mood-grid" id="collections-grid"></div>
+    </section>
+
+    <!-- Мои плейлисты -->
+    <section class="section" id="my-playlists-section" style="display:none">
+      <div class="section-header">
+        <h2 class="section-title">Мои плейлисты</h2>
+        <a href="library.html" class="section-link">Все плейлисты →</a>
+      </div>
+      <div class="horiz-scroll-wrap">
+        <div class="horiz-scroll" id="my-playlists-row"></div>
+      </div>
+    </section>
+
+  </div>
 </main>
-
-<!-- ===================== PLAYER ===================== -->
-<footer class="player" id="player">
-  <div class="player-track">
-    <div class="player-cover" id="player-cover" onclick="toggleNowPlaying()" title="Подробнее" style="cursor:pointer"></div>
-    <div class="player-track-info">
-      <div class="player-title" id="player-title">Ничего не играет</div>
-      <div class="player-artist" id="player-artist">Выбери трек</div>
-    </div>
-    <button class="player-like" id="player-like-btn" onclick="toggleFavPlayer()" title="В избранное">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/></svg>
-    </button>
-  </div>
-
-  <div class="player-controls">
-    <button class="ctrl-btn" id="btn-shuffle" onclick="toggleShuffle()" title="Перемешать">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M15 13.5L18 16.5V14H20V20L14 20V18H16.5L13.5 15L15 13.5ZM9 10.5L10.5 9L5.5 4L4 5.5L9 10.5Z" fill-rule="evenodd" clip-rule="evenodd" fill="currentColor"/>
-        <path d="M20 4H14V6H16.5L4 18.5L5.5 20L18 7.5V10H20L20 4Z" fill="currentColor"/>
-      </svg>
-    </button>
-    <button class="ctrl-btn" onclick="prevTrack()" title="Предыдущий">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-    </button>
-    <button class="ctrl-btn ctrl-play" id="btn-play" onclick="togglePlay()" title="Играть / Пауза">
-      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5203 21.9939 21.9939 17.5203 22 12ZM11.996 19.992C16.4127 19.9942 19.9956 16.4167 20 12C19.9956 7.58329 16.4127 3.98979 11.996 3.992C7.57929 3.99421 4 7.57528 4 11.992C4 16.4087 7.57929 19.9898 11.996 19.992Z" fill-rule="evenodd" clip-rule="evenodd" fill="currentColor"/>
-        <path d="M10 16V8L16 12L10 16Z" fill="currentColor"/>
-      </svg>
-    </button>
-    <button class="ctrl-btn" onclick="nextTrack()" title="Следующий">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-    </button>
-    <button class="ctrl-btn" id="btn-repeat" onclick="toggleRepeat()" title="Повтор">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M7.5 22L2.5 17L7.5 12L9 13.5L6.50003 16H18V14L20 12V18H6.49997L9 20.5L7.5 22Z" fill="currentColor"/>
-        <path d="M15 3.49999L16.5 2L21.5 7L16.5 12L15 10.5L17.5 8H6V10L4 12V5.99999H17.5L15 3.49999Z" fill="currentColor"/>
-      </svg>
-    </button>
-    <div class="progress-bar">
-      <span class="time-current" id="time-current">0:00</span>
-      <div class="progress-track" id="progress-track">
-        <div class="progress-fill" id="progress-fill"><div class="progress-thumb" id="progress-thumb"></div></div>
-      </div>
-      <span class="time-total" id="time-total">0:00</span>
-    </div>
-  </div>
-
-  <div class="player-right">
-    <button class="ctrl-btn" onclick="toggleQueue()" title="Очередь">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M3 6h18M3 12h12M3 18h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-    </button>
-    <div class="volume-control">
-      <button class="ctrl-btn" onclick="toggleMute()" id="btn-vol">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      </button>
-      <div class="volume-track" id="volume-track">
-        <div class="volume-fill" id="volume-fill" style="width:70%"><div class="volume-thumb"></div></div>
-      </div>
-    </div>
-  </div>
-</footer>
-
-<!-- ===================== QUEUE PANEL ===================== -->
-<div class="queue-panel hidden" id="queue-panel">
-  <div class="queue-header">
-    <span>Очередь воспроизведения</span>
-    <button onclick="toggleQueue()">✕</button>
-  </div>
-  <div id="queue-list" class="queue-list"></div>
-</div>
-
-<!-- ===================== NOTIFICATION ===================== -->
-<div class="notification hidden" id="notification"></div>
-
-<!-- ===================== NOW PLAYING PANEL ===================== -->
-<div class="now-playing-panel hidden" id="now-playing-panel">
-  <div class="np-header">
-    <span>Сейчас играет</span>
-    <button onclick="closeNowPlaying()">✕</button>
-  </div>
-  <div class="np-body">
-  <div class="np-cover-wrap">
-    <div class="np-cover" id="np-cover"></div>
-  </div>
-  <div class="np-meta">
-    <div class="np-title" id="np-title">—</div>
-    <div class="np-artist" id="np-artist-name">—</div>
-  </div>
-  <div class="np-actions">
-    <button class="np-artist-btn" id="np-artist-btn" onclick="goToNpArtist()">
-      <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      Перейти к исполнителю
-    </button>
-  </div>
-  <div class="np-artist-cover-wrap">
-    <div class="np-artist-cover" id="np-artist-cover"></div>
-    <div class="np-artist-label" id="np-artist-label">Исполнитель</div>
-    <div class="np-artist-name-big" id="np-artist-name-big">—</div>
-  </div>
-
-  <!-- LYRICS -->
-  <div class="np-lyrics-wrap" id="np-lyrics-wrap">
-    <div class="np-lyrics-header">
-      <span>Текст</span>
-    </div>
-    <div class="np-lyrics" id="np-lyrics">
-      <div class="np-lyrics-empty">Текст не найден</div>
-    </div>
-  </div>
-  </div>
-</div>
-
-<!-- ===================== MODALS ===================== -->
-<div class="modal-overlay hidden" id="modal-overlay" onclick="closeModal()"></div>
-
-<!-- Создать плейлист -->
-<div class="modal hidden" id="modal-create-playlist">
-  <div class="modal-header">
-    <span>Создать плейлист</span>
-    <button onclick="closeModal()">
-      <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-    </button>
-  </div>
-  <div class="modal-body">
-    <input type="text" class="modal-input" id="playlist-name-input" placeholder="Название плейлиста" maxlength="60" />
-    <input type="text" class="modal-input" id="playlist-desc-input" placeholder="Описание (необязательно)" maxlength="120" />
-  </div>
-  <div class="modal-footer">
-    <button class="btn-secondary" onclick="closeModal()">Отмена</button>
-    <button class="btn-primary" onclick="confirmCreatePlaylist()" style="padding:10px 20px;font-size:13px">Создать</button>
-  </div>
-</div>
-
-<!-- Добавить в плейлист -->
-<div class="modal hidden" id="modal-add-to-playlist">
-  <div class="modal-header">
-    <span>Добавить в плейлист</span>
-    <button onclick="closeModal()">
-      <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-    </button>
-  </div>
-  <div class="modal-body" id="modal-playlist-list"></div>
-</div>
+<div id="player-root"></div>
 
 <script src="mock.js"></script>
+<script src="shared.js"></script>
 <script src="app.js"></script>
+<script src="mrf-ready.js"></script>
+<script src="soft-nav.js"></script>
+<script>
+whenDomReady(() => {
+  initShared();
+  loadHomePage();
+  applyAccentColor();
+});
+
+function applyAccentColor() {
+  const color = Store.getSettings().accentColor;
+  if (color) document.documentElement.style.setProperty('--accent', color);
+}
+
+function goSearch(tag) {
+  location.href = mrfUrl('search', { q: tag });
+}
+
+async function loadHomePage() {
+  try {
+    renderHomeRecent();
+    renderHomeMoods();
+    renderHomeCollections();
+    await Promise.all([
+      renderHomeCharts(),
+      renderForYou(),
+      renderRuCharts(),
+      renderNewReleases(),
+      renderHomeArtists()
+    ]);
+    renderHomePlaylists();
+  } catch (err) {
+    console.error('[HOME] Error loading:', err);
+  }
+}
+
+function renderHomeRecent() {
+  const box = document.getElementById('recent-grid');
+  if (!box) return;
+  const recent = Store.getRecent();
+  const items = recent.length ? recent : MOCK.tracks.slice(0, 6).map(t => ({ id: t.id, title: t.title, artist: t.artistName, cover: t.cover }));
+  if (!items.length) { box.innerHTML = '<p style="color:var(--text-3);font-size:13px">Пока ничего нет</p>'; return; }
+  box.innerHTML = items.slice(0, 6).map(t => `
+    <div class="quick-item" onclick="playFromMockTrack('${t.id}')">
+      ${t.cover ? `<img src="${t.cover}" class="quick-cover" alt="" loading="lazy" onerror="this.style.display='none'">` : `<div class="quick-cover" style="display:flex;align-items:center;justify-content:center;color:var(--accent)">${noteSVGShared()}</div>`}
+      <div class="quick-item-info">
+        <div class="quick-item-title">${escHtml(t.title||'')}</div>
+        <div class="quick-item-sub">${escHtml(t.artist||'')}</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderHomeMoods() {
+  const box = document.getElementById('mood-grid');
+  if (!box) return;
+  const icons = ['<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="9" y1="9" x2="9.01" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="15" y1="9" x2="15.01" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>','<path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="1.8"/>','<path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>','<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>','<path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" stroke="currentColor" stroke-width="1.8"/><path d="M15 9h-3l-1 5h2l-2 7 7-9h-3l1-3z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>','<circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2m0 16v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M2 12h2m16 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'];
+  box.innerHTML = MOCK.moods.map((m, i) => `
+    <div class="mood-tile" onclick="location.href='${mrfUrl('search',{q:m.tag})}'" style="border-color:${m.color}20">
+      <svg viewBox="0 0 24 24" fill="none" width="28" height="28" style="color:${m.color};margin-bottom:8px">${icons[i]||icons[0]}</svg>
+      <div class="mood-tile-name">${escHtml(m.name)}</div>
+    </div>`).join('');
+}
+
+async function renderHomeCharts() {
+  const box = document.getElementById('home-charts-list');
+  if (!box) return;
+  
+  try {
+    console.log('[HOME] Loading charts...');
+    const tracks = (await dzArr('/chart/0/tracks?limit=10')).map(normDZ);
+    console.log('[HOME] Charts loaded:', tracks.length);
+    _src['home'] = tracks;
+    box.innerHTML = tracks.length
+      ? `<div class="track-list">${tracks.map((t,i) => rowHTML(t,i,'home')).join('')}</div>`
+      : `<p style="color:var(--text-3);padding:20px">Не удалось загрузить чарты</p>`;
+  } catch (err) {
+    console.error('[HOME] Charts error:', err);
+    box.innerHTML = `<p style="color:var(--text-3);padding:20px">Ошибка загрузки: ${err.message}</p>`;
+  }
+}
+
+function renderHomePlaylists() {
+  const pls = Store.getPlaylists();
+  const section = document.getElementById('my-playlists-section');
+  const row = document.getElementById('my-playlists-row');
+  if (!section || !row || !pls.length) return;
+  section.style.display = '';
+  row.innerHTML = pls.map(pl => `
+    <div class="horiz-card" onclick="location.href='playlist.html?id=${pl.id}'">
+      ${pl.cover ? `<img src="${pl.cover}" class="horiz-card-cover" alt="">` : `<div class="horiz-card-cover-placeholder">${noteSVGShared()}</div>`}
+      <div class="horiz-card-title">${escHtml(pl.name)}</div>
+      <div class="horiz-card-sub">${pl.trackCount} треков</div>
+    </div>`).join('');
+}
+
+function renderHomeCollections() {
+  const box = document.getElementById('collections-grid');
+  if (!box) return;
+  const items = [
+    { name: 'Поп', tag: 'pop', color: '#EE90B7' },
+    { name: 'Рэп', tag: 'rap', color: '#e74c3c' },
+    { name: 'Хип-хоп', tag: 'hip-hop', color: '#9b59b6' },
+    { name: 'Электронная', tag: 'electronic', color: '#27ae60' },
+    { name: 'Рок', tag: 'rock', color: '#f39c12' },
+    { name: 'Для отдыха', tag: 'chill', color: '#1abc9c' },
+    { name: 'Для тренировок', tag: 'workout', color: '#e67e22' },
+    { name: 'Концентрация', tag: 'focus', color: '#2980b9' }
+  ];
+  box.innerHTML = items.map(m => `
+    <div class="mood-tile" onclick="goSearch('${m.tag}')" style="border-color:${m.color}33">
+      <div class="mood-tile-name" style="color:${m.color}">${escHtml(m.name)}</div>
+    </div>`).join('');
+}
+
+async function renderForYou() {
+  const box = document.getElementById('for-you-row');
+  if (!box) return;
+  // BACKEND TODO: Получение рекомендаций
+  const tracks = (await dzArr('/chart/0/tracks?limit=12')).map(normDZ).slice(0, 8);
+  _src['foryou'] = tracks;
+  box.innerHTML = tracks.map((t, i) => `
+    <div class="horiz-card" onclick="playFromSrc('foryou',${i})">
+      ${t.album?.cover_medium ? `<img src="${t.album.cover_medium}" class="horiz-card-cover" alt="">` : `<div class="horiz-card-cover-placeholder">${noteSVGShared()}</div>`}
+      <div class="horiz-card-title">${escHtml(t.title)}</div>
+      <div class="horiz-card-sub">${escHtml(t.artist?.name||'')}</div>
+    </div>`).join('') || '<p style="color:var(--text-3)">Нет рекомендаций</p>';
+}
+
+async function renderRuCharts() {
+  const box = document.getElementById('ru-charts-list');
+  if (!box) return;
+  const tracks = (await dzArr('/chart/116/tracks?limit=8')).map(normDZ);
+  _src['ru_home'] = tracks;
+  box.innerHTML = tracks.length
+    ? `<div class="track-list">${tracks.map((t,i) => rowHTML(t,i,'ru_home')).join('')}</div>`
+    : `<p style="color:var(--text-3)">Не удалось загрузить</p>`;
+}
+
+async function renderNewReleases() {
+  const box = document.getElementById('new-releases-row');
+  if (!box) return;
+  // BACKEND TODO: Получение новых релизов
+  const albums = await dzArr('/chart/0/albums?limit=10');
+  box.innerHTML = albums.map(a => `
+    <div class="horiz-card" onclick="location.href='${mrfUrl('album',{id:a.id,title:a.title,artist:a.artist?.name||''})}'">
+      ${a.cover_medium ? `<img src="${a.cover_medium}" class="horiz-card-cover" alt="">` : `<div class="horiz-card-cover-placeholder">${noteSVGShared()}</div>`}
+      <div class="horiz-card-title">${escHtml(a.title)}</div>
+      <div class="horiz-card-sub">${escHtml(a.artist?.name||'')}</div>
+    </div>`).join('');
+}
+
+async function renderHomeArtists() {
+  const box = document.getElementById('home-artists-row');
+  if (!box) return;
+  const artists = await dzArr('/chart/0/artists?limit=10');
+  box.innerHTML = artists.map(a => `
+    <div class="artist-card" style="width:130px;flex-shrink:0" onclick="location.href='${mrfUrl('artist',{id:a.id,name:a.name})}'">
+      ${a.picture_medium ? `<img class="artist-img" src="${a.picture_medium}" alt="">` : `<div class="artist-img-placeholder">${(a.name||'?')[0]}</div>`}
+      <div class="artist-name">${escHtml(a.name)}</div>
+    </div>`).join('');
+}
+
+async function playFromMockTrack(id) {
+  for (const key in _src) {
+    const idx = (_src[key]||[]).findIndex(t => t.id === id || String(t.deezerId) === String(id));
+    if (idx >= 0) { playFromSrc(key, idx); return; }
+  }
+  const t = mockGetTrack(id);
+  if (!t) return;
+  // пробуем найти превью в Deezer по названию
+  try {
+    const found = (await dzArr(`/search/track?q=${encodeURIComponent(t.title + ' ' + t.artistName)}&limit=5`)).map(normDZ);
+    const hit = found.find(x => (x.title||'').toLowerCase() === (t.title||'').toLowerCase()) || found[0];
+    if (hit?.preview) {
+      _src['mock_single'] = [hit];
+      playFromSrc('mock_single', 0);
+      return;
+    }
+  } catch {}
+  const mockTrack = { id: t.id, title: t.title, artist: { name: t.artistName }, album: { cover_medium: t.cover }, duration: t.duration, preview: null };
+  _src['mock_single'] = [mockTrack];
+  playFromSrc('mock_single', 0);
+}
+
+// запуск поиска с главной страницы
+const urlParams = new URLSearchParams(location.search);
+if (urlParams.get('q')) {
+  location.href = 'search.html?q=' + urlParams.get('q');
+}
+</script>
 </body>
 </html>

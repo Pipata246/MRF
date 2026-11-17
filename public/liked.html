@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Любимые треки — MRF</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div id="sidebar-root"></div>
+<main class="main-content">
+  <div id="topbar-root"></div>
+  <div class="feed">
+
+    <div class="liked-header">
+      <div class="liked-cover-placeholder">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="64" height="64" style="color:#fff">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:center;gap:8px">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:2px">Плейлист</div>
+        <h2 style="font-size:36px;font-weight:800">Любимые треки</h2>
+        <div style="color:var(--text-3);font-size:13px" id="liked-count">0 треков</div>
+        <button class="btn-primary" id="play-all-btn" onclick="playAllLiked()" style="padding:10px 20px;font-size:13px;margin-top:8px;width:fit-content;display:none">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
+          Слушать всё
+        </button>
+      </div>
+    </div>
+
+    <div id="liked-list"></div>
+
+  </div>
+</main>
+<div id="player-root"></div>
+<script src="mock.js"></script>
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="mrf-ready.js"></script>
+<script src="soft-nav.js"></script>
+<script>
+whenDomReady(() => {
+  initShared();
+  renderLikedPage();
+});
+
+function renderLikedPage() {
+  const favs = Store.getFavs();
+  const box = document.getElementById('liked-list');
+  const countEl = document.getElementById('liked-count');
+  const playBtn = document.getElementById('play-all-btn');
+
+  if (countEl) countEl.textContent = favs.length + ' ' + (favs.length === 1 ? 'трек' : 'треков');
+  if (playBtn) playBtn.style.display = favs.length ? '' : 'none';
+
+  if (!favs.length) {
+    box.innerHTML = `<div class="search-empty" style="padding:60px 0">
+      <svg viewBox="0 0 24 24" fill="none" width="48" height="48" style="color:var(--text-3);margin-bottom:12px">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/>
+      </svg>
+      <p style="color:var(--text-3)">Добавляй треки в избранное сердечком</p>
+    </div>`;
+    return;
+  }
+
+  const fake = favs.map(f => ({
+    id: f.id||0, title: f.title,
+    artist: { name: f.artist },
+    album: { cover_medium: f.cover },
+    duration: f.duration||0,
+    preview: f.preview||null
+  }));
+  _src['liked'] = fake;
+  box.innerHTML = `<div class="track-list">${fake.map((t,i) => rowHTML(t,i,'liked')).join('')}</div>`;
+}
+
+function playAllLiked() {
+  if (_src['liked']?.length) playFromSrc('liked', 0);
+}
+</script>
+</body>
+</html>

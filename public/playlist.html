@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Плейлист — MRF</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div id="sidebar-root"></div>
+<main class="main-content">
+  <div id="topbar-root"></div>
+  <div class="feed" id="playlist-feed">
+    <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем плейлист…</span></div>
+  </div>
+</main>
+<div id="player-root"></div>
+<script src="mock.js"></script>
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="mrf-ready.js"></script>
+<script src="soft-nav.js"></script>
+<script>
+let _currentPlaylistId = null;
+
+whenDomReady(() => {
+  initShared();
+  loadPlaylistPage();
+});
+
+function loadPlaylistPage() {
+  const params = new URLSearchParams(location.search);
+  const id     = params.get('id');
+  const feed   = document.getElementById('playlist-feed');
+
+  if (!id) { feed.innerHTML = `<p style="color:var(--text-3)">Плейлист не найден</p>`; return; }
+
+  _currentPlaylistId = id;
+  renderPlaylist(id);
+}
+
+function renderPlaylist(id) {
+  const pl   = Store.getPlaylist(id);
+  const feed = document.getElementById('playlist-feed');
+
+  if (!pl) { feed.innerHTML = `<p style="color:var(--text-3)">Плейлист не найден</p>`; return; }
+  document.title = pl.name + ' — MRF';
+
+  const key = `pl_${id}`;
+  _src[key] = pl.tracks || [];
+
+  feed.innerHTML = `
+    <div style="display:flex;gap:24px;align-items:flex-start;margin-bottom:28px;flex-wrap:wrap">
+      ${pl.cover ? `<img src="${pl.cover}" style="width:180px;height:180px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="">` : `<div style="width:180px;height:180px;border-radius:10px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;flex-shrink:0">${noteSVGShared()}</div>`}
+      <div style="display:flex;flex-direction:column;justify-content:center;gap:8px">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:2px">Плейлист</div>
+        <h2 style="font-size:28px;font-weight:800;cursor:text" id="pl-title-display">${escHtml(pl.name)}</h2>
+        ${pl.description ? `<p style="color:var(--text-3);font-size:13px">${escHtml(pl.description)}</p>` : ''}
+        <div style="color:var(--text-3);font-size:12px">${pl.tracks?.length || 0} треков</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+          ${pl.tracks?.length ? `<button class="btn-primary" onclick="playFromSrc('${key}',0)" style="padding:10px 20px;font-size:13px">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
+            Слушать
+          </button>` : ''}
+          <button class="btn-secondary" onclick="editPlaylistName('${id}')" style="padding:10px 16px;font-size:13px">Переименовать</button>
+          <button class="btn-secondary" onclick="deleteThisPlaylist('${id}')" style="padding:10px 16px;font-size:13px;color:#ff6b6b;border-color:#ff6b6b22">Удалить</button>
+        </div>
+      </div>
+    </div>
+    ${pl.tracks?.length ? `<div class="track-list">${pl.tracks.map((t,i) => rowHTMLPlaylist(t, i, key, id)).join('')}</div>` : `<div class="search-empty" style="padding:40px 0"><p style="color:var(--text-3)">Плейлист пуст. Добавь треки через контекстное меню (ПКМ)</p></div>`}
+  `;
+}
+
+function rowHTMLPlaylist(t, i, key, plId) {
+  const cover  = t.cover || t.album?.cover_medium || '';
+  const artist = t.artistName || t.artist?.name || t.artist || '';
+  const fav    = Store.isFav(t.title||'', artist);
+  const playing= typeof queueIndex !== 'undefined' && queueIndex >= 0 && queue[queueIndex]?.id === t.id;
+  return `
+  <div class="track-item${playing?' playing':''}" onclick="playFromSrc('${key}',${i})">
+    <div class="track-num"><span class="num-text">${playing?'▶':i+1}</span><span class="play-hover">▶</span></div>
+    ${cover ? `<img class="track-cover" src="${cover}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<div class="track-cover-placeholder">${noteSVGShared()}</div>`}
+    <div class="track-info">
+      <div class="track-title">${escHtml(t.title||'')}</div>
+      <div class="track-artist">${escHtml(artist)}</div>
+    </div>
+    <div class="track-duration">${fmtDur(t.duration)}</div>
+    <button class="track-like-btn${fav?' liked':''}" onclick="event.stopPropagation();toggleFavPlaylist('${t.id}','${key}',${i},this)" title="${fav?'Убрать':'В избранное'}">
+      <svg viewBox="0 0 24 24" fill="${fav?'currentColor':'none'}"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/></svg>
+    </button>
+    <button class="track-like-btn" onclick="event.stopPropagation();removeFromCurrentPlaylist('${plId}','${t.id}')" title="Убрать из плейлиста" style="opacity:0;margin-left:4px">
+      <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>`;
+}
+
+function toggleFavPlaylist(trackId, key, idx, btn) {
+  const t = _src[key]?.[idx]; if (!t) return;
+  const artist = t.artistName || t.artist?.name || t.artist || '';
+  const added = Store.toggleFav({ id: t.id, title: t.title, artistName: artist, cover: t.cover || t.album?.cover_medium, duration: t.duration, preview: t.preview });
+  btn.classList.toggle('liked', added);
+  btn.querySelector('path').setAttribute('fill', added ? 'currentColor' : 'none');
+  updateFavBadge();
+}
+
+function removeFromCurrentPlaylist(plId, trackId) {
+  Store.removeTrackFromPlaylist(plId, trackId);
+  renderPlaylist(plId);
+  renderSidebarPlaylists();
+  showNotif('Трек удалён из плейлиста');
+}
+
+function editPlaylistName(id) {
+  const pl = Store.getPlaylist(id);
+  if (!pl) return;
+  const name = prompt('Новое название плейлиста:', pl.name);
+  if (!name?.trim()) return;
+  Store.updatePlaylist(id, { name: name.trim() });
+  renderPlaylist(id);
+  renderSidebarPlaylists();
+  showNotif('Плейлист переименован');
+}
+
+function deleteThisPlaylist(id) {
+  if (!confirm('Удалить плейлист?')) return;
+  Store.deletePlaylist(id);
+  renderSidebarPlaylists();
+  location.href = 'library.html';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Альбом — MRF</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div id="sidebar-root"></div>
+<main class="main-content">
+  <div id="topbar-root"></div>
+  <div class="feed" id="album-feed">
+    <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем альбом…</span></div>
+  </div>
+</main>
+<div id="player-root"></div>
+<script src="mock.js"></script>
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="mrf-ready.js"></script>
+<script src="soft-nav.js"></script>
+<script>
+whenDomReady(() => {
+  initShared();
+  loadAlbumPage();
+});
+
+async function loadAlbumPage() {
+  const params     = new URLSearchParams(location.search);
+  const id         = params.get('id');
+  const albumTitle = params.get('title') || '';
+  const artistName = params.get('artist') || '';
+  const feed       = document.getElementById('album-feed');
+
+  if (!id) { feed.innerHTML = `<p style="color:var(--text-3)">Альбом не найден</p>`; return; }
+
+  // BACKEND TODO: Получение информации об альбоме
+  const album = await dzObj(`/album/${id}`);
+  const raw   = album.tracks?.data || [];
+  const aName = album.artist?.name || artistName;
+  const aTitle= album.title || albumTitle;
+  const cover = album.cover_xl || album.cover_medium || '';
+  const key   = `alb_${id}`;
+
+  _src[key] = raw.map(t => normDZ({
+    ...t,
+    artist: { id: album.artist?.id, name: aName, picture_medium: album.artist?.picture_medium||'' },
+    album:  { id, title: aTitle, cover_medium: album.cover_medium, cover: album.cover }
+  }));
+
+  document.title = aTitle + ' — MRF';
+
+  feed.innerHTML = `
+    <div style="display:flex;gap:28px;align-items:flex-start;margin-bottom:32px;flex-wrap:wrap">
+      ${cover ? `<img src="${cover}" style="width:200px;height:200px;border-radius:12px;object-fit:cover;flex-shrink:0" alt="">` : `<div style="width:200px;height:200px;border-radius:12px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;flex-shrink:0">${noteSVGShared()}</div>`}
+      <div style="display:flex;flex-direction:column;justify-content:center;gap:8px">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:2px">Альбом</div>
+        <h2 style="font-size:32px;font-weight:800">${escHtml(aTitle)}</h2>
+        <div style="color:var(--text-3);font-size:14px;cursor:pointer" onclick="location.href='${mrfUrl('artist',{id:album.artist?.id,name:aName})}'">
+          ${escHtml(aName)}
+        </div>
+        <div style="color:var(--text-3);font-size:12px">${_src[key].length} треков · ${album.release_date||''}</div>
+        <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">
+          <button class="btn-primary" onclick="playFromSrc('${key}',0)" style="padding:10px 20px;font-size:13px;width:fit-content">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
+            Слушать альбом
+          </button>
+          <button class="btn-secondary" id="save-album-btn" onclick="toggleSaveAlbum()" style="padding:10px 18px;font-size:13px">
+            ${Store.isAlbumSaved(id) ? 'В библиотеке' : 'Сохранить'}
+          </button>
+          <button class="btn-secondary" onclick="addAlbumToQueue('${key}')" style="padding:10px 18px;font-size:13px">В очередь</button>
+        </div>
+      </div>
+    </div>
+    <div class="track-list">${_src[key].map((t,i) => rowHTML(t,i,key)).join('')}</div>`;
+
+  window._albumPageMeta = {
+    id, title: aTitle, artistName: aName,
+    cover: album.cover_medium || cover,
+    year: album.release_date || '',
+    trackCount: _src[key].length,
+    key
+  };
+}
+
+function toggleSaveAlbum() {
+  const m = window._albumPageMeta; if (!m) return;
+  const added = Store.toggleAlbum(m);
+  const btn = document.getElementById('save-album-btn');
+  if (btn) btn.textContent = added ? 'В библиотеке' : 'Сохранить';
+  showNotif(added ? 'Альбом сохранён' : 'Альбом удалён из библиотеки');
+}
+
+function addAlbumToQueue(key) {
+  (_src[key] || []).forEach(t => addToQueue(t));
+  showNotif('Альбом добавлен в очередь');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Плейлисты — MRF</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div id="sidebar-root"></div>
+<main class="main-content">
+  <div id="topbar-root"></div>
+  <div class="feed">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px">
+      <div>
+        <h2 style="font-size:28px;font-weight:800">Мои плейлисты</h2>
+        <p style="color:var(--text-3);font-size:13px;margin-top:4px" id="playlists-count">0 плейлистов</p>
+      </div>
+      <button class="btn-primary" onclick="showCreatePlaylist()" style="padding:10px 20px;font-size:13px">
+        <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Создать плейлист
+      </button>
+    </div>
+
+    <div id="playlists-grid"></div>
+
+  </div>
+</main>
+<div id="player-root"></div>
+<script src="mock.js"></script>
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="mrf-ready.js"></script>
+<script src="soft-nav.js"></script>
+<script>
+whenDomReady(() => {
+  initShared();
+  renderPlaylistsPage();
+});
+
+function renderPlaylistsPage() {
+  const pls = Store.getPlaylists();
+  const countEl = document.getElementById('playlists-count');
+  const box = document.getElementById('playlists-grid');
+
+  if (countEl) countEl.textContent = pls.length + ' ' + (pls.length === 1 ? 'плейлист' : pls.length < 5 ? 'плейлиста' : 'плейлистов');
+
+  if (!pls.length) {
+    box.innerHTML = `<div class="search-empty" style="padding:60px 0">
+      <svg viewBox="0 0 24 24" fill="none" width="48" height="48" style="color:var(--text-3);margin-bottom:12px">
+        <path d="M3 6h18M3 12h12M3 18h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <p style="color:var(--text-3)">Создай первый плейлист</p>
+    </div>`;
+    return;
+  }
+
+  box.innerHTML = '<div class="lib-grid">' + pls.map(pl => `
+    <div class="lib-card" onclick="location.href='playlist.html?id=${pl.id}'">
+      ${pl.cover ? `<img src="${pl.cover}" class="lib-card-cover" alt="">` : `<div class="lib-card-cover-placeholder">${noteSVGShared()}</div>`}
+      <div class="lib-card-body">
+        <div class="lib-card-title">${escHtml(pl.name)}</div>
+        <div class="lib-card-sub">${pl.trackCount} треков</div>
+      </div>
+      <div class="lib-card-actions">
+        <button class="lib-card-btn" onclick="event.stopPropagation();editPlaylistFromList('${pl.id}')" title="Переименовать">
+          <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="lib-card-btn" onclick="event.stopPropagation();deletePlaylistFromList('${pl.id}')" title="Удалить">
+          <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>`).join('') + '</div>';
+}
+
+function editPlaylistFromList(id) {
+  const pl = Store.getPlaylist(id);
+  if (!pl) return;
+  const name = prompt('Новое название плейлиста:', pl.name);
+  if (!name?.trim()) return;
+  Store.updatePlaylist(id, { name: name.trim() });
+  renderPlaylistsPage();
+  renderSidebarPlaylists();
+  showNotif('Плейлист переименован');
+}
+
+function deletePlaylistFromList(id) {
+  if (!confirm('Удалить плейлист?')) return;
+  Store.deletePlaylist(id);
+  renderPlaylistsPage();
+  renderSidebarPlaylists();
+  showNotif('Плейлист удалён');
+}
+</script>
+</body>
+</html>

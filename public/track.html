@@ -1,0 +1,112 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Трек — MRF</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div id="sidebar-root"></div>
+<main class="main-content">
+  <div id="topbar-root"></div>
+  <div class="feed" id="track-feed">
+    <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем…</span></div>
+  </div>
+</main>
+<div id="player-root"></div>
+<script src="mock.js"></script>
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="mrf-ready.js"></script>
+<script src="soft-nav.js"></script>
+<script>
+// BACKEND TODO: Получение информации о треке
+whenDomReady(() => {
+  initShared();
+  loadTrackPage();
+});
+
+async function loadTrackPage() {
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+  const feed = document.getElementById('track-feed');
+  if (!id) {
+    feed.innerHTML = `<p style="color:var(--text-3)">Трек не найден</p>`;
+    return;
+  }
+
+  let t = null;
+  // mock first
+  const mock = mockGetTrack(id);
+  if (mock) {
+    t = {
+      id: mock.id, title: mock.title, duration: mock.duration, preview: mock.preview,
+      artist: { id: mock.artistId, name: mock.artistName },
+      album: { id: mock.albumId, title: mock.albumTitle, cover_medium: mock.cover, cover: mock.cover },
+      genre: mock.genre, year: mock.year
+    };
+  } else {
+    const rawId = String(id).replace(/^dz_/, '');
+    const dz = await dzObj(`/track/${rawId}`);
+    if (dz && dz.id) t = normDZ(dz);
+  }
+
+  if (!t) {
+    feed.innerHTML = `<div class="search-empty" style="padding:60px 0"><p style="color:var(--text-3)">Трек не найден</p>
+      <button class="btn-secondary" onclick="history.back()" style="margin-top:16px;padding:10px 18px">Назад</button></div>`;
+    return;
+  }
+
+  document.title = (t.title || 'Трек') + ' — MRF';
+  _src['track_page'] = [t];
+  const cover = t.album?.cover_xl || t.album?.cover_medium || t.cover || '';
+  const artist = t.artist?.name || '';
+  const fav = Store.isFav(t.title || '', artist);
+
+  // similar
+  const similar = (await dzArr(`/search/track?q=${encodeURIComponent(artist || t.title || 'pop')}&limit=8`))
+    .map(normDZ).filter(x => x.id !== t.id).slice(0, 6);
+  _src['track_similar'] = similar;
+
+  feed.innerHTML = `
+    <div style="display:flex;gap:28px;align-items:flex-start;margin-bottom:32px;flex-wrap:wrap">
+      ${cover ? `<img src="${cover}" style="width:220px;height:220px;border-radius:12px;object-fit:cover;flex-shrink:0" alt="">`
+        : `<div style="width:220px;height:220px;border-radius:12px;background:var(--bg-3);display:flex;align-items:center;justify-content:center">${noteSVGShared()}</div>`}
+      <div style="display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:220px">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:2px">Композиция</div>
+        <h2 style="font-size:36px;font-weight:800">${escHtml(t.title||'')}</h2>
+        <div style="font-size:15px;color:var(--text-2);cursor:pointer" onclick="${t.artist?.id ? `location.href='${mrfUrl('artist',{id:t.artist.id,name:artist})}'` : ''}">${escHtml(artist)}</div>
+        <div style="color:var(--text-3);font-size:13px">
+          ${t.album?.title ? `<span style="cursor:pointer" onclick="location.href='${mrfUrl('album',{id:t.album.id,title:t.album.title,artist})}'">${escHtml(t.album.title)}</span> · ` : ''}
+          ${fmtDur(t.duration)}${t.year || t.album?.release_date ? ' · ' + (t.year || t.album.release_date) : ''}${t.genre ? ' · ' + escHtml(t.genre) : ''}
+        </div>
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn-primary" style="padding:10px 20px;font-size:13px" onclick="playFromSrc('track_page',0)">Слушать</button>
+          <button class="btn-secondary" style="padding:10px 18px;font-size:13px" id="track-fav-btn" onclick="toggleTrackFav()">${fav ? 'В избранном' : 'В избранное'}</button>
+          <button class="btn-secondary" style="padding:10px 18px;font-size:13px" onclick="showAddToPlaylist(_src['track_page'][0])">В плейлист</button>
+          <button class="btn-secondary" style="padding:10px 18px;font-size:13px" onclick="addToQueue(_src['track_page'][0])">В очередь</button>
+          <button class="btn-secondary" style="padding:10px 18px;font-size:13px" onclick="shareTrack(_src['track_page'][0])">Поделиться</button>
+        </div>
+      </div>
+    </div>
+    <section class="section">
+      <div class="section-header"><h3 class="section-title" style="font-size:18px">Похожие композиции</h3></div>
+      <div class="track-list">${similar.map((x,i) => rowHTML(x,i,'track_similar')).join('') || '<p style="color:var(--text-3)">Нет похожих</p>'}</div>
+    </section>`;
+}
+
+function toggleTrackFav() {
+  const t = _src['track_page']?.[0]; if (!t) return;
+  const added = Store.toggleFav({
+    id: t.id, title: t.title, artistName: t.artist?.name,
+    cover: t.album?.cover_medium, duration: t.duration, preview: t.preview
+  });
+  const btn = document.getElementById('track-fav-btn');
+  if (btn) btn.textContent = added ? 'В избранном' : 'В избранное';
+  updateFavBadge();
+  showNotif(added ? 'Добавлено в избранное' : 'Убрано из избранного');
+}
+</script>
+</body>
+</html>

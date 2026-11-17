@@ -1,0 +1,265 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Профиль — MRF</title>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .profile-page { max-width: 760px; margin: 0 auto; }
+    .profile-hero { display:flex;align-items:center;gap:28px;margin-bottom:40px;padding:28px;background:var(--bg-2);border-radius:14px;border:1px solid var(--border); }
+    .profile-avatar-wrap { position:relative;cursor:pointer;flex-shrink:0; }
+    .profile-avatar { width:96px;height:96px;border-radius:50%;background:var(--accent);color:#000;font-size:36px;font-weight:700;display:flex;align-items:center;justify-content:center;overflow:hidden; }
+    .profile-avatar img { width:100%;height:100%;object-fit:cover; }
+    .profile-avatar-edit { position:absolute;bottom:0;right:0;background:var(--bg-2);border:2px solid var(--border);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--text-2);transition:all 0.15s; }
+    .profile-avatar-wrap:hover .profile-avatar-edit { background:var(--accent);color:#000;border-color:var(--accent); }
+    .profile-info h2 { font-size:24px;font-weight:800;margin-bottom:4px; }
+    .profile-info .plan-badge { display:inline-flex;align-items:center;gap:6px;background:var(--bg-3);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;color:var(--text-2);margin-top:8px; }
+
+    .settings-section { background:var(--bg-2);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:16px; }
+    .settings-section h3 { font-size:15px;font-weight:700;margin-bottom:18px;color:var(--text); }
+    .settings-row { display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border); }
+    .settings-row:last-child { border-bottom:none; }
+    .settings-row-info { flex:1; }
+    .settings-row-label { font-size:13px;font-weight:600;color:var(--text); }
+    .settings-row-desc { font-size:11px;color:var(--text-3);margin-top:2px; }
+
+    .toggle-switch { position:relative;width:44px;height:24px;cursor:pointer; }
+    .toggle-switch input { opacity:0;width:0;height:0; }
+    .toggle-track { position:absolute;inset:0;background:var(--bg-3);border-radius:12px;transition:background 0.2s; }
+    .toggle-track::before { content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform 0.2s; }
+    .toggle-switch input:checked + .toggle-track { background:var(--accent); }
+    .toggle-switch input:checked + .toggle-track::before { transform:translateX(20px); }
+
+    .settings-input { background:var(--bg-3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:Arial,sans-serif;font-size:13px;outline:none;width:100%;transition:border-color 0.2s; }
+    .settings-input:focus { border-color:var(--accent); }
+    .settings-textarea { resize:vertical;min-height:60px; }
+
+    .color-swatches { display:flex;gap:8px;flex-wrap:wrap; }
+    .color-swatch { width:32px;height:32px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:border-color 0.15s; }
+    .color-swatch.active { border-color:#fff; }
+  </style>
+</head>
+<body>
+<div id="sidebar-root"></div>
+<main class="main-content">
+  <div id="topbar-root"></div>
+  <div class="feed">
+    <div class="profile-page">
+
+      <!-- Hero -->
+      <div class="profile-hero">
+        <div class="profile-avatar-wrap" onclick="document.getElementById('avatar-upload').click()">
+          <div class="profile-avatar" id="profile-avatar-display"></div>
+          <div class="profile-avatar-edit">
+            <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <input type="file" id="avatar-upload" accept="image/*" style="display:none" onchange="uploadAvatar(this)"/>
+        </div>
+        <div class="profile-info">
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Профиль</div>
+          <h2 id="profile-name-display">Пользователь</h2>
+          <div style="font-size:13px;color:var(--text-3);margin-top:2px" id="profile-username-display">@mrf_user</div>
+          <div class="plan-badge">
+            <svg viewBox="0 0 24 24" fill="none" width="12" height="12"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v4l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            MRF Free
+          </div>
+        </div>
+        <button class="btn-primary" style="margin-left:auto;padding:10px 20px;font-size:13px" onclick="saveProfile()">Сохранить</button>
+      </div>
+
+      <!-- Основная информация -->
+      <div class="settings-section">
+        <h3>Основная информация</h3>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label">Имя</div></div>
+          <input type="text" class="settings-input" id="pf-name" style="max-width:280px" placeholder="Ваше имя"/>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label">Никнейм</div></div>
+          <input type="text" class="settings-input" id="pf-username" style="max-width:280px" placeholder="@username"/>
+        </div>
+        <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+          <div class="settings-row-label">Описание</div>
+          <textarea class="settings-input settings-textarea" id="pf-description" placeholder="Расскажи о себе…" style="width:100%"></textarea>
+        </div>
+      </div>
+
+      <!-- Внешний вид -->
+      <div class="settings-section" id="settings">
+        <h3>Внешний вид</h3>
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <div class="settings-row-label">Тема</div>
+            <div class="settings-row-desc">Тёмная или светлая</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn-secondary" id="theme-dark-btn" style="padding:8px 12px;font-size:12px" onclick="setTheme('dark')">Тёмная</button>
+            <button class="btn-secondary" id="theme-light-btn" style="padding:8px 12px;font-size:12px" onclick="setTheme('light')">Светлая</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label">Акцентный цвет</div></div>
+          <div class="color-swatches" id="color-swatches">
+            <div class="color-swatch" style="background:#EE90B7" data-color="#EE90B7" onclick="setAccent('#EE90B7',this)"></div>
+            <div class="color-swatch" style="background:#E35A90" data-color="#E35A90" onclick="setAccent('#E35A90',this)"></div>
+            <div class="color-swatch" style="background:#68C7EC" data-color="#68C7EC" onclick="setAccent('#68C7EC',this)"></div>
+            <div class="color-swatch" style="background:#27ae60" data-color="#27ae60" onclick="setAccent('#27ae60',this)"></div>
+            <div class="color-swatch" style="background:#9b59b6" data-color="#9b59b6" onclick="setAccent('#9b59b6',this)"></div>
+            <div class="color-swatch" style="background:#f39c12" data-color="#f39c12" onclick="setAccent('#f39c12',this)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Воспроизведение -->
+      <div class="settings-section">
+        <h3>Воспроизведение</h3>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label">Автовоспроизведение</div><div class="settings-row-desc">Автоматически запускать следующий трек</div></div>
+          <label class="toggle-switch"><input type="checkbox" id="s-autoplay" onchange="saveSetting('autoplay',this.checked)"><div class="toggle-track"></div></label>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label">Перемешивание при запуске</div></div>
+          <label class="toggle-switch"><input type="checkbox" id="s-shuffle" onchange="saveSetting('shuffleOnPlay',this.checked)"><div class="toggle-track"></div></label>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label">Запоминать позицию</div></div>
+          <label class="toggle-switch"><input type="checkbox" id="s-position" onchange="saveSetting('rememberPosition',this.checked)"><div class="toggle-track"></div></label>
+        </div>
+      </div>
+
+      <!-- Уведомления -->
+      <div class="settings-section">
+        <h3>Уведомления</h3>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label">Новые релизы</div></div>
+          <label class="toggle-switch"><input type="checkbox" id="s-notifyReleases" onchange="saveSetting('notifyReleases',this.checked)"><div class="toggle-track"></div></label>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label">Обновления плейлистов</div></div>
+          <label class="toggle-switch"><input type="checkbox" id="s-notifyPlaylist" onchange="saveSetting('notifyPlaylist',this.checked)"><div class="toggle-track"></div></label>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label">Новости MRF</div></div>
+          <label class="toggle-switch"><input type="checkbox" id="s-notifyNews" onchange="saveSetting('notifyNews',this.checked)"><div class="toggle-track"></div></label>
+        </div>
+      </div>
+
+      <!-- Конфиденциальность -->
+      <div class="settings-section">
+        <h3>Конфиденциальность</h3>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label">Публичные плейлисты</div></div>
+          <label class="toggle-switch"><input type="checkbox" id="s-publicPlaylists" onchange="saveSetting('publicPlaylists',this.checked)"><div class="toggle-track"></div></label>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label">Публичные любимые треки</div></div>
+          <label class="toggle-switch"><input type="checkbox" id="s-publicLiked" onchange="saveSetting('publicLiked',this.checked)"><div class="toggle-track"></div></label>
+        </div>
+      </div>
+
+      <!-- О приложении -->
+      <div class="settings-section">
+        <h3>О приложении</h3>
+        <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">MRF — Make Russia Free</div><div class="settings-row-desc">Музыкальный стриминговый сервис</div></div><span style="color:var(--text-3);font-size:12px">v2.0.0</span></div>
+        <div class="settings-row">
+          <div class="settings-row-info"><div class="settings-row-label" style="color:var(--accent);cursor:pointer" onclick="if(confirm('Сбросить все данные?')){Store.reset();location.reload()}">Сбросить все данные</div><div class="settings-row-desc">Удалить избранное, плейлисты и настройки</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+<div id="player-root"></div>
+<script src="mock.js"></script>
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="mrf-ready.js"></script>
+<script src="soft-nav.js"></script>
+<script>
+// BACKEND TODO: Получение данных профиля
+// BACKEND TODO: Сохранение изменений профиля
+whenDomReady(() => {
+  initShared();
+  loadProfilePage();
+});
+
+function loadProfilePage() {
+  const profile  = Store.getProfile();
+  const settings = Store.getSettings();
+
+  // аватар
+  const avatarEl = document.getElementById('profile-avatar-display');
+  if (profile.avatar) avatarEl.innerHTML = `<img src="${profile.avatar}" alt="">`;
+  else avatarEl.textContent = (profile.name||'П')[0];
+
+  document.getElementById('profile-name-display').textContent = profile.name || 'Пользователь';
+  document.getElementById('profile-username-display').textContent = profile.username || '@mrf_user';
+
+  // поля
+  const pf = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  pf('pf-name', profile.name);
+  pf('pf-username', profile.username);
+  pf('pf-description', profile.description);
+
+  // настройки тоглов
+  const tog = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+  tog('s-autoplay',        settings.autoplay);
+  tog('s-shuffle',         settings.shuffleOnPlay);
+  tog('s-position',        settings.rememberPosition);
+  tog('s-notifyReleases',  settings.notifyReleases);
+  tog('s-notifyPlaylist',  settings.notifyPlaylist);
+  tog('s-notifyNews',      settings.notifyNews);
+  tog('s-publicPlaylists', settings.publicPlaylists);
+  tog('s-publicLiked',     settings.publicLiked);
+
+  // акцентный цвет
+  const cur = settings.accentColor || '#EE90B7';
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('active', s.dataset.color === cur));
+  const theme = settings.theme || 'dark';
+  document.getElementById('theme-dark-btn')?.classList.toggle('active-btn', theme === 'dark');
+  document.getElementById('theme-light-btn')?.classList.toggle('active-btn', theme === 'light');
+  if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
+}
+
+function saveProfile() {
+  const name = document.getElementById('pf-name')?.value.trim();
+  const username = document.getElementById('pf-username')?.value.trim();
+  const description = document.getElementById('pf-description')?.value.trim();
+  Store.setProfile({ ...Store.getProfile(), name, username, description });
+  document.getElementById('profile-name-display').textContent = name || 'Пользователь';
+  document.getElementById('profile-username-display').textContent = username || '@mrf_user';
+  showNotif('Профиль сохранён');
+}
+
+function saveSetting(key, value) {
+  Store.setSettings({ [key]: value });
+}
+
+function setAccent(color, el) {
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  document.documentElement.style.setProperty('--accent', color);
+  Store.setSettings({ accentColor: color });
+}
+
+function uploadAvatar(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const src = e.target.result;
+    document.getElementById('profile-avatar-display').innerHTML = `<img src="${src}" alt="">`;
+    Store.setProfile({ ...Store.getProfile(), avatar: src });
+    showNotif('Аватар обновлён');
+  };
+  reader.readAsDataURL(file);
+}
+
+// применяем сохранённый акцент
+(function applyAccent() {
+  const color = Store.getSettings().accentColor;
+  if (color) document.documentElement.style.setProperty('--accent', color);
+})();
+</script>
+</body>
+</html>
