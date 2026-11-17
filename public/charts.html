@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Чарты — MRF</title>
+  <link rel="icon" href="img/favicon.svg" type="image/svg+xml"/>
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
@@ -138,11 +139,6 @@ function rowHTMLChart(t, i) {
   const playing= typeof queueIndex !== 'undefined' && queueIndex >= 0 && queue[queueIndex]?.id === t.id;
   const live   = playing && typeof isPlaying !== 'undefined' && isPlaying && typeof audio !== 'undefined' && audio && !audio.paused;
   const topCls = i===0?' top-1':i===1?' top-2':i===2?' top-3':'';
-  const delta = i % 5 === 0
-    ? `<span class="track-delta delta-same">—</span>`
-    : (i % 2 === 0
-      ? `<span class="track-delta delta-up">+${(i % 7) + 1}</span>`
-      : `<span class="track-delta delta-down">-${(i % 4) + 1}</span>`);
   const playIco = `<svg class="play-hover" viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>`;
   const eq = typeof eqBarsHTML === 'function' ? eqBarsHTML() : `<span class="eq-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`;
   return `
@@ -152,7 +148,6 @@ function rowHTMLChart(t, i) {
       ${eq}
       ${playIco}
     </div>
-    ${delta}
     ${cover ? `<img class="track-cover" src="${cover}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<div class="track-cover-placeholder">${noteSVGShared()}</div>`}
     <div class="track-info">
       <div class="track-title">${escHtml(t.title||'')}</div>
@@ -207,7 +202,6 @@ function rowHTMLChartRising(t, i) {
   const primaryArtist = t.artist?.name || '';
   const playing= typeof queueIndex !== 'undefined' && queueIndex >= 0 && queue[queueIndex]?.id === t.id;
   const live   = playing && typeof isPlaying !== 'undefined' && isPlaying && typeof audio !== 'undefined' && audio && !audio.paused;
-  const grow = `+${(i % 9) + 3}`;
   const playIco = `<svg class="play-hover" viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>`;
   const eq = typeof eqBarsHTML === 'function' ? eqBarsHTML() : `<span class="eq-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`;
   return `
@@ -217,7 +211,6 @@ function rowHTMLChartRising(t, i) {
       ${eq}
       ${playIco}
     </div>
-    <span class="track-delta delta-up">${grow}</span>
     ${cover ? `<img class="track-cover" src="${cover}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<div class="track-cover-placeholder">${noteSVGShared()}</div>`}
     <div class="track-info">
       <div class="track-title">${escHtml(t.title||'')}</div>
