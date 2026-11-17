@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Профиль — MRF</title>
-  <link rel="icon" href="img/favicon.svg" type="image/svg+xml"/>
+  <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
@@ -61,15 +61,33 @@
             <button class="btn-secondary" id="theme-light-btn" style="padding:8px 12px;font-size:12px" onclick="setTheme('light')">Светлая</button>
           </div>
         </div>
-        <div class="settings-row">
-          <div class="settings-row-info"><div class="settings-row-label">Акцентный цвет</div></div>
-          <div class="color-swatches" id="color-swatches">
-            <div class="color-swatch" style="background:#EE90B7" data-color="#EE90B7" onclick="setAccent('#EE90B7',this)"></div>
-            <div class="color-swatch" style="background:#E35A90" data-color="#E35A90" onclick="setAccent('#E35A90',this)"></div>
-            <div class="color-swatch" style="background:#68C7EC" data-color="#68C7EC" onclick="setAccent('#68C7EC',this)"></div>
-            <div class="color-swatch" style="background:#27ae60" data-color="#27ae60" onclick="setAccent('#27ae60',this)"></div>
-            <div class="color-swatch" style="background:#9b59b6" data-color="#9b59b6" onclick="setAccent('#9b59b6',this)"></div>
-            <div class="color-swatch" style="background:#f39c12" data-color="#f39c12" onclick="setAccent('#f39c12',this)"></div>
+        <div class="settings-row" style="align-items:flex-start">
+          <div class="settings-row-info">
+            <div class="settings-row-label">Акцентный цвет</div>
+            <div class="settings-row-desc">Отдельный цвет для тёмной и светлой темы</div>
+          </div>
+          <div class="accent-palette-wrap">
+            <div class="accent-palette-meta">
+              <span class="accent-palette-hint" id="accent-theme-hint">Для тёмной темы</span>
+              <span class="accent-hex" id="accent-hex-label">#EE90B7</span>
+            </div>
+            <div class="color-swatches" id="color-swatches">
+              <div class="color-swatch" style="background:#EE90B7" data-color="#EE90B7" onclick="setAccent('#EE90B7',this)"></div>
+              <div class="color-swatch" style="background:#E35A90" data-color="#E35A90" onclick="setAccent('#E35A90',this)"></div>
+              <div class="color-swatch" style="background:#f39c12" data-color="#f39c12" onclick="setAccent('#f39c12',this)"></div>
+              <div class="color-swatch" style="background:#27ae60" data-color="#27ae60" onclick="setAccent('#27ae60',this)"></div>
+              <div class="color-swatch" style="background:#1dd1a1" data-color="#1dd1a1" onclick="setAccent('#1dd1a1',this)"></div>
+              <div class="color-swatch" style="background:#68C7EC" data-color="#68C7EC" onclick="setAccent('#68C7EC',this)"></div>
+              <div class="color-swatch" style="background:#e74c3c" data-color="#e74c3c" onclick="setAccent('#e74c3c',this)"></div>
+              <div class="color-swatch" style="background:#9b59b6" data-color="#9b59b6" onclick="setAccent('#9b59b6',this)"></div>
+              <div class="color-swatch" style="background:#a29bfe" data-color="#a29bfe" onclick="setAccent('#a29bfe',this)"></div>
+              <label class="color-swatch color-swatch-custom" id="color-swatch-custom" title="Свой цвет">
+                <input type="color" id="accent-color-picker" value="#EE90B7" oninput="setAccent(this.value, null)"/>
+                <svg class="color-swatch-custom-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                  <path fill="currentColor" d="M20.71 4.04a1 1 0 0 0-1.41 0l-1.34 1.34-1.06-1.06 1.06-1.06a1 1 0 1 0-1.41-1.41L15.2 2.26 13.97 1.03a1 1 0 0 0-1.41 0L9.9 3.69a1 1 0 0 0 0 1.41l1.23 1.23-7.5 7.5a2 2 0 0 0-.53 1.9l.5 1.9 1.9.5a2 2 0 0 0 1.9-.53l7.5-7.5 1.23 1.23a1 1 0 0 0 1.41 0l2.66-2.66a1 1 0 0 0 0-1.41L19.1 5.85l1.61-1.81a1 1 0 0 0 0-1.41zM7.4 17.1l-.7-.19.19-.7 6.8-6.8 1.2 1.2-6.49 6.49z"/>
+                </svg>
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -162,13 +180,35 @@ function loadProfilePage() {
   tog('s-shuffle', !!settings.shuffleOnPlay);
   tog('s-position', settings.rememberPosition !== false);
 
-  const cur = settings.accentColor || '#EE90B7';
-  page.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('active', s.dataset.color === cur));
   syncThemeButtons(settings.theme || 'dark');
   if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
+  syncAccentPaletteUI();
   refreshTopbarProfile();
 }
 window.loadProfilePage = loadProfilePage;
+
+function syncAccentPaletteUI() {
+  const settings = Store.getSettings();
+  const theme = settings.theme || 'dark';
+  const cur = (typeof getAccentForTheme === 'function'
+    ? getAccentForTheme(theme, settings)
+    : (settings.accentColor || '#EE90B7')).toUpperCase();
+  const hint = document.getElementById('accent-theme-hint');
+  if (hint) hint.textContent = theme === 'light' ? 'Для светлой темы' : 'Для тёмной темы';
+  const hex = document.getElementById('accent-hex-label');
+  if (hex) hex.textContent = cur;
+  const picker = document.getElementById('accent-color-picker');
+  if (picker) picker.value = cur;
+  const page = document.querySelector('.profile-page') || document;
+  let matched = false;
+  page.querySelectorAll('.color-swatch[data-color]').forEach(s => {
+    const on = String(s.dataset.color || '').toUpperCase() === cur;
+    s.classList.toggle('active', on);
+    if (on) matched = true;
+  });
+  document.getElementById('color-swatch-custom')?.classList.toggle('active', !matched);
+}
+window.syncAccentPaletteUI = syncAccentPaletteUI;
 
 function saveProfile() {
   let name = document.getElementById('pf-name')?.value.trim() || '';
@@ -202,12 +242,21 @@ function saveSetting(key, value) {
 window.saveSetting = saveSetting;
 
 function setAccent(color, el) {
-  document.querySelectorAll('.profile-page .color-swatch').forEach(s => s.classList.remove('active'));
-  if (el) el.classList.add('active');
-  Store.setSettings({ accentColor: color });
-  if (typeof applyAccentColor === 'function') applyAccentColor(color);
+  if (!color) return;
+  const hex = String(color).trim();
+  const theme = Store.getSettings().theme || 'dark';
+  const patch = theme === 'light'
+    ? { accentColorLight: hex, accentColor: hex }
+    : { accentColorDark: hex, accentColor: hex };
+  Store.setSettings(patch);
+  if (typeof applyAccentColor === 'function') applyAccentColor(hex);
   else if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
-  showNotif('Акцент обновлён');
+  syncAccentPaletteUI();
+  if (el) {
+    document.querySelectorAll('.profile-page .color-swatch').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+  }
+  showNotif(theme === 'light' ? 'Цвет светлой темы' : 'Цвет тёмной темы');
 }
 window.setAccent = setAccent;
 

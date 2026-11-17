@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MRF — Главная</title>
-  <link rel="icon" href="img/favicon.svg" type="image/svg+xml"/>
+  <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
@@ -197,29 +197,103 @@ function renderHomeRecent() {
   const recent = Store.getRecent();
   const items = recent.length
     ? recent
-    : MOCK.tracks.slice(0, 8).map(t => ({ id: t.id, title: t.title, artist: t.artistName, cover: t.cover }));
+    : MOCK.tracks.slice(0, 8).map(t => ({ id: t.id, title: t.title, artist: t.artistName, cover: t.cover, preview: t.preview, duration: t.duration }));
   if (!items.length) {
+    _src['recent'] = [];
     box.innerHTML = '<p style="color:var(--text-3);font-size:13px">Пока ничего нет</p>';
     if (typeof bindHomeRails === 'function') bindHomeRails();
     return;
   }
-  box.innerHTML = items.slice(0, 12).map(t => `
-    <button type="button" class="recent-card" onclick="playRecentTrack('${escHtml(String(t.id||''))}')">
-      ${t.cover
-        ? `<img src="${t.cover}" class="recent-card-cover" alt="" loading="lazy" onerror="this.style.display='none'">`
+  const list = items.slice(0, 12).map(t => {
+    const artistName = typeof t.artist === 'string' ? t.artist : (t.artist?.name || '');
+    const cover = t.cover || t.album?.cover_medium || '';
+    return {
+      id: t.id,
+      deezerId: t.deezerId || (String(t.id || '').startsWith('dz_') ? String(t.id).slice(3) : t.id),
+      title: t.title || '',
+      artist: { name: artistName, id: t.artistId || t.artist?.id },
+      album: { cover_medium: cover, cover },
+      preview: t.preview || null,
+      duration: t.duration || 0,
+      source: t.source || (String(t.id || '').startsWith('dz_') ? 'deezer' : 'local')
+    };
+  });
+  _src['recent'] = list;
+  box.innerHTML = list.map((t, i) => `
+    <button type="button" class="recent-card" onclick="playRecentAt(${i})">
+      ${t.album?.cover_medium
+        ? `<img src="${t.album.cover_medium}" class="recent-card-cover" alt="" loading="lazy" onerror="this.style.display='none'">`
         : `<span class="recent-card-cover recent-card-fallback">${noteSVGShared()}</span>`}
       <span class="recent-card-title">${escHtml(t.title||'')}</span>
-      <span class="recent-card-sub">${escHtml(t.artist||'')}</span>
+      <span class="recent-card-sub">${escHtml(t.artist?.name||'')}</span>
     </button>`).join('');
   if (typeof bindHomeRails === 'function') bindHomeRails();
 }
 window.renderHomeRecent = renderHomeRecent;
 
+async function playRecentAt(i) {
+  const list = _src['recent'] || [];
+  const t = list[i];
+  if (!t) return;
+  if (t.preview) {
+    playFromSrc('recent', i);
+    return;
+  }
+  // Уже загружен в другой ленте — копируем preview без лишних запросов
+  for (const key in _src) {
+    if (key === 'recent') continue;
+    const hit = (_src[key] || []).find(x =>
+      String(x.id) === String(t.id) ||
+      String(x.deezerId) === String(t.deezerId) ||
+      String(x.deezerId) === String(t.id)
+    );
+    if (hit?.preview) {
+      list[i] = { ...t, ...hit };
+      _src['recent'] = list;
+      playFromSrc('recent', i);
+      return;
+    }
+  }
+  const dzId = t.deezerId || (String(t.id || '').startsWith('dz_') ? String(t.id).slice(3) : '');
+  if (dzId) {
+    try {
+      const raw = await dzObj(`/track/${dzId}`);
+      if (raw && !raw.error && (raw.preview || raw.title)) {
+        list[i] = { ...t, ...normDZ(raw) };
+        _src['recent'] = list;
+        playFromSrc('recent', i);
+        return;
+      }
+    } catch {}
+  }
+  // mock / поиск по названию
+  const mock = typeof mockGetTrack === 'function' ? mockGetTrack(t.id) : null;
+  if (mock) {
+    playFromMockTrack(t.id);
+    return;
+  }
+  try {
+    const q = `${t.title || ''} ${t.artist?.name || ''}`.trim();
+    if (!q) return;
+    const found = (await dzArr(`/search/track?q=${encodeURIComponent(q)}&limit=5`)).map(normDZ);
+    const hit = found.find(x => String(x.deezerId) === String(dzId) || String(x.id) === String(t.id)) || found[0];
+    if (hit) {
+      list[i] = hit;
+      _src['recent'] = list;
+      playFromSrc('recent', i);
+    }
+  } catch {}
+}
+window.playRecentAt = playRecentAt;
+
 function playRecentTrack(id) {
   if (!id) return;
+  const list = _src['recent'] || [];
+  const idx = list.findIndex(t => String(t.id) === String(id) || String(t.deezerId) === String(id));
+  if (idx >= 0) { playRecentAt(idx); return; }
   for (const key in _src) {
-    const idx = (_src[key] || []).findIndex(t => String(t.id) === String(id) || String(t.deezerId) === String(id));
-    if (idx >= 0) { playFromSrc(key, idx); return; }
+    const i = (_src[key] || []).findIndex(t => String(t.id) === String(id) || String(t.deezerId) === String(id));
+    if (i >= 0) { playFromSrc(key, i); return; }
   }
   const qIdx = (queue || []).findIndex(t => String(t.id) === String(id));
   if (qIdx >= 0) { queueIndex = qIdx; playNow(); return; }

@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" fill="#EE90B7">
-  <circle cx="626" cy="615" r="603" fill="none" stroke="#EE90B7" stroke-width="38"/>
-  <rect x="429" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
-  <rect x="515" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
-  <rect x="600" y="193" width="54" height="287" rx="27" ry="27"/>
-  <rect x="686" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
-  <rect x="772" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
-  <text x="626" y="848" text-anchor="middle" font-family="Arial Black, Helvetica Neue, Impact, sans-serif" font-size="310" font-weight="900" font-style="italic" letter-spacing="-14" fill="#EE90B7">MRF</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Solid mark optimized for 16–32px tab icons -->
+  <rect width="64" height="64" rx="16" fill="#EE90B7"/>
+  <rect x="12" y="30" width="6" height="18" rx="3" fill="#111111"/>
+  <rect x="22" y="24" width="6" height="30" rx="3" fill="#111111"/>
+  <rect x="32" y="16" width="6" height="40" rx="3" fill="#111111"/>
+  <rect x="42" y="24" width="6" height="30" rx="3" fill="#111111"/>
+  <rect x="52" y="30" width="6" height="18" rx="3" fill="#111111"/>
 </svg>

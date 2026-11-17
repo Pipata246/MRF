@@ -24,6 +24,8 @@ const MOCK = {
     rememberPosition: true,
     defaultVolume: 70,
     accentColor: '#EE90B7',
+    accentColorDark: '#EE90B7',
+    accentColorLight: '#E35A90',
     theme: 'dark'
   },
 
@@ -296,8 +298,19 @@ const Store = {
   getRecent()     { return this._get(this.keys.recent, []); },
   addRecent(track) {
     let arr = this.getRecent();
-    arr = arr.filter(t => t.id !== track.id);
-    arr.unshift({ id: track.id, title: track.title, artist: track.artistName || track.artist?.name || '', cover: track.cover || track.album?.cover_medium || '', addedAt: Date.now() });
+    arr = arr.filter(t => String(t.id) !== String(track.id));
+    arr.unshift({
+      id: track.id,
+      deezerId: track.deezerId || (String(track.id || '').startsWith('dz_') ? String(track.id).slice(3) : null),
+      title: track.title,
+      artist: track.artistName || track.artist?.name || '',
+      artistId: track.artist?.id || track.artistId || null,
+      cover: track.cover || track.album?.cover_medium || track.album?.cover || '',
+      preview: track.preview || null,
+      duration: track.duration || 0,
+      source: track.source || null,
+      addedAt: Date.now()
+    });
     if (arr.length > 20) arr = arr.slice(0, 20);
     this._set(this.keys.recent, arr);
   },

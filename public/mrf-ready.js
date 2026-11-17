@@ -29,12 +29,21 @@ function applyAccentColor(color) {
 window.applyAccentColor = applyAccentColor;
 window.shadeHex = shadeHex;
 
+function getAccentForTheme(theme, settings) {
+  const s = settings || (typeof Store !== 'undefined' ? Store.getSettings() : {}) || {};
+  const t = theme || s.theme || 'dark';
+  if (t === 'light') return s.accentColorLight || s.accentColor || '#E35A90';
+  return s.accentColorDark || s.accentColor || '#EE90B7';
+}
+window.getAccentForTheme = getAccentForTheme;
+
 function applyThemeFromSettings() {
   const s = Store.getSettings();
   const theme = s.theme || 'dark';
   document.documentElement.setAttribute('data-theme', theme);
   document.body.classList.toggle('theme-light', theme === 'light');
-  applyAccentColor(s.accentColor || '#EE90B7');
+  applyAccentColor(getAccentForTheme(theme, s));
+  if (typeof syncAccentPaletteUI === 'function') syncAccentPaletteUI();
 }
 window.applyThemeFromSettings = applyThemeFromSettings;
 
