@@ -14,6 +14,8 @@
   );
 
   let busy = false;
+  let navToken = 0;
+  let pendingNav = null;
   let hrefPatchInstalled = false;
   let allowHardNav = false;
   let rawAssign = null;
@@ -104,9 +106,13 @@
     if (loadedScripts.has(name)) return Promise.resolve();
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
+      const timer = setTimeout(() => {
+        s.remove();
+        reject(new Error('script timeout ' + src));
+      }, 8000);
       s.src = src;
-      s.onload = () => { loadedScripts.add(name); resolve(); };
-      s.onerror = () => reject(new Error('script ' + src));
+      s.onload = () => { clearTimeout(timer); loadedScripts.add(name); resolve(); };
+      s.onerror = () => { clearTimeout(timer); reject(new Error('script ' + src)); };
       document.head.appendChild(s);
     });
   }
@@ -121,6 +127,60 @@
     s.textContent = rewritten;
     document.body.appendChild(s);
     s.remove();
+  }
+
+  /** Page-specific <style> / extra CSS from fetched document head */
+  function applyPageAssets(doc, pageId) {
+    document.querySelectorAll('style[data-mrf-page]').forEach(el => el.remove());
+    doc.querySelectorAll('head style').forEach((st, i) => {
+      const css = (st.textContent || '').trim();
+      if (!css) return;
+      const el = document.createElement('style');
+      el.setAttribute('data-mrf-page', pageId || ('p' + i));
+      el.textContent = css;
+      document.head.appendChild(el);
+    });
+    doc.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+      const href = link.getAttribute('href');
+      if (!href) return;
+      const name = href.split('/').pop().split('?')[0];
+      if (/^style\.css$/i.test(name)) return;
+      if (document.querySelector(`link[data-mrf-page-css="${name}"]`)) return;
+      const l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = href;
+      l.setAttribute('data-mrf-page-css', name);
+      document.head.appendChild(l);
+    });
+  }
+
+  /** Cancel in-flight artist/album renders only when leaving those pages */
+  function cancelLoadsWhenLeaving(fromPage, toPage) {
+    if (fromPage === 'artist' && toPage !== 'artist') {
+      window.__artistLoadGen = (window.__artistLoadGen || 0) + 1;
+    }
+    if (fromPage === 'album' && toPage !== 'album') {
+      window.__albumLoadGen = (window.__albumLoadGen || 0) + 1;
+    }
+    window.__mrfNavGen = (window.__mrfNavGen || 0) + 1;
+  }
+
+  function rememberRouteParams(absUrl) {
+    try {
+      const p = pageName(absUrl);
+      if (p === 'artist') {
+        sessionStorage.setItem('mrf_route_artist', JSON.stringify({
+          id: absUrl.searchParams.get('id') || '',
+          name: absUrl.searchParams.get('name') || ''
+        }));
+      } else if (p === 'album') {
+        sessionStorage.setItem('mrf_route_album', JSON.stringify({
+          id: absUrl.searchParams.get('id') || '',
+          title: absUrl.searchParams.get('title') || '',
+          artist: absUrl.searchParams.get('artist') || ''
+        }));
+      }
+    } catch {}
   }
 
   async function bootFetchedPage(doc, absUrl) {
@@ -140,13 +200,15 @@
     }
 
     for (const src of externals) {
-      await loadScriptOnce(src);
+      try { await loadScriptOnce(src); }
+      catch (e) { console.warn('[MRF soft-nav] script', e); }
     }
 
     // Inline page scripts (charts/artist/album/…) — whenDomReady runs immediately
     for (const code of inlines) runInline(code);
 
     // External page modules: first load auto-boots; later visits need a re-enter
+    // IMPORTANT: do not await Deezer/API page loaders — they block soft-nav for seconds
     const pname = pageName(absUrl);
     const justLoadedSearch = externals.some(s => String(s).includes('search-page'));
     const justLoadedLib = externals.some(s => String(s).includes('library-page'));
@@ -166,22 +228,39 @@
     } else if (pname === 'liked' && typeof renderLikedPage === 'function') {
       renderLikedPage();
     } else if (pname === 'artist' && typeof window.loadArtistPage === 'function') {
-      await window.loadArtistPage({
-        id: absUrl.searchParams.get('id') || '',
-        name: absUrl.searchParams.get('name') || ''
-      });
+      let id = absUrl.searchParams.get('id') || '';
+      let name = absUrl.searchParams.get('name') || '';
+      if (!id && !name) {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem('mrf_route_artist') || '{}');
+          id = saved.id || '';
+          name = saved.name || '';
+        } catch {}
+      }
+      void window.loadArtistPage({ id, name });
     } else if (pname === 'album' && typeof window.loadAlbumPage === 'function') {
-      await window.loadAlbumPage({
-        id: absUrl.searchParams.get('id') || '',
-        title: absUrl.searchParams.get('title') || '',
-        artist: absUrl.searchParams.get('artist') || ''
-      });
+      let id = absUrl.searchParams.get('id') || '';
+      let title = absUrl.searchParams.get('title') || '';
+      let artist = absUrl.searchParams.get('artist') || '';
+      if (!id && !title) {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem('mrf_route_album') || '{}');
+          id = saved.id || '';
+          title = saved.title || '';
+          artist = saved.artist || '';
+        } catch {}
+      }
+      void window.loadAlbumPage({ id, title, artist });
     } else if (pname === 'artists' && typeof window.renderArtistsPage === 'function') {
       window.renderArtistsPage();
     } else if (pname === 'albums' && typeof window.renderAlbumsPage === 'function') {
       window.renderAlbumsPage();
     } else if (pname === 'profile' && typeof window.loadProfilePage === 'function') {
       window.loadProfilePage();
+    } else if ((pname === 'index' || pname === '' || pname === 'home') && typeof window.loadHomePage === 'function') {
+      void window.loadHomePage();
+    } else if (pname === 'charts' && typeof window.loadCharts === 'function') {
+      void window.loadCharts();
     }
   }
 
@@ -210,14 +289,26 @@
       return;
     }
 
-    if (busy) return;
+    // If a nav is in flight, queue the latest target instead of dropping clicks
+    if (busy) {
+      pendingNav = { url: abs.href, opts: { replace, fromPop } };
+      return;
+    }
+
+    const token = ++navToken;
     busy = true;
     window.__mrfSoftNavigating = true;
+    const fromPage = pageName(location.href);
+    const toPage = pageName(abs);
+    cancelLoadsWhenLeaving(fromPage, toPage);
+    rememberRouteParams(abs);
 
     try {
       const res = await fetch(abs.href, { credentials: 'same-origin', cache: 'no-cache' });
+      if (token !== navToken) return;
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const html = await res.text();
+      if (token !== navToken) return;
       const doc = new DOMParser().parseFromString(html, 'text/html');
 
       const newMain = doc.querySelector('main.main-content, main');
@@ -226,12 +317,15 @@
 
       // Keep sidebar-root + player-root untouched — Audio keeps playing
       document.title = doc.title || document.title;
+      // Prefer URL with query (some static servers strip ? on clean /artist redirects)
+      const stateUrl = abs.href;
       if (!fromPop) {
-        if (replace) history.replaceState({ mrfSoft: 1 }, '', abs.href);
-        else history.pushState({ mrfSoft: 1 }, '', abs.href);
+        if (replace) history.replaceState({ mrfSoft: 1 }, '', stateUrl);
+        else history.pushState({ mrfSoft: 1 }, '', stateUrl);
       }
-      recordHistory(abs.href, { replace: replace && !fromPop, fromPop });
+      recordHistory(stateUrl, { replace: replace && !fromPop, fromPop });
 
+      applyPageAssets(doc, toPage);
       curMain.innerHTML = newMain.innerHTML;
 
       // Refresh chrome inside main + sidebar active state (no player rebuild)
@@ -240,13 +334,18 @@
         if (typeof injectTopbar === 'function') injectTopbar();
         if (typeof updateSidebarActive === 'function') updateSidebarActive(pageName(abs.href));
       }
+      if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
       if (typeof window.renderSidebarPlaylists === 'function') window.renderSidebarPlaylists();
       updateChromeNavButtons();
 
       await bootFetchedPage(doc, abs);
+      if (token !== navToken) return;
+
       if (typeof window.renderSidebarPlaylists === 'function') window.renderSidebarPlaylists();
 
       curMain.scrollTop = 0;
+      const feed = curMain.querySelector('.feed');
+      if (feed) feed.scrollTop = 0;
       window.scrollTo(0, 0);
       if (typeof updateFavBadge === 'function') updateFavBadge();
       if (typeof syncFavIcons === 'function') syncFavIcons();
@@ -257,14 +356,23 @@
       console.warn('[MRF soft-nav] fallback hard nav', err);
       window.__mrfSoftNavigating = false;
       busy = false;
+      pendingNav = null;
       allowHardNav = true;
       try { (rawAssign || Location.prototype.assign).call(location, abs.href); }
       finally { allowHardNav = false; }
       return;
+    } finally {
+      if (token === navToken) {
+        window.__mrfSoftNavigating = false;
+        busy = false;
+        const next = pendingNav;
+        pendingNav = null;
+        if (next) {
+          // Defer so finally settles before next nav
+          setTimeout(() => softNavigate(next.url, next.opts), 0);
+        }
+      }
     }
-
-    window.__mrfSoftNavigating = false;
-    busy = false;
   }
 
   window.mrfGo = softNavigate;

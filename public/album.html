@@ -35,17 +35,32 @@ else bootAlbumPage();
 
 async function loadAlbumPage(forced) {
   const params = new URLSearchParams(location.search);
-  const rawId = forced && forced.id != null && String(forced.id) !== ''
+  let rawId = forced && forced.id != null && String(forced.id) !== ''
     ? String(forced.id)
     : String(params.get('id') || '');
-  let albumTitle = forced && forced.title != null
+  let albumTitle = forced && forced.title != null && String(forced.title) !== ''
     ? String(forced.title)
     : String(params.get('title') || '');
-  let artistName = forced && forced.artist != null
+  let artistName = forced && forced.artist != null && String(forced.artist) !== ''
     ? String(forced.artist)
     : String(params.get('artist') || '');
+
+  if (!rawId && !albumTitle && !artistName) {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('mrf_route_album') || '{}');
+      rawId = saved.id || '';
+      albumTitle = saved.title || '';
+      artistName = saved.artist || '';
+    } catch (_) {}
+  }
+
   const feed = document.getElementById('album-feed');
   if (!feed) return;
+  try {
+    sessionStorage.setItem('mrf_route_album', JSON.stringify({
+      id: rawId || '', title: albumTitle || '', artist: artistName || ''
+    }));
+  } catch (_) {}
 
   let id = (typeof normalizeDeezerId === 'function' ? normalizeDeezerId(rawId) : rawId) || '';
   if (!id || id === 'undefined' || id === 'null' || id === '0') id = '';
@@ -59,7 +74,7 @@ async function loadAlbumPage(forced) {
     try {
       const q = [albumTitle, artistName].filter(Boolean).join(' ');
       const found = await dzArr(`/search/album?q=${encodeURIComponent(q)}&limit=10`);
-      if (gen !== window.__albumLoadGen) return;
+      if (gen !== window.__albumLoadGen || !document.getElementById('album-feed')) return;
       const exact = found.find(a =>
         (!albumTitle || (a.title || '').toLowerCase() === albumTitle.toLowerCase()) &&
         (!artistName || (a.artist?.name || '').toLowerCase() === artistName.toLowerCase())
@@ -74,7 +89,7 @@ async function loadAlbumPage(forced) {
   }
 
   if (!id) {
-    if (gen !== window.__albumLoadGen) return;
+    if (gen !== window.__albumLoadGen || !document.getElementById('album-feed')) return;
     feed.innerHTML = `
       <div class="search-empty" style="padding:48px 0;text-align:center">
         <p style="color:var(--text-3);margin-bottom:14px">Альбом не найден</p>
@@ -88,7 +103,7 @@ async function loadAlbumPage(forced) {
   // BACKEND TODO: Получение информации об альбоме
   let album = {};
   try { album = await dzObj(`/album/${id}`); } catch (_) { album = {}; }
-  if (gen !== window.__albumLoadGen) return;
+  if (gen !== window.__albumLoadGen || !document.getElementById('album-feed')) return;
   if (album && album.error) album = {};
 
   if (!album || !album.id) {
@@ -97,7 +112,7 @@ async function loadAlbumPage(forced) {
       try {
         const q = [albumTitle, artistName].filter(Boolean).join(' ');
         const found = await dzArr(`/search/album?q=${encodeURIComponent(q)}&limit=10`);
-        if (gen !== window.__albumLoadGen) return;
+        if (gen !== window.__albumLoadGen || !document.getElementById('album-feed')) return;
         const exact = found.find(a =>
           (!albumTitle || (a.title || '').toLowerCase() === albumTitle.toLowerCase()) &&
           (!artistName || (a.artist?.name || '').toLowerCase() === artistName.toLowerCase())
@@ -111,7 +126,7 @@ async function loadAlbumPage(forced) {
       } catch (_) {}
     }
   }
-  if (gen !== window.__albumLoadGen) return;
+  if (gen !== window.__albumLoadGen || !document.getElementById('album-feed')) return;
 
   if (!album || !album.id) {
     feed.innerHTML = `

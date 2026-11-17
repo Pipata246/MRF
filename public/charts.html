@@ -62,6 +62,7 @@ var _risingLoaded = false;
 whenDomReady(() => {
   initShared();
   switchChartsMode('charts', { silent: true });
+  if (window.__mrfSoftNavigating) return;
   loadCharts();
 });
 
@@ -104,8 +105,8 @@ function switchChartsMode(mode, opts) {
 }
 
 async function loadCharts() {
-  const box = document.getElementById('charts-list');
-  if (box) box.innerHTML = `<div class="loading-placeholder"><div class="spinner"></div><span>Загружаем чарты…</span></div>`;
+  const box0 = document.getElementById('charts-list');
+  if (box0) box0.innerHTML = `<div class="loading-placeholder"><div class="spinner"></div><span>Загружаем чарты…</span></div>`;
   // BACKEND TODO: Получение мировых чартов (топ-100)
   let all = (await dzArr('/chart/0/tracks?limit=100')).map(normDZ);
   if (_genre !== 'all') {
@@ -113,11 +114,13 @@ async function loadCharts() {
     const genreTracks = (await dzArr(`/search/track?q=${q}&limit=100`)).map(normDZ);
     if (genreTracks.length) all = genreTracks;
   }
+  if (!document.getElementById('charts-list')) return;
   _rawCharts = all;
   _src['charts'] = all;
   renderChartsList(all);
   if (typeof syncPlayingRows === 'function') syncPlayingRows();
 }
+window.loadCharts = loadCharts;
 
 function renderChartsList(all) {
   const box = document.getElementById('charts-list');

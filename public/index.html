@@ -157,9 +157,11 @@
 <script>
 whenDomReady(() => {
   initShared();
-  loadHomePage();
   if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
   else if (typeof applyAccentColor === 'function') applyAccentColor(Store.getSettings().accentColor);
+  // Soft-nav calls loadHomePage itself — avoid duplicate parallel Deezer flood
+  if (window.__mrfSoftNavigating) return;
+  loadHomePage();
 });
 
 function goSearch(tag) {
@@ -186,6 +188,7 @@ async function loadHomePage() {
     console.error('[HOME] Error loading:', err);
   }
 }
+window.loadHomePage = loadHomePage;
 
 function renderHomeRecent() {
   const box = document.getElementById('recent-rail');
@@ -313,13 +316,12 @@ function bindHomeRails() {
 }
 
 async function renderHomeCharts() {
-  const box = document.getElementById('home-charts-list');
-  if (!box) return;
-  
+  if (!document.getElementById('home-charts-list')) return;
+
   try {
-    console.log('[HOME] Loading charts...');
     const tracks = (await dzArr('/chart/0/tracks?limit=5')).map(normDZ);
-    console.log('[HOME] Charts loaded:', tracks.length);
+    const box = document.getElementById('home-charts-list');
+    if (!box) return;
     _src['home'] = tracks;
     fillHomeFeature(tracks[0] || null);
     box.innerHTML = tracks.length
@@ -328,8 +330,9 @@ async function renderHomeCharts() {
     if (typeof syncPlayingRows === 'function') syncPlayingRows();
   } catch (err) {
     console.error('[HOME] Charts error:', err);
+    const box = document.getElementById('home-charts-list');
     fillHomeFeature(null);
-    box.innerHTML = `<p style="color:var(--text-3);padding:20px">Ошибка загрузки: ${err.message}</p>`;
+    if (box) box.innerHTML = `<p style="color:var(--text-3);padding:20px">Ошибка загрузки: ${err.message}</p>`;
   }
 }
 

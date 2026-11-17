@@ -123,17 +123,43 @@ window.bindPlayerUIControls = bindPlayerUIControls;
 /* ══════════════════════════════════
    DEEZER JSONP
 ══════════════════════════════════ */
+/* Limit parallel JSONP — too many at once = timeouts / empty pages */
+const _dzMaxParallel = 5;
+let _dzActive = 0;
+const _dzWait = [];
+function _dzPump() {
+  while (_dzActive < _dzMaxParallel && _dzWait.length) {
+    const job = _dzWait.shift();
+    _dzActive++;
+    job();
+  }
+}
+
 function dz(path) {
   return new Promise((resolve, reject) => {
-    const cb  = '__dz' + (++_cbId);
-    const tag = document.createElement('script');
-    const tid = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 10000);
-    window[cb] = data => { cleanup(); resolve(data); };
-    function cleanup() { clearTimeout(tid); delete window[cb]; tag.remove(); }
-    const sep = path.includes('?') ? '&' : '?';
-    tag.src   = `${DZ}${path}${sep}callback=${cb}&output=jsonp`;
-    tag.onerror = () => { cleanup(); reject(new Error('error')); };
-    document.head.appendChild(tag);
+    const start = () => {
+      const cb  = '__dz' + (++_cbId);
+      const tag = document.createElement('script');
+      let done = false;
+      const finish = (fn, arg) => {
+        if (done) return;
+        done = true;
+        clearTimeout(tid);
+        try { delete window[cb]; } catch {}
+        try { tag.remove(); } catch {}
+        _dzActive = Math.max(0, _dzActive - 1);
+        _dzPump();
+        fn(arg);
+      };
+      const tid = setTimeout(() => finish(reject, new Error('timeout')), 10000);
+      window[cb] = data => finish(resolve, data);
+      tag.onerror = () => finish(reject, new Error('error'));
+      const sep = path.includes('?') ? '&' : '?';
+      tag.src = `${DZ}${path}${sep}callback=${cb}&output=jsonp`;
+      document.head.appendChild(tag);
+    };
+    _dzWait.push(start);
+    _dzPump();
   });
 }
 
