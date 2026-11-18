@@ -199,6 +199,15 @@
       }
     }
 
+    // Track which page modules were already cached BEFORE this nav
+    const wasCached = (needle) => {
+      const src = externals.find(s => String(s).includes(needle));
+      if (!src) return false;
+      const name = String(src).split('/').pop().split('?')[0];
+      return loadedScripts.has(name);
+    };
+    const searchWasCached = wasCached('search-page');
+
     for (const src of externals) {
       try { await loadScriptOnce(src); }
       catch (e) { console.warn('[MRF soft-nav] script', e); }
@@ -207,27 +216,27 @@
     // Inline page scripts (charts/artist/album/…) — whenDomReady runs immediately
     for (const code of inlines) runInline(code);
 
-    // External page modules: first load auto-boots; later visits need a re-enter
+    // External page modules: first load auto-boots; later visits need an explicit re-enter.
     // IMPORTANT: do not await Deezer/API page loaders — they block soft-nav for seconds
     const pname = pageName(absUrl);
-    const justLoadedSearch = externals.some(s => String(s).includes('search-page'));
-    const justLoadedLib = externals.some(s => String(s).includes('library-page'));
 
     if (pname === 'search') {
       const q = absUrl.searchParams.get('q');
       if (typeof bindMobileSearchField === 'function') bindMobileSearchField();
-      if (!justLoadedSearch && typeof bootSearchPage === 'function') {
-        // re-enter search without reloading search-page.js
+      // Always re-boot search: cached script won't auto-run, and DOM was just replaced
+      if (typeof bootSearchPage === 'function') bootSearchPage();
+      else if (searchWasCached) {
         if (typeof initSearchPage === 'function') initSearchPage();
         if (q && typeof doSearch === 'function') doSearch(q, { save: true });
         else if (typeof resetSearchHome === 'function') resetSearchHome({ replaceUrl: false });
         else if (typeof showSearchInitial === 'function') showSearchInitial();
-      } else if (justLoadedSearch && q && typeof doSearch === 'function') {
-        // script just loaded & may have booted; ensure query still applied
+      } else if (q && typeof doSearch === 'function') {
         doSearch(q, { save: true });
       }
-    } else if (pname === 'library' && typeof bootLibrary === 'function' && !justLoadedLib) {
-      bootLibrary();
+    } else if (pname === 'library') {
+      // HTML always lists library-page.js — must re-boot on every visit or lib-content stays empty
+      if (typeof bootLibrary === 'function') bootLibrary();
+      else if (typeof renderLib === 'function') renderLib('all');
     } else if (pname === 'playlist' && typeof loadPlaylistPage === 'function') {
       loadPlaylistPage();
     } else if (pname === 'playlists' && typeof renderPlaylistsPage === 'function') {

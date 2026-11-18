@@ -6,7 +6,10 @@ let _pageSelectMode = false;
 let _pageSelected = new Set();
 
 function bootLibrary() {
-  initShared();
+  if (typeof initShared === 'function') initShared();
+  if (typeof updateSearchModeUI === 'function') updateSearchModeUI();
+  if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
+  if (typeof updateMobileNavActive === 'function') updateMobileNavActive('library');
   const params = new URLSearchParams(location.search);
   if (params.get('tab')) {
     const tab = params.get('tab');
@@ -17,6 +20,7 @@ function bootLibrary() {
     else renderLib('all');
   } else renderLib('all');
 }
+window.bootLibrary = bootLibrary;
 if (typeof whenDomReady === 'function') whenDomReady(bootLibrary);
 else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootLibrary);
 else bootLibrary();
