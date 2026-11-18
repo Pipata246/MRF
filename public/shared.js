@@ -621,6 +621,54 @@ function injectPlayer() {
 }
 
 /* ══════════════════════════════════
+   МОБИЛЬНАЯ НАВИГАЦИЯ
+══════════════════════════════════ */
+function injectMobileNav() {
+  let root = document.getElementById('mobile-nav-root');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'mobile-nav-root';
+    document.body.appendChild(root);
+  }
+  if (root.querySelector('.mobile-nav')) {
+    updateMobileNavActive(getPageId());
+    return;
+  }
+
+  const navItems = [
+    {
+      href: 'index.html', page: 'index', label: 'Главная',
+      icon: '<path d="M3 12L12 3L21 12V20H15V14H9V20H3V12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'
+    },
+    {
+      href: 'search.html', page: 'search', label: 'Поиск',
+      icon: '<circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+    },
+    {
+      href: 'library.html', page: 'library', label: 'Библиотека',
+      icon: '<path d="M9 18V6l12-3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="15" r="3" stroke="currentColor" stroke-width="1.8"/>'
+    },
+  ];
+
+  const curPage = getPageId();
+  root.innerHTML = `<nav class="mobile-nav" role="navigation" aria-label="Главная навигация">
+    ${navItems.map(item => `
+      <a href="${item.href}" class="mobile-nav-item${curPage === item.page ? ' active' : ''}" data-mob-page="${item.page}" onclick="event.preventDefault();(window.mrfGo||function(u){location.href=u})('${item.href}')">
+        <svg viewBox="0 0 24 24" fill="none" width="24" height="24">${item.icon}</svg>
+        <span>${item.label}</span>
+      </a>`).join('')}
+  </nav>`;
+}
+
+function updateMobileNavActive(pageId) {
+  const id = pageId || getPageId();
+  document.querySelectorAll('.mobile-nav-item[data-mob-page]').forEach(a => {
+    a.classList.toggle('active', a.getAttribute('data-mob-page') === id);
+  });
+}
+window.updateMobileNavActive = updateMobileNavActive;
+
+/* ══════════════════════════════════
    ИНИЦИАЛИЗАЦИЯ SHARED
 ══════════════════════════════════ */
 function initShared() {
@@ -636,6 +684,7 @@ function initShared() {
   injectSidebar();
   injectTopbar();
   injectPlayer();
+  injectMobileNav();
   ensurePlaylistModals();
 
   // bind progress/volume after player DOM exists

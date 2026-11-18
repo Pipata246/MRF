@@ -123,12 +123,16 @@ function openRightPanel(tab) {
   document.body.classList.add('right-panel-open');
   setRightPanelTab(tab || 'now');
   Store.setPanelState({ open: true, tab: tab || 'now' });
+  // Сбросить скролл к верху при открытии
+  const body = document.getElementById('rp-body');
+  if (body) body.scrollTop = 0;
 }
 
 function closeRightPanel() {
   document.getElementById('right-panel')?.classList.add('hidden');
   document.body.classList.remove('right-panel-open');
   Store.setPanelState({ open: false });
+  if (typeof _stopRpProgressSync === 'function') _stopRpProgressSync();
 }
 
 function setRightPanelTab(tab) {
@@ -201,9 +205,15 @@ function renderRpNow(box) {
   const album = t.album?.title || '';
   const albumId = t.album?.id;
   const fav = typeof Store !== 'undefined' && Store.isFav(t);
+  const playing = typeof isPlaying !== 'undefined' && isPlaying;
   const albumClick = albumId
     ? `onclick="(typeof openSavedAlbum==='function'?openSavedAlbum('${albumId}','${ejsonReady(album)}','${ejsonReady(t.artist?.name || '')}'):(window.mrfGo||function(u){location.href=u})(mrfUrl('album',{id:'${albumId}',title:'${ejsonReady(album)}'})))"`
     : '';
+
+  const playIconSvg = playing
+    ? `<svg width="56" height="56" viewBox="0 0 24 24" fill="none"><path d="M22 12C22 6.477 17.523 2 12 2S2 6.477 2 12s4.477 10 10 10 10-4.477 10-10zm-10 7.992C7.58 19.99 4 16.408 4 11.992S7.58 3.994 11.996 3.992C16.413 3.99 20 7.583 20 12c0 4.413-3.583 7.994-7.996 7.992z" fill="currentColor" clip-rule="evenodd" fill-rule="evenodd"/><path d="M11 8H9v8h2V8zm4 0h-2v8h2V8z" fill="currentColor"/></svg>`
+    : `<svg width="56" height="56" viewBox="0 0 24 24" fill="none"><path d="M22 12C22 6.477 17.523 2 12 2S2 6.477 2 12s4.477 10 10 10 10-4.477 10-10zm-10 7.992C7.58 19.99 4 16.408 4 11.992S7.58 3.994 11.996 3.992C16.413 3.99 20 7.583 20 12c0 4.413-3.583 7.994-7.996 7.992z" fill="currentColor" clip-rule="evenodd" fill-rule="evenodd"/><path d="M10 16V8l6 4-6 4z" fill="currentColor"/></svg>`;
+
   box.innerHTML = `
     <div class="rp-now">
       <div class="rp-cover-wrap">
@@ -214,17 +224,51 @@ function renderRpNow(box) {
         ${rpArtistChipsHTML(t)}
         ${album ? `<button type="button" class="rp-now-album" ${albumClick}>${escHtml(album)}</button>` : ''}
       </div>
+
+      <!-- Мобильные контролы плеера -->
+      <div class="rp-player-controls">
+        <div class="rp-progress-wrap">
+          <div class="rp-progress-track" id="rp-progress-track">
+            <div class="rp-progress-fill" id="rp-progress-fill" style="width:${getRpProgressPct()}%">
+              <div class="rp-progress-thumb"></div>
+            </div>
+          </div>
+          <div class="rp-progress-times">
+            <span id="rp-time-current">${getRpTimeCurrent()}</span>
+            <span id="rp-time-total">${getRpTimeTotal()}</span>
+          </div>
+        </div>
+        <div class="rp-controls-row">
+          <button type="button" class="rp-ctrl-btn rp-ctrl-sm" onclick="toggleFavPlayer();setRightPanelTab('now')" title="${fav ? 'Убрать из избранного' : 'В избранное'}">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="${fav ? 'currentColor' : 'none'}"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/></svg>
+          </button>
+          <button type="button" class="rp-ctrl-btn" onclick="prevTrack()" title="Предыдущий">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="32" height="32"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          </button>
+          <button type="button" class="rp-ctrl-btn rp-ctrl-play" onclick="togglePlay();setTimeout(()=>setRightPanelTab('now'),80)" title="Пауза / Играть">
+            ${playIconSvg}
+          </button>
+          <button type="button" class="rp-ctrl-btn" onclick="nextTrack()" title="Следующий">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="32" height="32"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+          </button>
+          <button type="button" class="rp-ctrl-btn rp-ctrl-sm" onclick="setRightPanelTab('queue')" title="Очередь">
+            <svg viewBox="0 0 24 24" fill="none" width="22" height="22"><path d="M3 6h18M3 12h12M3 18h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+
       <div class="rp-now-actions">
-        <button type="button" class="rp-action${fav ? ' is-on' : ''}" onclick="toggleFavPlayer();setRightPanelTab('now')">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="${fav ? 'currentColor' : 'none'}"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/></svg>
-          ${fav ? 'В избранном' : 'В избранное'}
-        </button>
         <button type="button" class="rp-action" onclick="setRightPanelTab('lyrics')">Текст</button>
         <button type="button" class="rp-action" onclick="setRightPanelTab('artist')">Артисты</button>
       </div>
       <div class="rp-section-title">Похожие</div>
       <div id="rp-similar" class="rp-similar">${loaderHTMLShared('Ищем похожие…')}</div>
     </div>`;
+
+  // Привязка прогресс-бара
+  _bindRpProgress();
+  // Сбросить скролл к верху
+  if (box) box.scrollTop = 0;
   if (typeof enrichTrackArtists === 'function' && !t._artistsEnriched) {
     const tid = t.id;
     enrichTrackArtists(t).then(() => {
@@ -237,6 +281,99 @@ function renderRpNow(box) {
 }
 
 let _rpSimilarGen = 0;
+
+/* ── helpers for rp progress display ── */
+function getRpProgressPct() {
+  try {
+    const a = (typeof audio !== 'undefined') ? audio : null;
+    if (!a || !a.duration || !isFinite(a.duration)) return 0;
+    return Math.min(100, (a.currentTime / a.duration) * 100);
+  } catch { return 0; }
+}
+function _fmt(sec) {
+  if (!sec || !isFinite(sec)) return '0:00';
+  return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+}
+function getRpTimeCurrent() {
+  try { return _fmt((typeof audio !== 'undefined') ? audio.currentTime : 0); } catch { return '0:00'; }
+}
+function getRpTimeTotal() {
+  try {
+    const a = (typeof audio !== 'undefined') ? audio : null;
+    if (!a || !a.duration || !isFinite(a.duration)) return '0:00';
+    return _fmt(a.duration);
+  } catch { return '0:00'; }
+}
+
+let _rpProgressTimer = null;
+function _startRpProgressSync() {
+  _stopRpProgressSync();
+  _rpProgressTimer = setInterval(() => {
+    try {
+      const a = (typeof audio !== 'undefined') ? audio : null;
+      if (!a) return;
+      const fill = document.getElementById('rp-progress-fill');
+      const tc = document.getElementById('rp-time-current');
+      const tt = document.getElementById('rp-time-total');
+      if (fill && a.duration && isFinite(a.duration)) {
+        fill.style.width = Math.min(100, (a.currentTime / a.duration) * 100) + '%';
+      }
+      if (tc) tc.textContent = _fmt(a.currentTime);
+      if (tt && a.duration && isFinite(a.duration)) tt.textContent = _fmt(a.duration);
+    } catch {}
+  }, 500);
+}
+function _stopRpProgressSync() {
+  if (_rpProgressTimer) { clearInterval(_rpProgressTimer); _rpProgressTimer = null; }
+}
+
+function _bindRpProgress() {
+  _startRpProgressSync();
+  const track = document.getElementById('rp-progress-track');
+  if (!track || track.dataset.rpBound) return;
+  track.dataset.rpBound = '1';
+  let dragging = false;
+  const getPct = e => {
+    const r = track.getBoundingClientRect();
+    return Math.max(0, Math.min(1, ((e.clientX || e.touches?.[0]?.clientX || 0) - r.left) / r.width));
+  };
+  const apply = pct => {
+    const fill = document.getElementById('rp-progress-fill');
+    if (fill) fill.style.width = (pct * 100) + '%';
+    try {
+      const a = (typeof audio !== 'undefined') ? audio : null;
+      if (a && a.duration && isFinite(a.duration)) a.currentTime = pct * a.duration;
+    } catch {}
+  };
+  track.addEventListener('pointerdown', e => { dragging = true; track.setPointerCapture(e.pointerId); apply(getPct(e)); });
+  track.addEventListener('pointermove', e => { if (dragging) apply(getPct(e)); });
+  track.addEventListener('pointerup',   e => { if (dragging) { apply(getPct(e)); dragging = false; } });
+  track.addEventListener('pointercancel', () => { dragging = false; });
+}
+
+/* Keep rp-now controls in sync when play state changes from outside */
+const _origSetPlayIconRp = window.setPlayIcon;
+function _syncRpPlayBtn() {
+  const btn = document.querySelector('.rp-ctrl-play');
+  if (!btn) return;
+  const on = typeof isPlaying !== 'undefined' && isPlaying;
+  btn.innerHTML = on
+    ? `<svg width="56" height="56" viewBox="0 0 24 24" fill="none"><path d="M22 12C22 6.477 17.523 2 12 2S2 6.477 2 12s4.477 10 10 10 10-4.477 10-10zm-10 7.992C7.58 19.99 4 16.408 4 11.992S7.58 3.994 11.996 3.992C16.413 3.99 20 7.583 20 12c0 4.413-3.583 7.994-7.996 7.992z" fill="currentColor" clip-rule="evenodd" fill-rule="evenodd"/><path d="M11 8H9v8h2V8zm4 0h-2v8h2V8z" fill="currentColor"/></svg>`
+    : `<svg width="56" height="56" viewBox="0 0 24 24" fill="none"><path d="M22 12C22 6.477 17.523 2 12 2S2 6.477 2 12s4.477 10 10 10 10-4.477 10-10zm-10 7.992C7.58 19.99 4 16.408 4 11.992S7.58 3.994 11.996 3.992C16.413 3.99 20 7.583 20 12c0 4.413-3.583 7.994-7.996 7.992z" fill="currentColor" clip-rule="evenodd" fill-rule="evenodd"/><path d="M10 16V8l6 4-6 4z" fill="currentColor"/></svg>`;
+}
+window._syncRpPlayBtn = _syncRpPlayBtn;
+/* Patch setPlayIcon to also update rp panel button */
+(function patchSetPlayIcon() {
+  const wait = setInterval(() => {
+    if (typeof setPlayIcon !== 'function') return;
+    clearInterval(wait);
+    const orig = setPlayIcon;
+    window.setPlayIcon = function(on) {
+      orig(on);
+      _syncRpPlayBtn();
+    };
+  }, 100);
+})();
 async function loadSimilarTracks(t) {
   const box = document.getElementById('rp-similar');
   if (!box) return;
@@ -453,10 +590,10 @@ async function renderRpArtist(box) {
         </div>
       </div>
       <p class="rp-bio">${escHtml(aid
-        ? `Открой страницу ${aName}, чтобы посмотреть альбомы и релизы.`
+        ? ''
         : (name ? `Ищем данные по «${aName}»…` : 'Информация об артисте недоступна.'))}</p>
       <div class="rp-now-actions">
-        ${artistUrl ? `<button type="button" class="rp-action is-primary" onclick="(window.mrfGo||function(u){location.href=u})('${artistUrl}')">Страница</button>` : ''}
+        ${artistUrl ? `<button type="button" class="rp-action is-primary" onclick="closeRightPanel();(window.mrfGo||function(u){location.href=u})('${artistUrl}')">Страница</button>` : ''}
         ${aid ? `<button type="button" class="rp-action${following ? ' is-on' : ''}" onclick="toggleFollowFromPanel('${String(aid)}','${ejsonReady(aName)}','${String(pic).replace(/'/g, '')}')">${following ? 'Вы подписаны' : 'Подписаться'}</button>` : ''}
       </div>
       ${topN.length ? `<div class="rp-section-title">Популярные</div>
