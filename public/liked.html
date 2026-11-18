@@ -6,12 +6,33 @@
   <title>Любимые треки — MRF</title>
   <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
+  <script>
+  /* Layout boot: large screens = PC, smaller = mobile shell */
+  (function () {
+    try {
+      var desktop = window.matchMedia('(min-width: 901px)').matches;
+      document.documentElement.setAttribute('data-ui', desktop ? 'desktop' : 'mobile');
+    } catch (e) {
+      document.documentElement.setAttribute('data-ui', 'mobile');
+    }
+  })();
+  </script>
 </head>
 <body>
 <div id="sidebar-root"></div>
 <main class="main-content">
   <div id="topbar-root"></div>
-  <div class="feed">
+  <div class="feed liked-feed">
+
+    <div class="liked-sticky-bar" id="liked-sticky-bar">
+      <div class="liked-sticky-row">
+        <button type="button" class="mobile-page-avatar" id="liked-mobile-avatar" onclick="goProfile()" aria-label="Профиль"></button>
+        <label class="liked-search-wrap" id="liked-search-wrap" hidden>
+          <svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8"/><path d="M16.5 16.5L20 20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <input type="search" class="liked-search" id="liked-search" placeholder="Найти в любимых…" autocomplete="off" enterkeyhint="search" oninput="filterLikedTracks()"/>
+        </label>
+      </div>
+    </div>
 
     <section class="liked-hero" id="liked-hero">
       <div class="liked-mosaic" id="liked-mosaic" aria-hidden="true"></div>
@@ -24,7 +45,7 @@
             <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
             Слушать
           </button>
-          <button class="btn-secondary" id="shuffle-liked-btn" onclick="shuffleLiked()" style="display:none">Вразброс</button>
+          <button type="button" class="btn-secondary liked-shuffle-btn" id="shuffle-liked-btn" onclick="shuffleLiked()" style="display:none">Вразброс</button>
         </div>
       </div>
     </section>
@@ -43,23 +64,86 @@
 <script src="mrf-ready.js"></script>
 <script src="soft-nav.js"></script>
 <script>
+var _likedAllTracks = [];
+
 whenDomReady(() => {
   initShared();
   renderLikedPage();
 });
 
+function favToTrack(f) {
+  const primary = { id: f.artistId || null, name: f.artist || '' };
+  const feats = typeof parseFeatNames === 'function' ? parseFeatNames(f.title || '') : [];
+  const artists = typeof uniqArtists === 'function'
+    ? uniqArtists([primary, ...feats.map(n => ({ name: n, id: null }))])
+    : [primary, ...feats.map(n => ({ name: n, id: null }))];
+  return {
+    id: f.id || 0,
+    title: f.title,
+    artist: primary,
+    artists,
+    artistId: f.artistId || null,
+    album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
+    duration: f.duration || 0,
+    preview: f.preview || null
+  };
+}
+
+function renderLikedList(tracks) {
+  const box = document.getElementById('liked-list');
+  const listLabel = document.getElementById('liked-list-label');
+  if (!box) return;
+  if (!tracks.length) {
+    const q = (document.getElementById('liked-search')?.value || '').trim();
+    box.innerHTML = q
+      ? `<div class="liked-empty"><p>Ничего не найдено по «${escHtml(q)}»</p></div>`
+      : `<div class="liked-empty">
+          <div class="liked-empty-line"></div>
+          <p>Сердечко у трека — и он появится здесь</p>
+          <button class="btn-secondary" style="margin-top:8px;padding:10px 16px" onclick="(window.mrfGo||function(u){location.href=u})('search.html')">Найти музыку</button>
+        </div>`;
+    if (listLabel) listLabel.hidden = true;
+    _src['liked'] = [];
+    return;
+  }
+  if (listLabel) {
+    listLabel.hidden = false;
+    listLabel.textContent = tracks.length === _likedAllTracks.length
+      ? 'Все треки'
+      : `Найдено: ${tracks.length}`;
+  }
+  _src['liked'] = tracks;
+  box.innerHTML = `<div class="track-list liked-track-list">${tracks.map((t, i) => rowHTML(t, i, 'liked')).join('')}</div>`;
+  if (typeof syncPlayingRows === 'function') syncPlayingRows();
+}
+
+function filterLikedTracks() {
+  const q = (document.getElementById('liked-search')?.value || '').trim().toLowerCase();
+  if (!q) {
+    renderLikedList(_likedAllTracks);
+    return;
+  }
+  const filtered = _likedAllTracks.filter(t => {
+    const title = String(t.title || '').toLowerCase();
+    const artist = String(t.artist?.name || '').toLowerCase();
+    const album = String(t.album?.title || '').toLowerCase();
+    return title.includes(q) || artist.includes(q) || album.includes(q);
+  });
+  renderLikedList(filtered);
+}
+window.filterLikedTracks = filterLikedTracks;
+
 function renderLikedPage() {
-  // getFavs уже newest-first; на всякий случай ещё раз сортируем
   const favs = (typeof Store._sortNewestFirst === 'function'
     ? Store._sortNewestFirst(Store.getFavs())
     : Store.getFavs());
-  const box = document.getElementById('liked-list');
   const countEl = document.getElementById('liked-count');
   const playBtn = document.getElementById('play-all-btn');
   const shuffleBtn = document.getElementById('shuffle-liked-btn');
   const mosaic = document.getElementById('liked-mosaic');
-  const listLabel = document.getElementById('liked-list-label');
   const hero = document.getElementById('liked-hero');
+  const searchWrap = document.getElementById('liked-search-wrap');
+  const searchInput = document.getElementById('liked-search');
 
   const n = favs.length;
   if (countEl) {
@@ -69,50 +153,42 @@ function renderLikedPage() {
   }
   if (playBtn) playBtn.style.display = n ? '' : 'none';
   if (shuffleBtn) shuffleBtn.style.display = n ? '' : 'none';
-  if (listLabel) listLabel.hidden = !n;
+  if (searchWrap) searchWrap.hidden = !n;
+  document.getElementById('liked-sticky-bar')?.classList.add('is-ready');
   if (hero) hero.classList.toggle('is-empty', !n);
+  if (searchInput && !n) searchInput.value = '';
 
   if (mosaic) {
-    const covers = favs.map(f => f.cover).filter(Boolean).slice(0, 10);
+    const covers = favs.map(f => f.cover).filter(Boolean);
     if (!covers.length) {
       mosaic.innerHTML = '';
       mosaic.hidden = true;
     } else {
+      // Ordered right-side deck: neat staggered grid, light tilt, no empty gaps
+      const cols = 4;
+      const rows = 3;
+      const total = cols * rows;
+      const pool = [];
+      while (pool.length < total) {
+        for (let i = 0; i < covers.length && pool.length < total; i++) pool.push(covers[i]);
+      }
+      const rots = [-7, 5, -4, 6, -5, 4, -6, 3, -3, 7, -5, 4];
       mosaic.hidden = false;
-      mosaic.innerHTML = covers.map((src, i) =>
-        `<img class="liked-mosaic-cell" src="${src}" alt="" style="--i:${i}" loading="lazy">`
-      ).join('');
+      mosaic.innerHTML = pool.map((src, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const left = 46 + col * 14.5 + (row % 2 ? 3.5 : 0);
+        const top = 8 + row * 30;
+        const rot = rots[i % rots.length];
+        const z = row * cols + col + 1;
+        return `<img class="liked-mosaic-cell" src="${src}" alt="" loading="lazy" style="--c:${col};--r:${row};left:${left}%;top:${top}%;transform:rotate(${rot}deg);z-index:${z}">`;
+      }).join('');
     }
   }
 
-  if (!favs.length) {
-    box.innerHTML = `<div class="liked-empty">
-      <div class="liked-empty-line"></div>
-      <p>Сердечко у трека — и он появится здесь</p>
-      <button class="btn-secondary" style="margin-top:8px;padding:10px 16px" onclick="(window.mrfGo||function(u){location.href=u})('search.html')">Найти музыку</button>
-    </div>`;
-    return;
-  }
-
-  const fake = favs.map(f => {
-    const primary = { id: f.artistId || null, name: f.artist || '' };
-    const feats = typeof parseFeatNames === 'function' ? parseFeatNames(f.title || '') : [];
-    const artists = typeof uniqArtists === 'function'
-      ? uniqArtists([primary, ...feats.map(n => ({ name: n, id: null }))])
-      : [primary, ...feats.map(n => ({ name: n, id: null }))];
-    return {
-      id: f.id||0, title: f.title,
-      artist: primary,
-      artists,
-      artistId: f.artistId || null,
-      album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
-      duration: f.duration||0,
-      preview: f.preview||null
-    };
-  });
-  _src['liked'] = fake;
-  box.innerHTML = `<div class="track-list liked-track-list">${fake.map((t,i) => rowHTML(t,i,'liked')).join('')}</div>`;
-  if (typeof syncPlayingRows === 'function') syncPlayingRows();
+  _likedAllTracks = favs.map(favToTrack);
+  filterLikedTracks();
+  if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
 }
 window.renderLikedPage = renderLikedPage;
 

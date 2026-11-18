@@ -6,6 +6,17 @@
   <title>Артист — MRF</title>
   <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
+  <script>
+  /* Layout boot: large screens = PC, smaller = mobile shell */
+  (function () {
+    try {
+      var desktop = window.matchMedia('(min-width: 901px)').matches;
+      document.documentElement.setAttribute('data-ui', desktop ? 'desktop' : 'mobile');
+    } catch (e) {
+      document.documentElement.setAttribute('data-ui', 'mobile');
+    }
+  })();
+  </script>
 </head>
 <body>
 <div id="sidebar-root"></div>
@@ -43,21 +54,28 @@ else if (document.readyState === 'loading') document.addEventListener('DOMConten
 else bootArtistPage();
 
 async function loadArtistPage(forced) {
+  const hasForced = forced != null && typeof forced === 'object';
   const params = new URLSearchParams(location.search);
-  let rawId = forced && forced.id != null && String(forced.id) !== ''
-    ? String(forced.id)
-    : String(params.get('id') || '');
-  let name = forced && forced.name != null && String(forced.name) !== ''
-    ? String(forced.name)
-    : String(params.get('name') || '');
+  let rawId = '';
+  let name = '';
 
-  // Backup if clean-URL servers strip ?id=&name=
-  if (!rawId && !name) {
-    try {
-      const saved = JSON.parse(sessionStorage.getItem('mrf_route_artist') || '{}');
-      rawId = saved.id || '';
-      name = saved.name || '';
-    } catch (_) {}
+  if (hasForced) {
+    // Soft-nav pass: trust ONLY forced args (never stale sessionStorage)
+    rawId = forced.id != null && String(forced.id) !== '' ? String(forced.id) : '';
+    name = forced.name != null && String(forced.name) !== '' ? String(forced.name) : '';
+    if (!rawId) rawId = String(params.get('id') || '');
+    if (!name) name = String(params.get('name') || '');
+  } else {
+    rawId = String(params.get('id') || '');
+    name = String(params.get('name') || '');
+    // Cold load backup only when URL has no artist params
+    if (!rawId && !name) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem('mrf_route_artist') || '{}');
+        rawId = saved.id || '';
+        name = saved.name || '';
+      } catch (_) {}
+    }
   }
 
   const liveFeed = () => document.getElementById('artist-feed');
@@ -395,7 +413,10 @@ function toggleArtistFollow() {
     fans: 0
   });
   const btn = document.getElementById('follow-btn');
-  if (btn) btn.textContent = added ? 'Вы подписаны' : 'Подписаться';
+  if (btn) {
+    btn.textContent = added ? 'Вы подписаны' : 'Подписаться';
+    btn.classList.toggle('is-on', !!added);
+  }
   if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
   showNotif(added ? 'Подписка оформлена' : 'Подписка отменена');
 }

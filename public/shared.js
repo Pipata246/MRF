@@ -5,6 +5,87 @@
    ===================================================== */
 
 /* ══════════════════════════════════
+   LAYOUT MODE — phone/tablet vs desktop PC
+   Tablets (any resolution) ALWAYS use mobile UI.
+══════════════════════════════════ */
+function isDesktopLayout() {
+  // Simple rule: large screens = PC, smaller = phone/tablet shell
+  return window.matchMedia('(min-width: 901px)').matches;
+}
+window.isDesktopLayout = isDesktopLayout;
+
+function isTabletDevice() {
+  return !isDesktopLayout();
+}
+window.isTabletDevice = isTabletDevice;
+
+function isTabletViewport() {
+  return !isDesktopLayout();
+}
+window.isTabletViewport = isTabletViewport;
+
+function isMobileLayout() {
+  return !isDesktopLayout();
+}
+window.isMobileLayout = isMobileLayout;
+
+function applyUiLayoutMode() {
+  const desktop = isDesktopLayout();
+  const mode = desktop ? 'desktop' : 'mobile';
+  const root = document.documentElement;
+  if (root.getAttribute('data-ui') !== mode) {
+    root.setAttribute('data-ui', mode);
+  }
+  root.classList.toggle('ui-mobile', !desktop);
+  root.classList.toggle('ui-desktop', desktop);
+  if (document.body) {
+    document.body.classList.toggle('is-mobile-ui', !desktop);
+    document.body.classList.toggle('is-desktop-ui', desktop);
+    if (!desktop) {
+      document.body.style.setProperty('--sidebar-w', '0px');
+      document.body.classList.remove('sidebar-collapsed');
+    } else {
+      // Restore PC sidebar width (undo leftover mobile inline 0)
+      const collapsed = localStorage.getItem('mrf_sidebar_collapsed') === '1';
+      document.body.style.setProperty('--sidebar-w', collapsed ? '60px' : '240px');
+      document.body.classList.toggle('sidebar-collapsed', collapsed);
+      // Never keep FS player open on desktop
+      document.body.classList.remove('fs-player-open');
+      document.getElementById('fs-player')?.classList.add('hidden');
+      document.getElementById('fs-player')?.classList.remove('is-open');
+      document.getElementById('fs-sheet-overlay')?.classList.add('hidden');
+      document.getElementById('fs-more-sheet')?.classList.add('hidden');
+      document.getElementById('fs-queue-sheet')?.classList.add('hidden');
+    }
+  }
+  return mode;
+}
+window.applyUiLayoutMode = applyUiLayoutMode;
+
+// Run ASAP to avoid desktop FOUC on tablets
+try { applyUiLayoutMode(); } catch (_) {}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    applyUiLayoutMode();
+  });
+} else {
+  applyUiLayoutMode();
+}
+window.addEventListener('resize', () => {
+  clearTimeout(window.__mrfUiLayoutT);
+  window.__mrfUiLayoutT = setTimeout(() => {
+    const prev = document.documentElement.getAttribute('data-ui');
+    const next = applyUiLayoutMode();
+    if (prev !== next && typeof ensureFsPlayerChrome === 'function') {
+      try { ensureFsPlayerChrome(); } catch (_) {}
+    }
+  }, 120);
+});
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => applyUiLayoutMode(), 50);
+});
+
+/* ══════════════════════════════════
    ОПРЕДЕЛЕНИЕ ТЕКУЩЕЙ СТРАНИЦЫ
 ══════════════════════════════════ */
 function getPageId(href) {
@@ -80,7 +161,7 @@ function injectSidebar() {
     <aside class="sidebar" id="sidebar">
       <div class="logo" id="sidebar-logo" onclick="(window.mrfGo||function(u){location.href=u})('index.html')" style="cursor:pointer">
         ${mrfLogoSVG(52)}
-        <span class="logo-brand">СДВГ</span>
+        <span class="logo-brand">make russia free</span>
         <button class="sidebar-collapse-btn" onclick="event.stopPropagation();toggleSidebar()" title="Свернуть">
           <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
             <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/>
@@ -218,6 +299,8 @@ function injectTopbar() {
 
   root.innerHTML = `
     <header class="topbar">
+      <button type="button" class="topbar-avatar" id="topbar-avatar" onclick="goProfile()" title="Профиль" aria-label="Профиль">${avatarInner}</button>
+
       <div class="topbar-nav">
         <button class="topbar-btn is-disabled" id="btn-nav-back" onclick="(typeof mrfHistoryBack==='function'?mrfHistoryBack:history.back)()" title="Назад" aria-disabled="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -230,33 +313,143 @@ function injectTopbar() {
       <div class="topbar-search" id="topbar-search-box">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         <input type="text" id="main-search-input" placeholder="Артист, трек, альбом…" autocomplete="off"/>
-        <button type="button" class="search-clear hidden" id="topbar-search-clear" title="Очистить" aria-label="Очистить">✕</button>
+        <button type="button" class="search-clear hidden" id="topbar-search-clear" title="Очистить" aria-label="Очистить">
+          <svg viewBox="0 0 24 24" fill="none" width="12" height="12" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
         <div class="search-flyout hidden" id="search-flyout" role="listbox"></div>
-      </div>
-
-      <div class="topbar-actions">
-        <button type="button" class="topbar-avatar" id="topbar-avatar" onclick="goProfile()" title="Профиль" aria-label="Профиль">${avatarInner}</button>
       </div>
     </header>`;
 
+  injectMobileBackFab();
   updateSearchModeUI();
   bindTopbarSearchFlyout();
+  updateTopbarAvatar();
 
   // Restore back/forward active state after topbar rebuild (soft-nav)
   if (typeof updateChromeNavButtons === 'function') updateChromeNavButtons();
   else if (typeof updateNavBtns === 'function') updateNavBtns();
 }
 
-function updateTopbarAvatar() {
-  const btn = document.getElementById('topbar-avatar');
-  if (!btn) return;
-  const profile = Store.getProfile();
-  if (profile.avatar) {
-    btn.innerHTML = `<img src="${profile.avatar}" alt="">`;
-  } else {
-    btn.textContent = (profile.name || 'П')[0].toUpperCase();
+/** Root tabs in bottom nav — no back button here */
+function isMobileNavRootPage(pageId) {
+  const p = pageId || (typeof getPageId === 'function' ? getPageId() : '');
+  return p === 'index' || p === 'home' || p === '' || p === 'search' || p === 'library';
+}
+window.isMobileNavRootPage = isMobileNavRootPage;
+
+/** Deep pages (artist / playlist / album / …) need a Spotify-style back control */
+function isMobileDeepPage(pageId) {
+  return !isMobileNavRootPage(pageId);
+}
+window.isMobileDeepPage = isMobileDeepPage;
+
+function hasSearchDrillIn() {
+  const page = typeof getPageId === 'function' ? getPageId() : '';
+  if (!isSearchPage() && page !== 'search') return false;
+  // Back only when full results are open (not while typing in the flyout)
+  const results = document.getElementById('search-results-section');
+  if (!results) return false;
+  const disp = results.style.display || '';
+  if (disp === 'none') return false;
+  try {
+    return getComputedStyle(results).display !== 'none';
+  } catch (_) {
+    return true;
   }
-  btn.title = profile.name || 'Профиль';
+}
+window.hasSearchDrillIn = hasSearchDrillIn;
+
+function shouldShowMobileBack() {
+  if (isMobileDeepPage()) return true;
+  // Search root tab: back only when user drilled into results
+  if (isSearchPage() || (typeof getPageId === 'function' && getPageId() === 'search')) {
+    return hasSearchDrillIn();
+  }
+  return false;
+}
+window.shouldShowMobileBack = shouldShowMobileBack;
+
+function mobileGoBack() {
+  if (isSearchPage() || (typeof getPageId === 'function' && getPageId() === 'search')) {
+    if (hasSearchDrillIn()) {
+      if (typeof resetSearchHome === 'function') resetSearchHome({ replaceUrl: true });
+      else if (typeof clearSearchInput === 'function') clearSearchInput();
+      updateMobileBackFab();
+      return;
+    }
+  }
+  const hist = window.__mrfSoftHist;
+  if (hist && hist.index > 0 && typeof mrfHistoryBack === 'function') {
+    mrfHistoryBack();
+    return;
+  }
+  if (window.history.length > 1) {
+    history.back();
+    return;
+  }
+  const page = typeof getPageId === 'function' ? getPageId() : '';
+  let url = 'index.html';
+  if (['playlist', 'liked', 'playlists', 'albums', 'artists', 'album', 'profile'].includes(page)) {
+    url = 'library.html';
+  } else if (['artist', 'charts'].includes(page)) {
+    url = 'search.html';
+  }
+  if (typeof mrfGo === 'function') mrfGo(url);
+  else location.href = url;
+}
+window.mobileGoBack = mobileGoBack;
+
+function injectMobileBackFab() {
+  const main = document.querySelector('main.main-content');
+  if (!main) return;
+  let fab = document.getElementById('mobile-back-fab');
+  if (!fab) {
+    fab = document.createElement('button');
+    fab.type = 'button';
+    fab.id = 'mobile-back-fab';
+    fab.className = 'mobile-back-fab';
+    fab.title = 'Назад';
+    fab.setAttribute('aria-label', 'Назад');
+    fab.innerHTML = `<svg viewBox="0 0 24 24" fill="none" width="20" height="20" aria-hidden="true"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    fab.addEventListener('click', () => mobileGoBack());
+  }
+  // Overlay on main — sits over hero content like Spotify (not a padded row)
+  if (fab.parentElement !== main) main.appendChild(fab);
+  updateMobileBackFab();
+}
+window.injectMobileBackFab = injectMobileBackFab;
+
+function updateMobileBackFab() {
+  const fab = document.getElementById('mobile-back-fab');
+  const show = shouldShowMobileBack();
+  const deep = isMobileDeepPage();
+  document.body.classList.toggle('is-deep-page', deep);
+  document.body.classList.toggle('can-go-back', show);
+  document.body.classList.toggle('has-mobile-back', show);
+  if (!fab) return;
+  fab.classList.toggle('is-on', show);
+  fab.hidden = !show;
+  fab.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+window.updateMobileBackFab = updateMobileBackFab;
+
+function updateTopbarAvatar() {
+  const profile = Store.getProfile();
+  const letter = (profile.name || 'П')[0].toUpperCase();
+  const fill = (el) => {
+    if (!el) return;
+    if (profile.avatar) el.innerHTML = `<img src="${profile.avatar}" alt="">`;
+    else el.textContent = letter;
+    el.title = profile.name || 'Профиль';
+  };
+  fill(document.getElementById('topbar-avatar'));
+  fill(document.getElementById('search-mobile-avatar'));
+  fill(document.getElementById('library-mobile-avatar'));
+  fill(document.getElementById('liked-mobile-avatar'));
+  document.querySelectorAll('.mobile-page-avatar').forEach(el => {
+    if (el.id === 'search-mobile-avatar' || el.id === 'library-mobile-avatar' || el.id === 'liked-mobile-avatar') return;
+    fill(el);
+  });
 }
 window.updateTopbarAvatar = updateTopbarAvatar;
 
@@ -265,9 +458,49 @@ function isSearchPage() {
   return /(?:^|\/)search(?:\.html)?$/i.test(path);
 }
 
+function updateHomeTopbarScroll() {
+  if (!document.body.classList.contains('is-home-page')) {
+    document.body.classList.remove('is-home-scrolled');
+    return;
+  }
+  const feed = document.getElementById('feed') || document.querySelector('main .feed');
+  const hero = document.getElementById('home-feature');
+  const top = feed ? feed.scrollTop : 0;
+  const limit = hero ? Math.max(72, Math.round(hero.offsetHeight * 0.42)) : 96;
+  document.body.classList.toggle('is-home-scrolled', top > limit);
+}
+window.updateHomeTopbarScroll = updateHomeTopbarScroll;
+
+function bindHomeTopbarScroll() {
+  const feed = document.getElementById('feed') || document.querySelector('main .feed');
+  if (!feed) {
+    document.body.classList.remove('is-home-scrolled');
+    return;
+  }
+  if (feed.dataset.homeScrollBound !== '1') {
+    feed.dataset.homeScrollBound = '1';
+    feed.addEventListener('scroll', () => updateHomeTopbarScroll(), { passive: true });
+  }
+  updateHomeTopbarScroll();
+}
+window.bindHomeTopbarScroll = bindHomeTopbarScroll;
+
 function updateSearchModeUI() {
-  document.body.classList.toggle('is-search-page', isSearchPage());
-  if (isSearchPage()) closeSearchFlyout();
+  const page = typeof getPageId === 'function' ? getPageId() : '';
+  const home = page === 'index' || page === 'home' || page === '';
+  const onSearch = page === 'search' || isSearchPage();
+  document.body.classList.toggle('is-search-page', onSearch);
+  document.body.classList.toggle('is-library-page', page === 'library');
+  document.body.classList.toggle('is-liked-page', page === 'liked');
+  document.body.classList.toggle('is-home-page', home);
+  document.body.classList.toggle('is-profile-page', page === 'profile');
+  document.body.classList.toggle('is-deep-page', isMobileDeepPage(page));
+  if (!home) document.body.classList.remove('is-home-scrolled');
+  if (!onSearch) document.body.classList.remove('is-search-results');
+  if (onSearch) closeSearchFlyout();
+  if (typeof injectMobileBackFab === 'function') injectMobileBackFab();
+  else if (typeof updateMobileBackFab === 'function') updateMobileBackFab();
+  if (typeof bindHomeTopbarScroll === 'function') bindHomeTopbarScroll();
 }
 
 function goProfile() {
@@ -452,8 +685,6 @@ function playlistModalsHTML() {
       <div class="modal-body modal-create-pl-body">
         <input type="text" class="modal-input" id="playlist-name-input" placeholder="Название плейлиста" maxlength="60"/>
         <div class="modal-pl-add-block">
-          <label class="modal-pl-add-label">Из избранного</label>
-          <input type="text" class="modal-input" id="playlist-track-search" placeholder="Фильтр по избранному…" maxlength="80" oninput="renderFavPickerCreate()"/>
           <div class="modal-pl-picked" id="playlist-picked-tracks"></div>
           <div class="modal-pl-search-results" id="playlist-track-results"></div>
         </div>
@@ -466,7 +697,6 @@ function playlistModalsHTML() {
     <div class="modal hidden" id="modal-add-tracks">
       <div class="modal-header"><span>Добавить из избранного</span><button onclick="closeModal()">✕</button></div>
       <div class="modal-body modal-create-pl-body">
-        <input type="text" class="modal-input" id="add-tracks-search" placeholder="Фильтр по избранному…" maxlength="80" oninput="renderFavPickerAdd()"/>
         <div class="modal-pl-search-results" id="add-tracks-results"></div>
       </div>
       <div class="modal-footer">
@@ -495,7 +725,7 @@ function playlistModalsHTML() {
 
 /** Keep playlist modals up to date even when player DOM is preserved across soft-nav */
 function ensurePlaylistModals() {
-  const needCreate = !document.getElementById('playlist-track-search')
+  const needCreate = !document.getElementById('playlist-picked-tracks')
     || !document.getElementById('modal-add-tracks')
     || !document.getElementById('modal-rename-playlist');
   if (!needCreate) return;
@@ -510,6 +740,132 @@ function ensurePlaylistModals() {
 }
 window.ensurePlaylistModals = ensurePlaylistModals;
 
+function fsPlayerMarkup() {
+  return `
+    <div class="fs-player hidden" id="fs-player" aria-hidden="true">
+      <div class="fs-player-bg" id="fs-player-bg" aria-hidden="true"></div>
+      <div class="fs-player-shade" aria-hidden="true"></div>
+      <div class="fs-scroll" id="fs-scroll">
+        <div class="fs-stage">
+          <div class="fs-player-top">
+            <button type="button" class="fs-icon-btn" id="fs-close-btn" onclick="closeFsPlayer()" aria-label="Свернуть">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="fs-player-context" id="fs-player-context">Сейчас играет</div>
+            <button type="button" class="fs-icon-btn" id="fs-menu-btn" onclick="openFsMoreSheet()" aria-label="Ещё">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+            </button>
+          </div>
+          <div class="fs-hero">
+            <div class="fs-cover" id="fs-cover">
+              <img class="fs-cover-img" alt="" decoding="async" draggable="false" hidden>
+            </div>
+          </div>
+          <div class="fs-dock">
+            <div class="fs-meta-row">
+              <div class="fs-meta">
+                <div class="fs-title" id="fs-title">—</div>
+                <div class="fs-artist" id="fs-artist">—</div>
+              </div>
+              <button type="button" class="fs-like" id="fs-like-btn" onclick="event.stopPropagation();toggleFavPlayer()" title="В избранное">
+                <svg viewBox="0 0 24 24" fill="none" width="22" height="22"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/></svg>
+              </button>
+            </div>
+            <div class="fs-progress">
+              <div class="fs-progress-track" id="fs-progress-track">
+                <div class="fs-progress-fill" id="fs-progress-fill"><div class="fs-progress-thumb"></div></div>
+              </div>
+              <div class="fs-progress-times">
+                <span id="fs-time-current">0:00</span>
+                <span id="fs-time-total">0:00</span>
+              </div>
+            </div>
+            <div class="fs-controls">
+              <button type="button" class="fs-ctrl" id="fs-btn-shuffle" onclick="toggleShuffle()" title="Перемешать">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M15 13.5L18 16.5V14H20V20L14 20V18H16.5L13.5 15L15 13.5ZM9 10.5L10.5 9L5.5 4L4 5.5L9 10.5Z"/><path d="M20 4H14V6H16.5L4 18.5L5.5 20L18 7.5V10H20L20 4Z"/></svg>
+              </button>
+              <button type="button" class="fs-ctrl" onclick="prevTrack()" title="Предыдущий">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+              </button>
+              <button type="button" class="fs-ctrl fs-ctrl-play" id="fs-btn-play" onclick="togglePlay()" title="Играть / Пауза">
+                <svg width="52" height="52" viewBox="0 0 24 24" fill="none"><path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5203 21.9939 21.9939 17.5203 22 12ZM11.996 19.992C16.4127 19.9942 19.9956 16.4167 20 12C19.9956 7.58329 16.4127 3.98979 11.996 3.992C7.57929 3.99421 4 7.57528 4 11.992C4 16.4087 7.57929 19.9898 11.996 19.992Z" fill-rule="evenodd" clip-rule="evenodd" fill="currentColor"/><path d="M10 16V8L16 12L10 16Z" fill="currentColor"/></svg>
+              </button>
+              <button type="button" class="fs-ctrl" onclick="nextTrack()" title="Следующий">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+              </button>
+              <button type="button" class="fs-ctrl" id="fs-btn-repeat" onclick="toggleRepeat()" title="Повтор">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M7.5 22L2.5 17L7.5 12L9 13.5L6.50003 16H18V14L20 12V18H6.49997L9 20.5L7.5 22Z"/><path d="M15 3.49999L16.5 2L21.5 7L16.5 12L15 10.5L17.5 8H6V10L4 12V5.99999H17.5L15 3.49999Z"/></svg>
+              </button>
+            </div>
+            <div class="fs-tools">
+              <span class="fs-tools-spacer" aria-hidden="true"></span>
+              <button type="button" class="fs-tool-ico" onclick="if(typeof shareTrack==='function'&&queue[queueIndex])shareTrack(queue[queueIndex])" aria-label="Поделиться" title="Поделиться">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M12 3v10" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8.5 6.5L12 3l3.5 3.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12v6.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+              </button>
+              <button type="button" class="fs-tool-ico" onclick="openFsQueueSheet()" aria-label="Очередь" title="Очередь">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M17 15.5v5l4-2.5-4-2.5z" fill="currentColor"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <section class="fs-block" id="fs-block-artists">
+          <h3 class="fs-block-title">Исполнители</h3>
+          <div class="fs-artists" id="fs-artists"></div>
+        </section>
+        <section class="fs-block" id="fs-block-about">
+          <h3 class="fs-block-title">Об исполнителе</h3>
+          <div class="fs-card" id="fs-about-card"></div>
+        </section>
+        <section class="fs-block" id="fs-block-credits">
+          <h3 class="fs-block-title">Сведения</h3>
+          <div class="fs-card" id="fs-credits-card"></div>
+        </section>
+        <section class="fs-block" id="fs-block-lyrics">
+          <h3 class="fs-block-title">Текст</h3>
+          <div class="fs-card fs-lyrics-card" id="fs-lyrics-card"></div>
+        </section>
+        <section class="fs-block" id="fs-block-next">
+          <h3 class="fs-block-title">Следующий трек</h3>
+          <div class="fs-card" id="fs-next-card"></div>
+        </section>
+        <section class="fs-block" id="fs-block-similar">
+          <h3 class="fs-block-title">Похожие треки</h3>
+          <div class="fs-card" id="fs-similar-card"></div>
+        </section>
+        <div class="fs-scroll-spacer"></div>
+      </div>
+    </div>
+
+    <div class="fs-sheet-overlay hidden" id="fs-sheet-overlay" onclick="closeFsSheets()"></div>
+    <div class="fs-sheet hidden" id="fs-more-sheet" role="dialog" aria-label="Действия">
+      <div class="fs-sheet-handle" aria-hidden="true"></div>
+      <div class="fs-sheet-head" id="fs-more-head"></div>
+      <div class="fs-sheet-list" id="fs-more-list"></div>
+    </div>
+    <div class="fs-sheet fs-sheet-queue hidden" id="fs-queue-sheet" role="dialog" aria-label="Очередь">
+      <div class="fs-sheet-handle" aria-hidden="true"></div>
+      <div class="fs-queue-head">
+        <div>
+          <div class="fs-queue-title">Очередь</div>
+          <div class="fs-queue-sub" id="fs-queue-sub">Сейчас играет</div>
+        </div>
+        <button type="button" class="fs-sheet-close" onclick="closeFsSheets()" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="fs-queue-actions fs-queue-actions-2">
+        <button type="button" class="fs-q-chip" id="fs-q-shuffle" onclick="toggleShuffle();syncFsQueueChrome()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15 13.5L18 16.5V14H20V20L14 20V18H16.5L13.5 15L15 13.5ZM9 10.5L10.5 9L5.5 4L4 5.5L9 10.5Z"/><path d="M20 4H14V6H16.5L4 18.5L5.5 20L18 7.5V10H20L20 4Z"/></svg>
+          Перемешать
+        </button>
+        <button type="button" class="fs-q-chip" onclick="if(typeof clearQueue==='function')clearQueue();renderFsQueueSheet()">
+          Очистить
+        </button>
+      </div>
+      <div class="fs-queue-list" id="fs-queue-list"></div>
+    </div>`;
+}
+window.fsPlayerMarkup = fsPlayerMarkup;
+
 function injectPlayer() {
   const root = document.getElementById('player-root');
   if (!root) return;
@@ -522,14 +878,16 @@ function injectPlayer() {
   root.innerHTML = `
     <footer class="player" id="player">
       <div class="player-track">
-        <div class="player-cover" id="player-cover" onclick="openNowPlaying()" title="Подробнее" style="cursor:pointer"></div>
+        <div class="player-cover" id="player-cover" title="Подробнее"></div>
         <div class="player-track-info">
-          <div class="player-title" id="player-title">Ничего не играет</div>
+          <div class="player-title-row">
+            <div class="player-title" id="player-title">Ничего не играет</div>
+            <button type="button" class="player-like" id="player-like-btn" onclick="event.stopPropagation();toggleFavPlayer()" title="В избранное">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/></svg>
+            </button>
+          </div>
           <div class="player-artist" id="player-artist">Выбери трек</div>
         </div>
-        <button class="player-like" id="player-like-btn" onclick="toggleFavPlayer()" title="В избранное">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/></svg>
-        </button>
       </div>
 
       <div class="player-controls">
@@ -542,7 +900,7 @@ function injectPlayer() {
         <button class="ctrl-btn" onclick="prevTrack()" title="Предыдущий">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
         </button>
-        <button class="ctrl-btn ctrl-play" id="btn-play" onclick="togglePlay()" title="Играть / Пауза">
+        <button type="button" class="ctrl-btn ctrl-play" id="btn-play" onclick="event.stopPropagation();togglePlay()" title="Играть / Пауза">
           <svg width="52" height="52" viewBox="0 0 24 24" fill="none">
             <path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5203 21.9939 21.9939 17.5203 22 12ZM11.996 19.992C16.4127 19.9942 19.9956 16.4167 20 12C19.9956 7.58329 16.4127 3.98979 11.996 3.992C7.57929 3.99421 4 7.57528 4 11.992C4 16.4087 7.57929 19.9898 11.996 19.992Z" fill-rule="evenodd" clip-rule="evenodd" fill="currentColor"/>
             <path d="M10 16V8L16 12L10 16Z" fill="currentColor"/>
@@ -614,6 +972,8 @@ function injectPlayer() {
       </div>
     </div>
 
+    ${fsPlayerMarkup()}
+
     <!-- NOTIFICATION -->
     <div class="notification hidden" id="notification"></div>
     ${playlistModalsHTML()}
@@ -630,40 +990,70 @@ function injectMobileNav() {
     root.id = 'mobile-nav-root';
     document.body.appendChild(root);
   }
-  if (root.querySelector('.mobile-nav')) {
-    updateMobileNavActive(getPageId());
-    return;
-  }
 
+  // Apple / SF Symbols–style: outline idle, filled when active
   const navItems = [
     {
       href: 'index.html', page: 'index', label: 'Главная',
-      icon: '<path d="M3 12L12 3L21 12V20H15V14H9V20H3V12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'
+      icon: `
+        <g class="nav-ico-line" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M4.5 10.2L12 4.2l7.5 6V19.2a1.3 1.3 0 0 1-1.3 1.3h-4.4v-5.2h-4.6v5.2H5.8A1.3 1.3 0 0 1 4.5 19.2v-9z"/>
+        </g>
+        <g class="nav-ico-fill" fill="currentColor">
+          <path d="M12 3.4L3.8 9.9a1 1 0 0 0-.3.7V19a1.7 1.7 0 0 0 1.7 1.7h4.2v-5.6h5.2V20.7h4.2A1.7 1.7 0 0 0 20.5 19v-8.4a1 1 0 0 0-.3-.7L12 3.4z"/>
+        </g>`
     },
     {
       href: 'search.html', page: 'search', label: 'Поиск',
-      icon: '<circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+      icon: `
+        <g class="nav-ico-line" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <circle cx="11" cy="11" r="6.2"/>
+          <path d="M16.2 16.2L20 20"/>
+        </g>
+        <g class="nav-ico-fill" fill="currentColor">
+          <path d="M10.8 3.6a7.2 7.2 0 1 0 4.5 12.8l3.7 3.7a1 1 0 0 0 1.4-1.4l-3.7-3.7A7.2 7.2 0 0 0 10.8 3.6zm0 2a5.2 5.2 0 1 1 0 10.4 5.2 5.2 0 0 1 0-10.4z"/>
+        </g>`
     },
     {
       href: 'library.html', page: 'library', label: 'Библиотека',
-      icon: '<path d="M9 18V6l12-3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="15" r="3" stroke="currentColor" stroke-width="1.8"/>'
+      icon: `
+        <g class="nav-ico-line" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6.2 5.2h11.6a1 1 0 0 1 1 1v1.4H5.2V6.2a1 1 0 0 1 1-1z"/>
+          <path d="M5.2 9.4h13.6v9.2a1.2 1.2 0 0 1-1.2 1.2H6.4a1.2 1.2 0 0 1-1.2-1.2V9.4z"/>
+          <path d="M9.2 13.2h5.6"/>
+        </g>
+        <g class="nav-ico-fill" fill="currentColor">
+          <path d="M6.2 4.4h11.6A1.8 1.8 0 0 1 19.6 6.2v.8H4.4v-.8A1.8 1.8 0 0 1 6.2 4.4z"/>
+          <path d="M4.4 8.6h15.2v9.6A2 2 0 0 1 17.6 20.2H6.4A2 2 0 0 1 4.4 18.2V8.6zm5.2 4.2a1 1 0 0 0 0 2h5.6a1 1 0 0 0 0-2H9.6z"/>
+        </g>`
     },
   ];
 
   const curPage = getPageId();
   root.innerHTML = `<nav class="mobile-nav" role="navigation" aria-label="Главная навигация">
     ${navItems.map(item => `
-      <a href="${item.href}" class="mobile-nav-item${curPage === item.page ? ' active' : ''}" data-mob-page="${item.page}" onclick="event.preventDefault();(window.mrfGo||function(u){location.href=u})('${item.href}')">
-        <svg viewBox="0 0 24 24" fill="none" width="24" height="24">${item.icon}</svg>
+      <a href="${item.href}" class="mobile-nav-item${mobileNavRootForPage(curPage) === item.page ? ' active' : ''}" data-mob-page="${item.page}" onclick="event.preventDefault();(window.mrfGo||function(u){location.href=u})('${item.href}')">
+        <svg class="mobile-nav-ico" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">${item.icon}</svg>
         <span>${item.label}</span>
       </a>`).join('')}
   </nav>`;
 }
 
+function mobileNavRootForPage(pageId) {
+  const p = pageId || getPageId();
+  if (p === 'search') return 'search';
+  if (['library', 'liked', 'playlists', 'albums', 'artists', 'playlist', 'album', 'profile'].includes(p)) {
+    return 'library';
+  }
+  if (p === 'artist' || p === 'charts') return 'search';
+  if (p === 'index' || p === 'home' || p === '') return 'index';
+  return 'index';
+}
+
 function updateMobileNavActive(pageId) {
-  const id = pageId || getPageId();
+  const root = mobileNavRootForPage(pageId);
   document.querySelectorAll('.mobile-nav-item[data-mob-page]').forEach(a => {
-    a.classList.toggle('active', a.getAttribute('data-mob-page') === id);
+    a.classList.toggle('active', a.getAttribute('data-mob-page') === root);
   });
 }
 window.updateMobileNavActive = updateMobileNavActive;
@@ -673,11 +1063,18 @@ window.updateMobileNavActive = updateMobileNavActive;
 ══════════════════════════════════ */
 function initShared() {
   console.log('[MRF] initShared started');
-  
-  // восстанавливаем ширину sidebar
+
+  applyUiLayoutMode();
+
+  // восстанавливаем ширину sidebar (только desktop PC)
   const isCollapsed = localStorage.getItem('mrf_sidebar_collapsed') === '1';
-  document.body.style.setProperty('--sidebar-w', isCollapsed ? '60px' : '240px');
-  if (isCollapsed) document.body.classList.add('sidebar-collapsed');
+  if (isDesktopLayout()) {
+    document.body.style.setProperty('--sidebar-w', isCollapsed ? '60px' : '240px');
+    if (isCollapsed) document.body.classList.add('sidebar-collapsed');
+  } else {
+    document.body.style.setProperty('--sidebar-w', '0px');
+    document.body.classList.remove('sidebar-collapsed');
+  }
 
   const hadPlayer = !!document.querySelector('#player-root .player');
 
@@ -686,6 +1083,7 @@ function initShared() {
   injectPlayer();
   injectMobileNav();
   ensurePlaylistModals();
+  applyUiLayoutMode();
 
   // bind progress/volume after player DOM exists
   if (typeof bindPlayerUIControls === 'function') bindPlayerUIControls();
@@ -768,6 +1166,8 @@ function notifyLibraryChanged() {
   if (page === 'library' && typeof renderLib === 'function') {
     renderLib(typeof _pageLibTab !== 'undefined' ? _pageLibTab : 'all');
   }
+  if (page === 'artists' && typeof renderArtistsPage === 'function') renderArtistsPage();
+  else if (document.getElementById('artists-grid') && typeof renderArtistsPage === 'function') renderArtistsPage();
   if (page === 'playlists' && typeof renderPlaylistsPage === 'function') renderPlaylistsPage();
   if (page === 'liked' && typeof renderLikedPage === 'function') renderLikedPage();
   if (page === 'playlist' && typeof renderPlaylist === 'function' && typeof _currentPlaylistId !== 'undefined' && _currentPlaylistId) {
@@ -777,14 +1177,21 @@ function notifyLibraryChanged() {
 }
 window.notifyLibraryChanged = notifyLibraryChanged;
 
+function trackCoverOf(t) {
+  if (!t) return '';
+  return t.cover || t.album?.cover_medium || t.album?.cover || t.picture_medium || '';
+}
+window.trackCoverOf = trackCoverOf;
+
 function favToTrack(f) {
+  const cover = f.cover || f.album?.cover_medium || f.album?.cover || '';
   return {
     id: f.id,
     title: f.title,
-    artistName: f.artist,
-    artist: { id: f.artistId || null, name: f.artist },
-    cover: f.cover,
-    album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
+    artistName: f.artist || f.artistName || '',
+    artist: { id: f.artistId || f.artist?.id || null, name: f.artist || f.artistName || f.artist?.name || '' },
+    cover,
+    album: { id: f.albumId || f.album?.id || null, title: f.albumTitle || f.album?.title || '', cover_medium: cover, cover },
     duration: f.duration || 0,
     preview: f.preview || null
   };
@@ -805,13 +1212,11 @@ function showCreatePlaylist() {
   const modal = document.getElementById('modal-create-playlist');
   const overlay = document.getElementById('modal-overlay');
   const nameInput = document.getElementById('playlist-name-input');
-  const searchInput = document.getElementById('playlist-track-search');
   _createPlDraftTracks = [];
   if (_pendingTrackForPlaylist) {
     _createPlDraftTracks.push(_pendingTrackForPlaylist);
   }
   if (nameInput) nameInput.value = '';
-  if (searchInput) searchInput.value = '';
   renderCreatePlaylistPicked();
   renderFavPickerCreate();
   if (modal) modal.classList.remove('hidden');
@@ -819,25 +1224,37 @@ function showCreatePlaylist() {
   if (nameInput) setTimeout(() => nameInput.focus(), 50);
 }
 
+function dedupeTracksById(list) {
+  const seen = new Set();
+  return (list || []).filter(t => {
+    const id = String(t?.id ?? '');
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
 function renderCreatePlaylistPicked() {
   const box = document.getElementById('playlist-picked-tracks');
   if (!box) return;
+  _createPlDraftTracks = dedupeTracksById(_createPlDraftTracks);
   if (!_createPlDraftTracks.length) {
     box.innerHTML = `<div class="modal-pl-picked-empty">Выбери треки из избранного ниже</div>`;
     return;
   }
-  box.innerHTML = _createPlDraftTracks.map((t, i) => {
-    const cover = t.cover || t.album?.cover_medium || '';
-    const artist = t.artistName || t.artist?.name || t.artist || '';
-    return `<div class="modal-pl-picked-row">
-      ${cover ? `<img src="${cover}" alt="">` : `<span class="modal-pl-picked-ph"></span>`}
-      <span class="modal-pl-picked-meta">
-        <span class="modal-pl-picked-title">${escHtml(t.title || '')}</span>
-        <span class="modal-pl-picked-artist">${escHtml(artist)}</span>
-      </span>
-      <button type="button" class="modal-pl-picked-x" onclick="removeCreatePlaylistDraft(${i})" title="Убрать">✕</button>
-    </div>`;
-  }).join('');
+  box.innerHTML = `<div class="modal-pl-picked-label">${_createPlDraftTracks.length} выбрано</div>` +
+    _createPlDraftTracks.map((t, i) => {
+      const cover = trackCoverOf(t);
+      const artist = t.artistName || t.artist?.name || t.artist || '';
+      return `<div class="modal-pl-picked-row">
+        ${cover ? `<img src="${cover}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<span class="modal-pl-picked-ph"></span>`}
+        <span class="modal-pl-picked-meta">
+          <span class="modal-pl-picked-title">${escHtml(t.title || '')}</span>
+          <span class="modal-pl-picked-artist">${escHtml(artist)}</span>
+        </span>
+        <button type="button" class="modal-pl-picked-x" onclick="removeCreatePlaylistDraft(${i})" title="Убрать" aria-label="Убрать">✕</button>
+      </div>`;
+    }).join('');
 }
 
 function removeCreatePlaylistDraft(i) {
@@ -849,27 +1266,28 @@ function removeCreatePlaylistDraft(i) {
 function renderFavPickerCreate() {
   const box = document.getElementById('playlist-track-results');
   if (!box) return;
-  const q = document.getElementById('playlist-track-search')?.value || '';
-  const favs = filterFavsByQuery(q);
+  const allFavs = dedupeTracksById(filterFavsByQuery('').map(favToTrack));
   if (!Store.getFavs().length) {
     box.innerHTML = `<div class="modal-pl-search-hint">В избранном пока пусто — добавь треки сердечком</div>`;
     return;
   }
-  if (!favs.length) {
-    box.innerHTML = `<div class="modal-pl-search-hint">Ничего не найдено в избранном</div>`;
+  // PC logic: already-picked tracks stay only in the top selection — no duplicates below
+  const pickedIds = new Set(_createPlDraftTracks.map(t => String(t.id)));
+  const available = allFavs.filter(t => !pickedIds.has(String(t.id)));
+  _src['create_pl_favs'] = available;
+  if (!available.length) {
+    box.innerHTML = `<div class="modal-pl-search-hint">${pickedIds.size ? 'Все треки из избранного уже выбраны' : 'Ничего не найдено в избранном'}</div>`;
     return;
   }
-  _src['create_pl_favs'] = favs.map(favToTrack);
-  box.innerHTML = _src['create_pl_favs'].map((t, i) => {
-    const cover = t.cover || '';
-    const picked = _createPlDraftTracks.some(x => String(x.id) === String(t.id));
-    return `<button type="button" class="modal-pl-search-row${picked ? ' is-picked' : ''}" onclick="pickCreatePlaylistTrack(${i})">
-      ${cover ? `<img src="${cover}" alt="">` : `<span class="modal-pl-picked-ph"></span>`}
+  box.innerHTML = available.map((t, i) => {
+    const cover = trackCoverOf(t);
+    return `<button type="button" class="modal-pl-search-row" onclick="pickCreatePlaylistTrack(${i})">
+      ${cover ? `<img src="${cover}" alt="" loading="lazy" onerror="this.style.opacity='0'">` : `<span class="modal-pl-picked-ph"></span>`}
       <span class="modal-pl-picked-meta">
         <span class="modal-pl-picked-title">${escHtml(t.title || '')}</span>
-        <span class="modal-pl-picked-artist">${escHtml(t.artist?.name || '')}</span>
+        <span class="modal-pl-picked-artist">${escHtml(t.artist?.name || t.artistName || '')}</span>
       </span>
-      <span class="modal-pl-search-add">${picked ? '✓' : '+'}</span>
+      <span class="modal-pl-search-add" aria-hidden="true">+</span>
     </button>`;
   }).join('');
 }
@@ -878,9 +1296,8 @@ window.renderFavPickerCreate = renderFavPickerCreate;
 function pickCreatePlaylistTrack(i) {
   const t = _src['create_pl_favs']?.[i];
   if (!t) return;
-  const idx = _createPlDraftTracks.findIndex(x => String(x.id) === String(t.id));
-  if (idx >= 0) _createPlDraftTracks.splice(idx, 1);
-  else _createPlDraftTracks.push(t);
+  if (_createPlDraftTracks.some(x => String(x.id) === String(t.id))) return;
+  _createPlDraftTracks.push(t);
   renderCreatePlaylistPicked();
   renderFavPickerCreate();
 }
@@ -913,21 +1330,17 @@ function showAddTracksToPlaylist(playlistId) {
   _addTracksPlaylistId = playlistId;
   const modal = document.getElementById('modal-add-tracks');
   const overlay = document.getElementById('modal-overlay');
-  const input = document.getElementById('add-tracks-search');
-  if (input) input.value = '';
   renderFavPickerAdd();
   if (modal) modal.classList.remove('hidden');
   if (overlay) overlay.classList.remove('hidden');
-  if (input) setTimeout(() => input.focus(), 50);
 }
 window.showAddTracksToPlaylist = showAddTracksToPlaylist;
 
 function renderFavPickerAdd() {
   const box = document.getElementById('add-tracks-results');
   if (!box || !_addTracksPlaylistId) return;
-  const q = document.getElementById('add-tracks-search')?.value || '';
   const pl = Store.getPlaylist(_addTracksPlaylistId);
-  const favs = filterFavsByQuery(q);
+  const favs = filterFavsByQuery('');
   if (!Store.getFavs().length) {
     box.innerHTML = `<div class="modal-pl-search-hint">В избранном пока пусто</div>`;
     return;
@@ -936,15 +1349,15 @@ function renderFavPickerAdd() {
     box.innerHTML = `<div class="modal-pl-search-hint">Ничего не найдено в избранном</div>`;
     return;
   }
-  _src['add_pl_favs'] = favs.map(favToTrack);
+  _src['add_pl_favs'] = dedupeTracksById(favs.map(favToTrack));
   box.innerHTML = _src['add_pl_favs'].map((t, i) => {
-    const cover = t.cover || '';
+    const cover = trackCoverOf(t);
     const inPl = pl?.tracks?.some(x => String(x.id) === String(t.id));
     return `<button type="button" class="modal-pl-search-row${inPl ? ' is-picked' : ''}" onclick="pickAddPlaylistTrack(${i})">
-      ${cover ? `<img src="${cover}" alt="">` : `<span class="modal-pl-picked-ph"></span>`}
+      ${cover ? `<img src="${cover}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<span class="modal-pl-picked-ph"></span>`}
       <span class="modal-pl-picked-meta">
         <span class="modal-pl-picked-title">${escHtml(t.title || '')}</span>
-        <span class="modal-pl-picked-artist">${escHtml(t.artist?.name || '')}</span>
+        <span class="modal-pl-picked-artist">${escHtml(t.artist?.name || t.artistName || '')}</span>
       </span>
       <span class="modal-pl-search-add">${inPl ? '✓' : '+'}</span>
     </button>`;

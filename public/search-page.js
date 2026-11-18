@@ -5,7 +5,86 @@ var _searchPageResults = { tracks: [], artists: [], albums: [] };
 function syncMobileSearchInput(query) {
   const mob = document.getElementById('mobile-search-input');
   if (mob && mob.value !== (query || '')) mob.value = query || '';
+  syncMobileSearchClear(query);
 }
+
+function syncMobileSearchClear(query) {
+  const q = (query != null ? query : (document.getElementById('mobile-search-input')?.value || '')).trim();
+  document.getElementById('mobile-search-clear')?.classList.toggle('hidden', !q);
+  document.getElementById('topbar-search-clear')?.classList.toggle('hidden', !q);
+}
+
+function closeMobileSearchFlyout() {
+  document.getElementById('mobile-search-flyout')?.classList.add('hidden');
+}
+window.closeMobileSearchFlyout = closeMobileSearchFlyout;
+
+var _mobileFlyoutGen = 0;
+
+async function renderMobileSearchFlyout(q) {
+  const fly = document.getElementById('mobile-search-flyout');
+  if (!fly) return;
+  const query = (q || '').trim();
+  const gen = ++_mobileFlyoutGen;
+
+  if (!query) {
+    closeMobileSearchFlyout();
+    return;
+  }
+
+  fly.classList.remove('hidden');
+  fly.innerHTML = `<div class="search-flyout-empty">Ищем…</div>`;
+  try {
+    const [tracks, artists, albums] = await Promise.all([
+      dzArr(`/search/track?q=${encodeURIComponent(query)}&limit=5`),
+      dzArr(`/search/artist?q=${encodeURIComponent(query)}&limit=4`),
+      dzArr(`/search/album?q=${encodeURIComponent(query)}&limit=3`)
+    ]);
+    if (gen !== _mobileFlyoutGen) return;
+    const tNorm = (tracks || []).map(normDZ);
+    const aList = artists || [];
+    const albList = albums || [];
+    if (!tNorm.length && !aList.length && !albList.length) {
+      fly.innerHTML = `<div class="search-flyout-empty">Ничего не найдено</div>
+        <button type="button" class="search-flyout-row search-flyout-more" onclick="commitMobileSearch('${jsStr(query)}')">Искать «${escHtml(query)}»</button>`;
+      return;
+    }
+    let html = `<div class="search-flyout-hint"><span>Быстрый поиск</span><kbd>Enter</kbd><span>— все результаты</span></div>`;
+    if (aList.length) {
+      html += `<div class="search-flyout-label">Артисты</div>` + aList.map(a => `
+        <button type="button" class="search-flyout-row" onclick="closeMobileSearchFlyout();openArtist(${a.id != null && String(a.id) !== '' ? `'${jsStr(a.id)}'` : 'null'},'${jsStr(a.name)}')">
+          ${a.picture_medium ? `<img class="search-flyout-avatar" src="${a.picture_medium}" alt="">` : `<span class="search-flyout-avatar ph">${escHtml((a.name || '?')[0])}</span>`}
+          <span class="search-flyout-meta"><span class="search-flyout-title">${escHtml(a.name || '')}</span><span class="search-flyout-sub">Исполнитель</span></span>
+        </button>`).join('');
+    }
+    if (albList.length) {
+      html += `<div class="search-flyout-label">Альбомы</div>` + albList.map(a => `
+        <button type="button" class="search-flyout-row" onclick="closeMobileSearchFlyout();openSavedAlbum('${jsStr(a.id)}','${jsStr(a.title)}','${jsStr(a.artist?.name || '')}')">
+          ${a.cover_medium ? `<img class="search-flyout-cover" src="${a.cover_medium}" alt="">` : `<span class="search-flyout-cover ph"></span>`}
+          <span class="search-flyout-meta"><span class="search-flyout-title">${escHtml(a.title || '')}</span><span class="search-flyout-sub">${escHtml(a.artist?.name || '')}</span></span>
+        </button>`).join('');
+    }
+    if (tNorm.length) {
+      _src['mobile_flyout_tracks'] = tNorm;
+      html += `<div class="search-flyout-label">Треки</div>` + tNorm.map((t, i) => `
+        <button type="button" class="search-flyout-row" onclick="closeMobileSearchFlyout();playFromSrc('mobile_flyout_tracks',${i})">
+          ${t.album?.cover_medium ? `<img class="search-flyout-cover" src="${t.album.cover_medium}" alt="">` : `<span class="search-flyout-cover ph"></span>`}
+          <span class="search-flyout-meta"><span class="search-flyout-title">${escHtml(t.title || '')}</span><span class="search-flyout-sub">${escHtml(t.artist?.name || '')}</span></span>
+        </button>`).join('');
+    }
+    html += `<button type="button" class="search-flyout-row search-flyout-more" onclick="commitMobileSearch('${jsStr(query)}')">Смотреть все по запросу «${escHtml(query)}»</button>`;
+    fly.innerHTML = html;
+  } catch {
+    if (gen !== _mobileFlyoutGen) return;
+    fly.innerHTML = `<div class="search-flyout-empty">Ошибка поиска</div>`;
+  }
+}
+
+function commitMobileSearch(q) {
+  closeMobileSearchFlyout();
+  doSearch(q, { save: true });
+}
+window.commitMobileSearch = commitMobileSearch;
 
 function bindMobileSearchField() {
   const mob = document.getElementById('mobile-search-input');
@@ -15,18 +94,38 @@ function bindMobileSearchField() {
     const q = mob.value.trim();
     const top = document.getElementById('main-search-input');
     if (top) top.value = mob.value;
-    document.getElementById('topbar-search-clear')?.classList.toggle('hidden', !q);
+    syncMobileSearchClear(q);
     clearTimeout(_searchPageTimer);
     _searchPageTimer = setTimeout(() => {
-      if (!q) showSearchInitial();
-      else doSearch(q, { save: false });
-    }, 280);
+      if (!q) {
+        closeMobileSearchFlyout();
+        showSearchInitial();
+        return;
+      }
+      // Live suggestions under the field; full results on Enter / «смотреть все»
+      void renderMobileSearchFlyout(q);
+    }, 260);
+  });
+  mob.addEventListener('focus', () => {
+    const q = mob.value.trim();
+    if (q) void renderMobileSearchFlyout(q);
   });
   mob.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeMobileSearchFlyout();
+      mob.blur();
+      return;
+    }
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    doSearch(mob.value.trim(), { save: true });
+    commitMobileSearch(mob.value.trim());
   });
+  if (!window._mobileSearchFlyoutDocBound) {
+    window._mobileSearchFlyoutDocBound = true;
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.mobile-search-wrap')) closeMobileSearchFlyout();
+    });
+  }
 }
 window.bindMobileSearchField = bindMobileSearchField;
 
@@ -39,13 +138,14 @@ function bootSearchPage() {
   if (q) {
     if (top) top.value = q;
     syncMobileSearchInput(q);
-    document.getElementById('topbar-search-clear')?.classList.remove('hidden');
+    syncMobileSearchClear(q);
     doSearch(q, { save: true });
   } else if (top?.value.trim()) {
     syncMobileSearchInput(top.value.trim());
     // Restore results from typed query without re-saving drafts
     doSearch(top.value.trim(), { save: false });
   } else {
+    syncMobileSearchClear('');
     showSearchInitial();
   }
 }
@@ -97,7 +197,7 @@ async function renderSearchAlbumsFocus() {
       return;
     }
     box.innerHTML = albums.map(a => `
-      <button type="button" class="cover-card" onclick="location.href='${mrfUrl('album',{id:a.id,title:a.title,artist:a.artist?.name||''})}'">
+      <button type="button" class="cover-card" onclick="openSavedAlbum('${jsStr(a.id)}','${jsStr(a.title)}','${jsStr(a.artist?.name || '')}')">
         ${a.cover_medium
           ? `<img class="cover-card-art" src="${a.cover_medium}" alt="" loading="lazy">`
           : `<span class="cover-card-art cover-card-fallback">${noteSVGShared()}</span>`}
@@ -197,7 +297,9 @@ function resetSearchHome(opts) {
   const hidden = document.getElementById('search-input');
   if (hidden) hidden.value = '';
   document.getElementById('topbar-search-clear')?.classList.add('hidden');
+  document.getElementById('mobile-search-clear')?.classList.add('hidden');
   if (typeof closeSearchFlyout === 'function') closeSearchFlyout();
+  closeMobileSearchFlyout();
 
   if (replaceUrl && /(?:^|[?&])q=/i.test(location.search || '')) {
     const clean = typeof mrfUrl === 'function' ? mrfUrl('search') : 'search.html';
@@ -225,8 +327,12 @@ function showSearchInitial() {
   const results = document.getElementById('search-results-section');
   if (initial) initial.style.display = '';
   if (results) results.style.display = 'none';
+  document.body.classList.remove('is-search-results');
+  closeMobileSearchFlyout();
   renderSearchHistory();
   renderSearchBrowse();
+  if (typeof updateMobileBackFab === 'function') updateMobileBackFab();
+  if (typeof updateChromeNavButtons === 'function') updateChromeNavButtons();
 }
 
 function showSearchResults() {
@@ -234,6 +340,18 @@ function showSearchResults() {
   const results = document.getElementById('search-results-section');
   if (initial) initial.style.display = 'none';
   if (results) results.style.display = '';
+  document.body.classList.add('is-search-results');
+  closeMobileSearchFlyout();
+  // Sync sticky topbar with the query (becomes the pinned search chrome)
+  const q = (document.getElementById('mobile-search-input')?.value
+    || document.getElementById('main-search-input')?.value
+    || document.getElementById('search-input')?.value || '').trim();
+  const top = document.getElementById('main-search-input');
+  if (top && q && top.value.trim() !== q) top.value = q;
+  syncMobileSearchClear(q);
+  if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
+  if (typeof updateMobileBackFab === 'function') updateMobileBackFab();
+  if (typeof updateChromeNavButtons === 'function') updateChromeNavButtons();
 }
 
 function doSearch(q, opts) {
@@ -244,7 +362,8 @@ function doSearch(q, opts) {
   const top = document.getElementById('main-search-input');
   if (top && top.value.trim() !== query) top.value = query;
   syncMobileSearchInput(query);
-  document.getElementById('topbar-search-clear')?.classList.toggle('hidden', !query);
+  syncMobileSearchClear(query);
+  closeMobileSearchFlyout();
   if (!query) { showSearchInitial(); return; }
   showSearchResults();
   const box = document.getElementById('search-results');
@@ -255,6 +374,7 @@ function doSearch(q, opts) {
     renderSearchHistory();
   }
   pageRunSearch(query);
+  if (typeof updateMobileBackFab === 'function') updateMobileBackFab();
 }
 
 async function pageRunSearch(q) {
@@ -334,7 +454,7 @@ function renderSearchAll() {
   if (artists.length) {
     html += `<div class="section"><div class="section-header"><h3 class="section-title" style="font-size:16px">Артисты</h3></div>
       <div class="artists-grid">${artists.slice(0, 6).map(a => `
-        <div class="artist-card" onclick="openArtist('${String(a.id||'').replace(/'/g,"\\'")}','${String(a.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
+        <div class="artist-card" onclick="openArtist(${a.id != null && String(a.id) !== '' ? `'${jsStr(a.id)}'` : 'null'},'${jsStr(a.name)}')">
           ${a.picture_medium ? `<img class="artist-img" src="${a.picture_medium}" alt="" loading="lazy">` : `<div class="artist-img-placeholder">${(a.name || '?')[0]}</div>`}
           <div class="artist-name">${escHtml(a.name)}</div>
           <div class="artist-listeners">${a.nb_fan ? (+a.nb_fan).toLocaleString('ru') + ' фанатов' : ''}</div>
@@ -343,7 +463,7 @@ function renderSearchAll() {
   if (albums.length) {
     html += `<div class="section"><div class="section-header"><h3 class="section-title" style="font-size:16px">Альбомы</h3></div>
       <div class="albums-grid">${albums.slice(0, 6).map(a => `
-        <div class="album-card" onclick="(window.mrfGo||function(u){location.href=u})('${mrfUrl('album',{id:a.id,title:a.title,artist:a.artist?.name||''})}')">
+        <div class="album-card" onclick="openSavedAlbum('${jsStr(a.id)}','${jsStr(a.title)}','${jsStr(a.artist?.name || '')}')">
           ${a.cover_medium ? `<img class="album-cover" src="${a.cover_medium}" alt="" loading="lazy">` : `<div class="album-cover-placeholder">${noteSVGShared()}</div>`}
           <div class="album-body"><div class="album-title">${escHtml(a.title)}</div><div class="album-artist">${escHtml(a.artist?.name || '')}</div></div>
         </div>`).join('')}</div></div>`;
@@ -370,7 +490,7 @@ function renderSearchArtists() {
   if (!box) return;
   box.innerHTML = _searchPageResults.artists.length
     ? `<div class="artists-grid">${_searchPageResults.artists.map(a => `
-        <div class="artist-card" onclick="openArtist('${String(a.id||'').replace(/'/g,"\\'")}','${String(a.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
+        <div class="artist-card" onclick="openArtist(${a.id != null && String(a.id) !== '' ? `'${jsStr(a.id)}'` : 'null'},'${jsStr(a.name)}')">
           ${a.picture_medium ? `<img class="artist-img" src="${a.picture_medium}" alt="" loading="lazy">` : `<div class="artist-img-placeholder">${(a.name || '?')[0]}</div>`}
           <div class="artist-name">${escHtml(a.name)}</div>
           <div class="artist-listeners">${a.nb_fan ? (+a.nb_fan).toLocaleString('ru') + ' фанатов' : ''}</div>
@@ -383,7 +503,7 @@ function renderSearchAlbums() {
   if (!box) return;
   box.innerHTML = _searchPageResults.albums.length
     ? `<div class="albums-grid">${_searchPageResults.albums.map(a => `
-        <div class="album-card" onclick="location.href='${mrfUrl('album',{id:a.id,title:a.title,artist:a.artist?.name||''})}'">
+        <div class="album-card" onclick="openSavedAlbum('${jsStr(a.id)}','${jsStr(a.title)}','${jsStr(a.artist?.name || '')}')">
           ${a.cover_medium ? `<img class="album-cover" src="${a.cover_medium}" alt="" loading="lazy">` : `<div class="album-cover-placeholder">${noteSVGShared()}</div>`}
           <div class="album-body"><div class="album-title">${escHtml(a.title)}</div><div class="album-artist">${escHtml(a.artist?.name || '')}</div></div>
         </div>`).join('')}</div>`
@@ -399,16 +519,12 @@ function renderSearchHistory() {
 
   if (!history.length) { section.style.display = 'none'; list.innerHTML = ''; return; }
   section.style.display = '';
-  list.innerHTML = history.slice(0, 12).map(h => {
+  list.innerHTML = history.slice(0, 8).map(h => {
     const safe = escHtml(h).replace(/'/g, "\\'");
     return `
     <button type="button" class="search-history-chip search-history-row" onclick="doSearch('${safe}',{save:true})">
-      <span class="search-history-ico" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      </span>
       <span class="search-history-meta">
         <span class="search-history-chip-text">${escHtml(h)}</span>
-        <span class="search-history-sub">Запрос</span>
       </span>
       <span class="search-history-chip-x" onclick="event.stopPropagation();removeHistoryItem('${safe}')" title="Удалить" aria-label="Удалить">✕</span>
     </button>`;

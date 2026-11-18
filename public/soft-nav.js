@@ -46,6 +46,7 @@
     const fwd = document.getElementById('btn-nav-fwd');
     const canBack = hist.index > 0;
     const canFwd = hist.index < hist.stack.length - 1;
+    document.body.classList.toggle('can-go-back', canBack);
     if (back) {
       back.style.opacity = canBack ? '1' : '0.4';
       back.classList.toggle('is-disabled', !canBack);
@@ -56,6 +57,7 @@
       fwd.classList.toggle('is-disabled', !canFwd);
       fwd.setAttribute('aria-disabled', canFwd ? 'false' : 'true');
     }
+    if (typeof updateMobileBackFab === 'function') updateMobileBackFab();
   }
   window.updateChromeNavButtons = updateChromeNavButtons;
 
@@ -156,11 +158,19 @@
 
   /** Cancel in-flight artist/album renders only when leaving those pages */
   function cancelLoadsWhenLeaving(fromPage, toPage) {
-    if (fromPage === 'artist' && toPage !== 'artist') {
+    // Bump only when leaving (or switching same-type page). Do NOT bump on enter —
+    // the page loader bumps its own gen; an enter-bump raced and aborted fresh loads.
+    if (fromPage === 'artist') {
       window.__artistLoadGen = (window.__artistLoadGen || 0) + 1;
     }
-    if (fromPage === 'album' && toPage !== 'album') {
+    if (fromPage === 'album') {
       window.__albumLoadGen = (window.__albumLoadGen || 0) + 1;
+    }
+    if (toPage !== 'artist') {
+      try { sessionStorage.removeItem('mrf_route_artist'); } catch (_) {}
+    }
+    if (toPage !== 'album') {
+      try { sessionStorage.removeItem('mrf_route_album'); } catch (_) {}
     }
     window.__mrfNavGen = (window.__mrfNavGen || 0) + 1;
   }
@@ -251,8 +261,9 @@
           const saved = JSON.parse(sessionStorage.getItem('mrf_route_artist') || '{}');
           id = saved.id || '';
           name = saved.name || '';
-        } catch {}
+        } catch (_) {}
       }
+      // Always pass forced object so loadArtistPage won't revive a previous favourite from sessionStorage
       if (typeof window.loadArtistPage === 'function') {
         void window.loadArtistPage({ id, name });
       } else if (typeof openArtist === 'function') {
@@ -262,13 +273,13 @@
       let id = absUrl.searchParams.get('id') || '';
       let title = absUrl.searchParams.get('title') || '';
       let artist = absUrl.searchParams.get('artist') || '';
-      if (!id && !title) {
+      if (!id && !title && !artist) {
         try {
           const saved = JSON.parse(sessionStorage.getItem('mrf_route_album') || '{}');
           id = saved.id || '';
           title = saved.title || '';
           artist = saved.artist || '';
-        } catch {}
+        } catch (_) {}
       }
       void window.loadAlbumPage({ id, title, artist });
     } else if (pname === 'artists' && typeof window.renderArtistsPage === 'function') {

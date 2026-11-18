@@ -108,11 +108,58 @@ function libCheckHTML(id) {
   </button>`;
 }
 
+function isDesktopLibrary() {
+  try {
+    return window.matchMedia('(min-width: 901px)').matches
+      || document.documentElement.getAttribute('data-ui') === 'desktop';
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Tracks block for library (PC: 5 + «Показать ещё»; mobile tracks tab: full list) */
+function libTracksSectionHTML(favs) {
+  const isDesktopLib = isDesktopLibrary();
+  const likedHref = typeof mrfUrl === 'function' ? mrfUrl('liked') : 'liked.html';
+  const sectionTitle = isDesktopLib ? 'Треки' : 'Любимые треки';
+  let html = `<div class="section lib-tracks-section"><div class="section-header">
+    <h3 class="section-title" style="font-size:16px">${sectionTitle} <span style="font-size:12px;color:var(--text-3)">${favs.length}</span></h3>
+    ${favs.length ? `<button class="btn-primary" style="padding:7px 14px;font-size:12px" onclick="playFavs()">Слушать</button>` : ''}
+  </div>`;
+  if (!favs.length) {
+    html += `<div class="search-empty" style="padding:12px 0 8px"><p style="color:var(--text-3)">Добавляй треки в избранное сердечком</p></div>`;
+  } else {
+    const fake = favs.map(f => ({
+      id: f.id || 0,
+      title: f.title,
+      artist: { id: f.artistId || null, name: f.artist },
+      artistId: f.artistId || null,
+      album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
+      duration: f.duration || 0,
+      preview: f.preview || null
+    }));
+    _src['favs'] = fake;
+    const shown = isDesktopLib ? fake.slice(0, 5) : fake;
+    html += `<div id="fav-list" class="track-list">${shown.map((t, i) => {
+      const row = rowHTML(t, i, 'favs');
+      return row.replace('<div class="track-num">', `${libCheckHTML(t.id)}<div class="track-num">`);
+    }).join('')}</div>`;
+    if (isDesktopLib && fake.length > 5) {
+      html += `<div style="padding:14px 0 4px;display:flex;justify-content:center">
+        <button type="button" class="btn-secondary" style="padding:9px 18px;font-size:13px" onclick="(window.mrfGo||function(u){location.href=u})('${likedHref}')">Показать ещё</button>
+      </div>`;
+    }
+  }
+  html += `</div>`;
+  return html;
+}
+
 function renderLib(tab) {
   const box = document.getElementById('lib-content');
   if (!box) return;
   const activeTab = tab || _pageLibTab || 'all';
   _pageLibTab = activeTab;
+  const isDesktopLib = isDesktopLibrary();
   let html = '';
 
   if (activeTab === 'all' || activeTab === 'tracks') {
@@ -120,8 +167,8 @@ function renderLib(tab) {
     const likedHref = typeof mrfUrl === 'function' ? mrfUrl('liked') : 'liked.html';
     const cover = favs.find(f => f.cover)?.cover || '';
 
-    if (activeTab === 'all') {
-      // Mobile-style featured card; desktop still uses the same entry point
+    if (activeTab === 'all' && !isDesktopLib) {
+      // Mobile only: featured «Любимые треки» card
       html += `<div class="section lib-featured-section">
         <button type="button" class="lib-featured" onclick="(window.mrfGo||function(u){location.href=u})('${likedHref}')">
           <span class="lib-featured-text">
@@ -135,37 +182,17 @@ function renderLib(tab) {
           </span>
         </button>
       </div>`;
-    } else {
-      html += `<div class="section"><div class="section-header">
-        <h3 class="section-title" style="font-size:16px">Любимые треки <span style="font-size:12px;color:var(--text-3)">${favs.length}</span></h3>
-        ${favs.length ? `<button class="btn-primary" style="padding:7px 14px;font-size:12px" onclick="playFavs()">Слушать</button>` : ''}
-      </div>`;
-      if (!favs.length) {
-        html += `<div class="search-empty" style="padding:12px 0 8px"><p style="color:var(--text-3)">Добавляй треки в избранное сердечком</p></div>`;
-      } else {
-        const fake = favs.map(f => ({
-          id: f.id || 0,
-          title: f.title,
-          artist: { id: f.artistId || null, name: f.artist },
-          artistId: f.artistId || null,
-          album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
-          duration: f.duration || 0,
-          preview: f.preview || null
-        }));
-        _src['favs'] = fake;
-        html += `<div id="fav-list" class="track-list">${fake.map((t,i) => {
-          const row = rowHTML(t,i,'favs');
-          return row.replace('<div class="track-num">', `${libCheckHTML(t.id)}<div class="track-num">`);
-        }).join('')}</div>`;
-      }
-      html += `</div>`;
+    } else if (activeTab === 'tracks' || (activeTab === 'all' && isDesktopLib)) {
+      // PC: always real tracks (5 + show more). Mobile tracks tab: full list.
+      html += libTracksSectionHTML(favs);
     }
   }
 
+  // Mini-app order: Playlists → Artists → Albums (after featured liked)
   if (activeTab === 'all' || activeTab === 'playlists') {
     let pls = Store.getPlaylists();
     if (_pageLibQuery) pls = pls.filter(p => (p.name||'').toLowerCase().includes(_pageLibQuery));
-    html += `<div class="section"><div class="section-header"><h3 class="section-title" style="font-size:16px">Плейлисты</h3></div>`;
+    html += `<div class="section lib-section"><div class="section-header lib-section-head"><h3 class="lib-section-title">Плейлисты</h3></div>`;
     if (!pls.length) {
       html += `<div class="search-empty" style="padding:8px 0 4px"><p style="color:var(--text-3)">Создай первый плейлист</p></div>`;
     } else {
@@ -194,31 +221,10 @@ function renderLib(tab) {
     html += `</div>`;
   }
 
-  if (activeTab === 'all' || activeTab === 'albums') {
-    let albs = Store.getAlbums();
-    if (_pageLibQuery) albs = albs.filter(a => ((a.title||'')+(a.artistName||'')).toLowerCase().includes(_pageLibQuery));
-    html += `<div class="section"><div class="section-header"><h3 class="section-title" style="font-size:16px">Альбомы и релизы</h3></div>`;
-    if (!albs.length) {
-      html += `<div class="search-empty" style="padding:8px 0 4px"><p style="color:var(--text-3)">Сохраняй альбомы со страницы альбома</p></div>`;
-    } else {
-      html += `<div class="albums-grid">${albs.map(a => {
-        const sid = typeof jsStr === 'function' ? jsStr(a.id) : String(a.id ?? '').replace(/'/g, "\\'");
-        const st = typeof jsStr === 'function' ? jsStr(a.title) : String(a.title || '').replace(/'/g, "\\'");
-        const sa = typeof jsStr === 'function' ? jsStr(a.artistName) : String(a.artistName || '').replace(/'/g, "\\'");
-        return `
-        <div class="album-card" onclick="openSavedAlbum('${sid}','${st}','${sa}')">
-          ${a.cover ? `<img class="album-cover" src="${a.cover}" alt="">` : `<div class="album-cover-placeholder">${noteSVGShared()}</div>`}
-          <div class="album-body"><div class="album-title">${escHtml(a.title || '')}</div><div class="album-artist">${escHtml(a.artistName||'')}</div></div>
-        </div>`;
-      }).join('')}</div>`;
-    }
-    html += `</div>`;
-  }
-
   if (activeTab === 'all' || activeTab === 'artists') {
     let followed = Store.getFollowed();
     if (_pageLibQuery) followed = followed.filter(a => (a.name||'').toLowerCase().includes(_pageLibQuery));
-    html += `<div class="section"><div class="section-header"><h3 class="section-title" style="font-size:16px">Исполнители</h3></div>`;
+    html += `<div class="section lib-section"><div class="section-header lib-section-head"><h3 class="lib-section-title">Артисты</h3></div>`;
     if (!followed.length) {
       html += `<div class="search-empty" style="padding:8px 0 4px"><p style="color:var(--text-3)">Подпишись на исполнителей</p></div>`;
     } else {
@@ -236,6 +242,27 @@ function renderLib(tab) {
             ${a.fans ? `<span class="artist-tile-fans">${(+a.fans).toLocaleString('ru')} фанатов</span>` : `<span class="artist-tile-fans">Исполнитель</span>`}
           </span>
         </button>`;
+      }).join('')}</div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (activeTab === 'all' || activeTab === 'albums') {
+    let albs = Store.getAlbums();
+    if (_pageLibQuery) albs = albs.filter(a => ((a.title||'')+(a.artistName||'')).toLowerCase().includes(_pageLibQuery));
+    html += `<div class="section lib-section"><div class="section-header lib-section-head"><h3 class="lib-section-title">Альбомы</h3></div>`;
+    if (!albs.length) {
+      html += `<div class="search-empty" style="padding:8px 0 4px"><p style="color:var(--text-3)">Сохраняй альбомы со страницы альбома</p></div>`;
+    } else {
+      html += `<div class="albums-grid">${albs.map(a => {
+        const sid = typeof jsStr === 'function' ? jsStr(a.id) : String(a.id ?? '').replace(/'/g, "\\'");
+        const st = typeof jsStr === 'function' ? jsStr(a.title) : String(a.title || '').replace(/'/g, "\\'");
+        const sa = typeof jsStr === 'function' ? jsStr(a.artistName) : String(a.artistName || '').replace(/'/g, "\\'");
+        return `
+        <div class="album-card" onclick="openSavedAlbum('${sid}','${st}','${sa}')">
+          ${a.cover ? `<img class="album-cover" src="${a.cover}" alt="">` : `<div class="album-cover-placeholder">${noteSVGShared()}</div>`}
+          <div class="album-body"><div class="album-title">${escHtml(a.title || '')}</div><div class="album-artist">${escHtml(a.artistName||'')}</div></div>
+        </div>`;
       }).join('')}</div>`;
     }
     html += `</div>`;

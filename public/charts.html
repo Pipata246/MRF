@@ -6,6 +6,17 @@
   <title>Чарты — MRF</title>
   <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
+  <script>
+  /* Layout boot: large screens = PC, smaller = mobile shell */
+  (function () {
+    try {
+      var desktop = window.matchMedia('(min-width: 901px)').matches;
+      document.documentElement.setAttribute('data-ui', desktop ? 'desktop' : 'mobile');
+    } catch (e) {
+      document.documentElement.setAttribute('data-ui', 'mobile');
+    }
+  })();
+  </script>
 </head>
 <body>
 <div id="sidebar-root"></div>

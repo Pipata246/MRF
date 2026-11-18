@@ -260,15 +260,41 @@ function artistsLinksHTML(t, cls = 'artist-link') {
   const arts = trackArtists(t);
   if (!arts.length) return '—';
   const escFn = typeof escHtml === 'function' ? escHtml : (s => String(s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])));
+  // Mobile / tablet: plain text only — no navigate-from-name (PC only)
+  const mobileUi = (typeof isMobileLayout === 'function')
+    ? isMobileLayout()
+    : (document.documentElement.getAttribute('data-ui') === 'mobile');
+  if (mobileUi) {
+    return arts.map((a, i) => {
+      let sep = '';
+      if (i > 0) sep = (i === arts.length - 1) ? ' <span class="artist-sep">&</span> ' : '<span class="artist-sep">,</span> ';
+      return `${sep}<span class="artist-name-plain">${escFn(a.name)}</span>`;
+    }).join('');
+  }
   const js = typeof jsStr === 'function' ? jsStr : (s => String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
   return arts.map((a, i) => {
     let sep = '';
     if (i > 0) sep = (i === arts.length - 1) ? ' <span class="artist-sep">&</span> ' : '<span class="artist-sep">,</span> ';
     const idArg = a.id != null && String(a.id) !== '' ? `'${js(a.id)}'` : 'null';
-    return `${sep}<a href="#" class="${cls}" data-artist-id="${escFn(a.id || '')}" data-artist-name="${escFn(a.name)}" onclick="event.preventDefault();event.stopPropagation();openArtist(${idArg},'${js(a.name)}')">${escFn(a.name)}</a>`;
+    return `${sep}<a href="#" class="${cls}" data-artist-id="${escFn(a.id || '')}" data-artist-name="${escFn(a.name)}" onclick="event.preventDefault();event.stopPropagation();openArtist(${idArg},'${js(a.name)}',true)">${escFn(a.name)}</a>`;
   }).join('');
 }
 window.artistsLinksHTML = artistsLinksHTML;
+
+/* Kill leftover track-name artist links on mobile (already rendered HTML) */
+document.addEventListener('click', (e) => {
+  const mobileUi = (typeof isMobileLayout === 'function')
+    ? isMobileLayout()
+    : (document.documentElement.getAttribute('data-ui') === 'mobile');
+  if (!mobileUi) return;
+  const link = e.target.closest?.('a.artist-link, a.track-artist-link, a.player-artist-link');
+  if (!link) return;
+  // Allow only if it's not a track-row / search-result name link
+  if (link.closest('.track-item, .track-row, .track-artist, .search-result, .search-flyout-track, .liked-track, .np-meta, .queue-item')) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
 
 async function enrichTrackArtists(t) {
   if (!t || t._artistsEnriched) return t;
@@ -339,8 +365,11 @@ function normDZ(t) {
     album: {
       id:           t.album?.id,
       title:        t.album?.title || '',
+      cover_small:  t.album?.cover_small  || '',
       cover_medium: t.album?.cover_medium || '',
-      cover:        t.album?.cover        || ''
+      cover_big:    t.album?.cover_big    || '',
+      cover_xl:     t.album?.cover_xl     || '',
+      cover:        t.album?.cover_xl || t.album?.cover_big || t.album?.cover_medium || t.album?.cover || ''
     },
     duration:  t.duration || 0,
     preview:   t.preview  || null,
@@ -684,7 +713,11 @@ function openSavedAlbum(id, title, artist) {
 }
 window.openSavedAlbum = openSavedAlbum;
 
-async function openArtist(id, name) {
+async function openArtist(id, name, fromTrackName) {
+  // Block "open artist from track name" on mobile/tablet — PC only
+  if (fromTrackName && (typeof isMobileLayout === 'function' ? isMobileLayout() : document.documentElement.getAttribute('data-ui') === 'mobile')) {
+    return;
+  }
   const aid = normalizeDeezerId(id);
   const aname = name || '';
   // Always use dedicated artist page in multipage build
@@ -809,44 +842,17 @@ async function loadArtistAlbums(id, name) {
    ALBUM PAGE
 ══════════════════════════════════ */
 async function openAlbum(id, albumName, artistName) {
-  if (!document.getElementById('page-search') && !document.getElementById('search-results')) {
-    location.href = `album.html?id=${encodeURIComponent(id)}`;
+  // Multipage: always soft-nav to album.html (search page has #search-results — never use SPA path)
+  if (typeof openSavedAlbum === 'function') {
+    openSavedAlbum(id, albumName, artistName);
     return;
   }
-  showPage('search', qs('[data-page=search]'));
-  el('search-tabs')?.classList.add('hidden');
-  const resultsBox = el('search-results');
-  if (resultsBox) resultsBox.innerHTML = loaderHTML('Загружаем альбом…');
-
-  const album  = await dzObj(`/album/${id}`);
-  const raw    = album.tracks?.data || [];
-  const tracks = raw.map(t => normDZ({
-    ...t,
-    artist: { id: album.artist?.id, name: artistName, picture_medium: album.artist?.picture_medium||'' },
-    album:  { id, title: albumName, cover_medium: album.cover_medium, cover: album.cover }
-  }));
-  const key   = `alb_${id}`;
-  _src[key]   = tracks;
-  const cover = album.cover_xl || album.cover_medium || '';
-
-  if (!resultsBox) return;
-  resultsBox.innerHTML = `
-    <div style="display:flex;gap:28px;align-items:flex-start;margin-bottom:32px;flex-wrap:wrap">
-      ${cover ? `<img src="${cover}" style="width:180px;height:180px;border-radius:12px;object-fit:cover;flex-shrink:0" alt="">` : ''}
-      <div style="display:flex;flex-direction:column;justify-content:center;gap:8px">
-        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:2px">Альбом</div>
-        <h2 style="font-size:32px;font-weight:800">${esc(albumName)}</h2>
-        <div style="color:var(--text-3);font-size:14px;cursor:pointer"
-          onclick="openArtist(${album.artist?.id||0},'${ejson(artistName)}')">${esc(artistName)}</div>
-        <div style="color:var(--text-3);font-size:12px">${tracks.length} треков · ${album.release_date||''}</div>
-        <button class="btn-primary" onclick="playFromSrc('${esc(key)}',0)" style="margin-top:6px;padding:10px 20px;font-size:13px;width:fit-content">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
-          Слушать альбом
-        </button>
-      </div>
-    </div>
-    <div class="track-list">${tracks.map((t,i) => rowHTML(t,i,key)).join('')}</div>`;
+  const go = typeof mrfGo === 'function' ? mrfGo : (u) => { location.href = u; };
+  go(typeof mrfUrl === 'function'
+    ? mrfUrl('album', { id: id || '', title: albumName || '', artist: artistName || '' })
+    : `album.html?id=${encodeURIComponent(id || '')}&title=${encodeURIComponent(albumName || '')}&artist=${encodeURIComponent(artistName || '')}`);
 }
+window.openAlbum = openAlbum;
 
 /* ══════════════════════════════════
    CHARTS
@@ -933,11 +939,14 @@ async function searchByTag(tag) {
 function playFromSrc(key, index) {
   const list = _src[key];
   if (!list?.length) return;
+  _trackFlowDir = 1;
+  window._trackFlowDir = 1;
   // «Перемешивание при запуске» — включать shuffle при старте нового списка
   try {
     if (typeof Store !== 'undefined' && Store.getSettings().shuffleOnPlay && !isShuffle) {
       isShuffle = true;
-      el('btn-shuffle')?.classList.toggle('active-btn', true);
+      if (typeof syncShuffleRepeatUi === 'function') syncShuffleRepeatUi();
+      else el('btn-shuffle')?.classList.toggle('active-btn', true);
     }
   } catch {}
   _originalQueue = list.map(t => ({ ...t }));
@@ -1026,20 +1035,52 @@ function togglePlay() {
     audio.play().catch(() => { _wantPlaying = false; });
   }
 }
+let _trackFlowDir = 0; // 1 = next (swipe left), -1 = prev (swipe right)
+window._trackFlowDir = 0;
+
 function nextTrack() {
   if (!queue.length) return;
+  _trackFlowDir = 1;
+  window._trackFlowDir = 1;
   queueIndex = (queueIndex + 1) % queue.length;
   playNow();
 }
 function prevTrack() {
   if (!queue.length) return;
   if (audio.currentTime>3) { audio.currentTime=0; return; }
+  _trackFlowDir = -1;
+  window._trackFlowDir = -1;
   queueIndex = (queueIndex-1+queue.length)%queue.length;
   playNow();
 }
+function syncShuffleRepeatUi() {
+  const on = !!isShuffle;
+  el('btn-shuffle')?.classList.toggle('active-btn', on);
+  el('fs-btn-shuffle')?.classList.toggle('active-btn', on);
+  document.getElementById('fs-q-shuffle')?.classList.toggle('is-on', on);
+  const repOn = isRepeat !== 'off';
+  const applyRep = (btn) => {
+    if (!btn) return;
+    btn.classList.toggle('active-btn', repOn);
+    btn.classList.toggle('is-on', repOn);
+    const badge = btn.querySelector('.repeat-one-badge');
+    if (badge) badge.remove();
+    if (isRepeat === 'one') {
+      const b = document.createElement('span');
+      b.className = 'repeat-one-badge';
+      b.textContent = '1';
+      btn.appendChild(b);
+    }
+  };
+  applyRep(el('btn-repeat'));
+  applyRep(el('fs-btn-repeat'));
+  document.getElementById('fs-q-repeat')?.classList.toggle('is-on', repOn);
+}
+window.syncShuffleRepeatUi = syncShuffleRepeatUi;
+
 function toggleShuffle() {
   isShuffle = !isShuffle;
-  el('btn-shuffle')?.classList.toggle('active-btn', isShuffle);
+  syncShuffleRepeatUi();
 
   if (queue.length) {
     const currentTrack = queue[queueIndex];
@@ -1062,6 +1103,9 @@ function toggleShuffle() {
     persistPlayer();
     if (typeof notifyQueueChanged === 'function') notifyQueueChanged();
     else renderQueuePanel();
+    if (typeof renderFsQueueSheet === 'function' && !document.getElementById('fs-queue-sheet')?.classList.contains('hidden')) {
+      renderFsQueueSheet();
+    }
   }
 }
 function toggleRepeat() {
@@ -1069,47 +1113,94 @@ function toggleRepeat() {
   else if (isRepeat === 'all') isRepeat = 'one';
   else                         isRepeat = 'off';
   updateRepeatBtn();
+  persistPlayer();
 }
 function updateRepeatBtn() {
-  const btn = el('btn-repeat');
-  if (!btn) return;
-  btn.classList.toggle('active-btn', isRepeat !== 'off');
-  const badge = btn.querySelector('.repeat-one-badge');
-  if (badge) badge.remove();
-  if (isRepeat === 'one') {
-    const b = document.createElement('span');
-    b.className = 'repeat-one-badge';
-    b.textContent = '1';
-    btn.appendChild(b);
-  }
+  syncShuffleRepeatUi();
 }
 
 /* ── Player UI ── */
-function setPlayIcon(on) {
-  const btn = el('btn-play'); if (!btn) return;
-  if (on) {
-    // пауза — две полоски
-    btn.innerHTML = '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5203 21.9939 21.9939 17.5203 22 12ZM11.996 19.992C16.4127 19.9942 19.9956 16.4167 20 12C19.9956 7.58329 16.4127 3.98979 11.996 3.992C7.57929 3.99421 4 7.57528 4 11.992C4 16.4087 7.57929 19.9898 11.996 19.992Z" fill-rule="evenodd" clip-rule="evenodd" fill="currentColor"/><path d="M11 8H9V16H11V8Z" fill="currentColor"/><path d="M13 16V8H15V16H13Z" fill="currentColor"/></svg>';
-  } else {
-    // плей — треугольник
-    btn.innerHTML = '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5203 21.9939 21.9939 17.5203 22 12ZM11.996 19.992C16.4127 19.9942 19.9956 16.4167 20 12C19.9956 7.58329 16.4127 3.98979 11.996 3.992C7.57929 3.99421 4 7.57528 4 11.992C4 16.4087 7.57929 19.9898 11.996 19.992Z" fill-rule="evenodd" clip-rule="evenodd" fill="currentColor"/><path d="M10 16V8L16 12L10 16Z" fill="currentColor"/></svg>';
-  }
+function upgradeCoverUrl(url, size = 1000) {
+  if (!url) return '';
+  return String(url).replace(/\/(\d{2,4})x(\d{2,4})-/g, `/${size}x${size}-`);
 }
+window.upgradeCoverUrl = upgradeCoverUrl;
+
+function bestCoverUrl(t, size = 1000) {
+  if (!t) return '';
+  const raw = t.album?.cover_xl || t.album?.cover_big || t.album?.cover_medium
+    || t.album?.cover || t.cover_xl || t.cover_big || t.cover || '';
+  return upgradeCoverUrl(raw, size);
+}
+window.bestCoverUrl = bestCoverUrl;
+
+function setPlayIcon(on) {
+  // Crisp stroke-based icons (no soft evenodd rings)
+  const pauseSvg = '<svg viewBox="0 0 24 24" width="52" height="52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="12" r="9.15" stroke="currentColor" stroke-width="1.7"/><rect x="8.4" y="7.6" width="2.5" height="8.8" rx="0.7" fill="currentColor"/><rect x="13.1" y="7.6" width="2.5" height="8.8" rx="0.7" fill="currentColor"/></svg>';
+  const playSvg = '<svg viewBox="0 0 24 24" width="52" height="52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="12" r="9.15" stroke="currentColor" stroke-width="1.7"/><path d="M10 8.15v7.7L16.6 12 10 8.15z" fill="currentColor"/></svg>';
+  const html = on ? pauseSvg : playSvg;
+  const btn = el('btn-play');
+  if (btn) btn.innerHTML = html;
+  const fsBtn = el('fs-btn-play');
+  if (fsBtn) fsBtn.innerHTML = html;
+}
+
+function runTrackFlowAnim(dir) {
+  if (!dir || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const fsOpen = document.body.classList.contains('fs-player-open');
+  const targets = [];
+  if (!fsOpen) {
+    const cover = document.getElementById('player-cover');
+    const info = document.querySelector('#player .player-track-info');
+    if (cover) targets.push(cover);
+    if (info) targets.push(info);
+  } else {
+    const fsCover = document.getElementById('fs-cover');
+    const fsMeta = document.querySelector('#fs-player .fs-meta');
+    if (fsCover) targets.push(fsCover);
+    if (fsMeta) targets.push(fsMeta);
+  }
+  if (!targets.length) return;
+  const cls = dir > 0 ? 'track-flow-next' : 'track-flow-prev';
+  // single reflow restart for all targets
+  targets.forEach((node) => node.classList.remove('track-flow-next', 'track-flow-prev'));
+  void targets[0].offsetWidth;
+  targets.forEach((node) => {
+    node.classList.add(cls);
+    const done = () => {
+      node.classList.remove(cls);
+      node.style.willChange = '';
+      node.removeEventListener('animationend', done);
+    };
+    node.addEventListener('animationend', done, { once: true });
+    setTimeout(done, 340);
+  });
+}
+window.runTrackFlowAnim = runTrackFlowAnim;
+
 function updatePlayerUI(t) {
+  const flowDir = _trackFlowDir || window._trackFlowDir || 0;
+  _trackFlowDir = 0;
+  window._trackFlowDir = 0;
+  if (flowDir) runTrackFlowAnim(flowDir);
+
   const titleEl = el('player-title');
   const artistEl = el('player-artist');
   if (titleEl) titleEl.textContent = t.title || '—';
   if (artistEl) {
-    artistEl.innerHTML = typeof artistsLinksHTML === 'function'
-      ? artistsLinksHTML(t, 'artist-link player-artist-link')
-      : esc(formatArtistsText(t) || t.artist?.name || t.artist || '—');
+    // Mini-player: plain text only — no artist navigation
+    artistEl.textContent = (typeof formatArtistsText === 'function'
+      ? formatArtistsText(t)
+      : (t.artist?.name || t.artist || '')) || '—';
   }
   const c = el('player-cover');
-  const cover = t.album?.cover_medium || t.album?.cover || t.cover || '';
+  const cover = bestCoverUrl(t, 500);
   if (c) {
-    c.style.background = cover ? `url("${cover}") center/cover` : 'var(--bg-3)';
+    c.style.backgroundImage = cover ? `url("${cover}")` : '';
     c.style.backgroundSize = 'cover';
     c.style.backgroundPosition = 'center';
+    c.style.backgroundColor = cover ? 'transparent' : 'var(--bg-3)';
+    c.classList.toggle('is-empty', !cover);
   }
   const tt = el('time-total');
   const tc = el('time-current');
@@ -1119,6 +1210,7 @@ function updatePlayerUI(t) {
   if (pf) pf.style.width = '0%';
   el('player-like-btn')?.classList.add('visible');
   updateNowPlayingPanel(t);
+  if (typeof syncFsPlayer === 'function') syncFsPlayer(t);
   if (typeof syncRightPanel === 'function') syncRightPanel();
   else if (typeof window.syncRightPanel === 'function') window.syncRightPanel();
 }
@@ -1129,12 +1221,19 @@ function startProgress() { stopProgress(); _pt = setInterval(tickProgress, 250);
 function stopProgress()  { clearInterval(_pt); }
 function tickProgress() {
   if (!audio.duration) return;
+  const pct = (audio.currentTime / audio.duration * 100);
   const pf = el('progress-fill');
   const tc = el('time-current');
   const tt = el('time-total');
-  if (pf) pf.style.width = (audio.currentTime/audio.duration*100)+'%';
+  if (pf) pf.style.width = pct + '%';
   if (tc) tc.textContent = fmt(audio.currentTime);
   if (tt) tt.textContent = fmt(audio.duration);
+  const fsFill = el('fs-progress-fill');
+  const fsCur = el('fs-time-current');
+  const fsTot = el('fs-time-total');
+  if (fsFill) fsFill.style.width = pct + '%';
+  if (fsCur) fsCur.textContent = fmt(audio.currentTime);
+  if (fsTot) fsTot.textContent = fmt(audio.duration);
 }
 function seekTo(e) {
   if (!audio.duration) return;
@@ -1219,7 +1318,6 @@ function toggleFavByIdx(idx, key, btn) {
       if (typeof renderLikedPage === 'function') renderLikedPage();
     }
   }
-  showNotif?.(added ? 'Добавлено в избранное' : 'Убрано из избранного');
 }
 
 function toggleFavPlayer() {
@@ -1237,16 +1335,17 @@ function toggleFavPlayer() {
   });
   favourites = Store.getFavs();
   applyLikeBtnState(btn, added);
+  applyLikeBtnState(el('fs-like-btn'), added);
   updateFavBadge();
   syncFavIcons();
   if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
-  showNotif?.(added ? 'Добавлено в избранное' : 'Убрано из избранного');
 }
 
 function updateFavBtn() {
   const t=queue[queueIndex]; if (!t) return;
   const f = Store.isFav(t);
   applyLikeBtnState(el('player-like-btn'), f);
+  applyLikeBtnState(el('fs-like-btn'), f);
 }
 
 function updateFavBadge() {
@@ -1284,8 +1383,11 @@ function restorePlayerState() {
   audio.volume = isMuted ? 0 : volume;
   const vfill = el('volume-fill');
   if (vfill) vfill.style.width = (volume * 100) + '%';
-  el('btn-shuffle')?.classList.toggle('active-btn', isShuffle);
-  updateRepeatBtn();
+  if (typeof syncShuffleRepeatUi === 'function') syncShuffleRepeatUi();
+  else {
+    el('btn-shuffle')?.classList.toggle('active-btn', isShuffle);
+    updateRepeatBtn();
+  }
   updateVolumeIcon();
 
   const t = queue[queueIndex];
@@ -1994,7 +2096,7 @@ let _ctxMenu = null;
 function showTrackMenu(e, idx, key) {
   e.preventDefault();
   e.stopPropagation();
-  hideTrackMenu();
+  hideTrackMenu(true);
   const t = _src[key]?.[idx];
   if (!t) return;
 
@@ -2009,12 +2111,8 @@ function showTrackMenu(e, idx, key) {
   if (btn) {
     const br = btn.getBoundingClientRect();
     x = br.right;
-    y = br.bottom;
+    y = br.bottom + 6;
   }
-  menu.style.position = 'fixed';
-  menu.style.top = y + 'px';
-  menu.style.left = x + 'px';
-  menu.style.zIndex = '4000';
 
   const artistId = t.artist?.id || trackArtists(t)[0]?.id || null;
   const artistName = t.artist?.name || trackArtists(t)[0]?.name || '';
@@ -2043,7 +2141,6 @@ function showTrackMenu(e, idx, key) {
     ${albumId ? item('album', '', 'К альбому') : ''}
     ${artistName || artistId ? item('artist', '', 'К исполнителю') : ''}
     ${item('track', '', 'Страница трека')}
-    ${item('info', '', 'Информация')}
     ${item('share', '', 'Поделиться')}
     ${key === 'favs' || key === 'liked' ? `<div class="ctx-divider"></div>${item('rm-lib', '', 'Удалить из библиотеки', true)}` : ''}
   `;
@@ -2077,10 +2174,6 @@ function showTrackMenu(e, idx, key) {
     else if (act === 'track') {
       go(typeof mrfUrl === 'function' ? mrfUrl('track', { id: trackId }) : `track.html?id=${encodeURIComponent(trackId)}`);
     }
-    else if (act === 'info') {
-      if (typeof showTrackInfo === 'function') showTrackInfo(t);
-      else alert(`${t.title || ''}\n${formatArtistsText(t) || artistName}`);
-    }
     else if (act === 'share') {
       if (typeof shareTrack === 'function') shareTrack(t);
       else {
@@ -2090,21 +2183,43 @@ function showTrackMenu(e, idx, key) {
     }
   });
 
+  // Mount off-screen measure, then place + open smoothly (no jump)
+  menu.style.position = 'fixed';
+  menu.style.left = '-9999px';
+  menu.style.top = '0';
+  menu.style.zIndex = '4000';
   document.body.appendChild(menu);
   _ctxMenu = menu;
   const r = menu.getBoundingClientRect();
-  let left = x;
+  let left = x - r.width;
   let top = y;
-  if (r.right > innerWidth) left = Math.max(8, x - r.width);
-  if (r.bottom > innerHeight) top = Math.max(8, y - r.height);
+  if (left < 8) left = Math.min(x, innerWidth - r.width - 8);
+  if (left < 8) left = 8;
+  if (top + r.height > innerHeight - 8) top = Math.max(8, y - r.height - 8);
+  if (top < 8) top = 8;
   menu.style.left = left + 'px';
   menu.style.top = top + 'px';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => menu.classList.add('is-open'));
+  });
   setTimeout(() => document.addEventListener('click', hideTrackMenu, { once: true }), 0);
 }
 window.showTrackMenu = showTrackMenu;
+window.__bindCtxMenu = function (el) { _ctxMenu = el; };
 
-function hideTrackMenu() {
-  if (_ctxMenu) { _ctxMenu.remove(); _ctxMenu = null; }
+function hideTrackMenu(instant) {
+  if (!_ctxMenu) return;
+  const menu = _ctxMenu;
+  _ctxMenu = null;
+  if (instant) {
+    menu.remove();
+    return;
+  }
+  menu.classList.remove('is-open');
+  menu.classList.add('is-closing');
+  const done = () => menu.remove();
+  menu.addEventListener('transitionend', done, { once: true });
+  setTimeout(done, 220);
 }
 window.hideTrackMenu = hideTrackMenu;
 
@@ -2124,7 +2239,6 @@ function toggleFavFromMenu(idx, key) {
   updateFavBadge();
   syncFavIcons();
   if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
-  showNotif?.(added ? 'Добавлено в избранное' : 'Убрано из избранного');
 }
 window.toggleFavFromMenu = toggleFavFromMenu;
 

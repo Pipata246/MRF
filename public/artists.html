@@ -6,6 +6,17 @@
   <title>Исполнители — MRF</title>
   <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
+  <script>
+  /* Layout boot: large screens = PC, smaller = mobile shell */
+  (function () {
+    try {
+      var desktop = window.matchMedia('(min-width: 901px)').matches;
+      document.documentElement.setAttribute('data-ui', desktop ? 'desktop' : 'mobile');
+    } catch (e) {
+      document.documentElement.setAttribute('data-ui', 'mobile');
+    }
+  })();
+  </script>
 </head>
 <body>
 <div id="sidebar-root"></div>
@@ -42,6 +53,7 @@ function renderArtistsPage() {
   const followed = Store.getFollowed();
   const countEl = document.getElementById('artists-count');
   const box = document.getElementById('artists-grid');
+  if (!box) return;
 
   if (countEl) countEl.textContent = followed.length + ' ' + (followed.length === 1 ? 'подписка' : followed.length < 5 ? 'подписки' : 'подписок');
 
@@ -56,13 +68,27 @@ function renderArtistsPage() {
     return;
   }
 
+  const isDesktop = (() => {
+    try {
+      return window.matchMedia('(min-width: 901px)').matches
+        || document.documentElement.getAttribute('data-ui') === 'desktop';
+    } catch (_) { return false; }
+  })();
+
   box.innerHTML = '<div class="artists-grid artists-grid-follow">' + followed.map(a => {
     const id = a.id != null ? (typeof jsStr === 'function' ? jsStr(a.id) : String(a.id).replace(/'/g, "\\'")) : '';
     const name = a.name || '';
     const safeName = typeof jsStr === 'function' ? jsStr(name) : name.replace(/'/g, "\\'");
     const letter = escHtml((name || '?')[0]);
+    const pic = a.picture || '';
+    const safePic = String(pic).replace(/'/g, '');
+    // PC: unfollow control on the tile so list updates instantly
+    const unfollowBtn = isDesktop && id
+      ? `<button type="button" class="artist-tile-unfollow" title="Отписаться" aria-label="Отписаться"
+          onclick="event.stopPropagation();unfollowArtistFromList('${id}','${safeName}','${safePic}')">×</button>`
+      : '';
     return `
-    <button type="button" class="artist-tile" onclick="openArtist(${id ? `'${id}'` : 'null'},'${safeName}')">
+    <button type="button" class="artist-tile" data-artist-id="${escHtml(String(a.id || ''))}" onclick="openArtist(${id ? `'${id}'` : 'null'},'${safeName}')">
       <span class="artist-tile-photo">
         ${a.picture
           ? `<img src="${a.picture}" alt="">`
@@ -72,9 +98,24 @@ function renderArtistsPage() {
         <span class="artist-tile-name">${escHtml(name)}</span>
         ${a.fans ? `<span class="artist-tile-fans">${(+a.fans).toLocaleString('ru')} фанатов</span>` : `<span class="artist-tile-fans">Исполнитель</span>`}
       </span>
+      ${unfollowBtn}
     </button>`;
   }).join('') + '</div>';
 }
+
+function unfollowArtistFromList(id, name, picture) {
+  if (!id) return;
+  const was = Store.isFollowing(id);
+  if (!was) {
+    if (typeof renderArtistsPage === 'function') renderArtistsPage();
+    return;
+  }
+  Store.toggleFollow({ id, name: name || '', picture: picture || '' });
+  if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
+  else if (typeof renderArtistsPage === 'function') renderArtistsPage();
+  if (typeof showNotif === 'function') showNotif('Подписка отменена');
+}
+window.unfollowArtistFromList = unfollowArtistFromList;
 </script>
 </body>
 </html>

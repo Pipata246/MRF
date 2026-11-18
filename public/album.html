@@ -6,6 +6,17 @@
   <title>Альбом — MRF</title>
   <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
+  <script>
+  /* Layout boot: large screens = PC, smaller = mobile shell */
+  (function () {
+    try {
+      var desktop = window.matchMedia('(min-width: 901px)').matches;
+      document.documentElement.setAttribute('data-ui', desktop ? 'desktop' : 'mobile');
+    } catch (e) {
+      document.documentElement.setAttribute('data-ui', 'mobile');
+    }
+  })();
+  </script>
 </head>
 <body>
 <div id="sidebar-root"></div>
@@ -35,24 +46,32 @@ else if (document.readyState === 'loading') document.addEventListener('DOMConten
 else bootAlbumPage();
 
 async function loadAlbumPage(forced) {
+  const hasForced = forced != null && typeof forced === 'object';
   const params = new URLSearchParams(location.search);
-  let rawId = forced && forced.id != null && String(forced.id) !== ''
-    ? String(forced.id)
-    : String(params.get('id') || '');
-  let albumTitle = forced && forced.title != null && String(forced.title) !== ''
-    ? String(forced.title)
-    : String(params.get('title') || '');
-  let artistName = forced && forced.artist != null && String(forced.artist) !== ''
-    ? String(forced.artist)
-    : String(params.get('artist') || '');
+  let rawId = '';
+  let albumTitle = '';
+  let artistName = '';
 
-  if (!rawId && !albumTitle && !artistName) {
-    try {
-      const saved = JSON.parse(sessionStorage.getItem('mrf_route_album') || '{}');
-      rawId = saved.id || '';
-      albumTitle = saved.title || '';
-      artistName = saved.artist || '';
-    } catch (_) {}
+  if (hasForced) {
+    // Soft-nav: trust ONLY forced args (never stale sessionStorage)
+    rawId = forced.id != null && String(forced.id) !== '' ? String(forced.id) : '';
+    albumTitle = forced.title != null && String(forced.title) !== '' ? String(forced.title) : '';
+    artistName = forced.artist != null && String(forced.artist) !== '' ? String(forced.artist) : '';
+    if (!rawId) rawId = String(params.get('id') || '');
+    if (!albumTitle) albumTitle = String(params.get('title') || '');
+    if (!artistName) artistName = String(params.get('artist') || '');
+  } else {
+    rawId = String(params.get('id') || '');
+    albumTitle = String(params.get('title') || '');
+    artistName = String(params.get('artist') || '');
+    if (!rawId && !albumTitle && !artistName) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem('mrf_route_album') || '{}');
+        rawId = saved.id || '';
+        albumTitle = saved.title || '';
+        artistName = saved.artist || '';
+      } catch (_) {}
+    }
   }
 
   const feed = document.getElementById('album-feed');
@@ -151,7 +170,9 @@ async function loadAlbumPage(forced) {
   }));
 
   document.title = aTitle + ' — MRF';
-  const artistUrl = mrfUrl('artist', { id: album.artist?.id, name: aName });
+  const artistIdJs = album.artist?.id != null && String(album.artist.id) !== ''
+    ? `'${jsStr(album.artist.id)}'`
+    : 'null';
 
   feed.innerHTML = `
     <div style="display:flex;gap:28px;align-items:flex-start;margin-bottom:32px;flex-wrap:wrap">
@@ -159,7 +180,7 @@ async function loadAlbumPage(forced) {
       <div style="display:flex;flex-direction:column;justify-content:center;gap:8px">
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:2px">Альбом</div>
         <h2 style="font-size:32px;font-weight:800">${escHtml(aTitle)}</h2>
-        <div style="color:var(--text-3);font-size:14px;cursor:pointer" onclick="(window.mrfGo||function(u){location.href=u})('${artistUrl}')">
+        <div style="color:var(--text-3);font-size:14px;cursor:pointer" onclick="openArtist(${artistIdJs},'${jsStr(aName)}')">
           ${escHtml(aName)}
         </div>
         <div style="color:var(--text-3);font-size:12px">${_src[key].length} треков · ${album.release_date||''}</div>
