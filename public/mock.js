@@ -158,9 +158,20 @@ const Store = {
     try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
   },
 
-  /* Избранное */
-  getFavs()       { return this._get(this.keys.favs, []); },
-  setFavs(v)      { this._set(this.keys.favs, v); },
+  /* Избранное — всегда newest-first */
+  _sortNewestFirst(arr) {
+    if (!Array.isArray(arr) || arr.length < 2) return Array.isArray(arr) ? arr : [];
+    return arr
+      .map((item, i) => ({ item, i, t: Number(item && item.addedAt) || 0 }))
+      .sort((a, b) => (b.t - a.t) || (a.i - b.i))
+      .map(x => x.item);
+  },
+  getFavs() {
+    return this._sortNewestFirst(this._get(this.keys.favs, []));
+  },
+  setFavs(v) {
+    this._set(this.keys.favs, this._sortNewestFirst(Array.isArray(v) ? v : []));
+  },
   isFav(titleOrTrack, artist) {
     const favs = this.getFavs();
     if (titleOrTrack && typeof titleOrTrack === 'object') {
@@ -177,7 +188,9 @@ const Store = {
     return favs.some(f => f.title === title && f.artist === (artist || ''));
   },
   toggleFav(track) {
-    let favs = this.getFavs();
+    // Сырой массив без сортировки — чтобы не потерять порядок при записи
+    let favs = this._get(this.keys.favs, []);
+    if (!Array.isArray(favs)) favs = [];
     const tid = track.id != null ? String(track.id) : '';
     const key = { title: track.title, artist: track.artistName || track.artist?.name || track.artist || '' };
     const exists = favs.some(f =>
@@ -191,7 +204,7 @@ const Store = {
         return true;
       });
     } else {
-      favs.push({
+      const entry = {
         id: track.id, title: track.title,
         artist: key.artist,
         artistId: track.artist?.id || track.artistId || null,
@@ -201,7 +214,9 @@ const Store = {
         duration: track.duration || 0,
         preview: track.preview || null,
         addedAt: Date.now()
-      });
+      };
+      // Жёстко в начало + сортировка по дате при чтении
+      favs = [entry, ...favs.filter(f => String(f.id) !== tid)];
     }
     this.setFavs(favs);
     return !exists;
@@ -254,10 +269,16 @@ const Store = {
       this.setPlaylists(pls);
       return;
     }
-    pl.tracks.push(norm);
+    // Новые треки — строго первая позиция
+    pl.tracks = [norm, ...pl.tracks.filter(t => String(t.id) !== tid)];
     pl.trackCount = pl.tracks.length;
     if (!pl.cover && norm.cover) pl.cover = norm.cover;
     this.setPlaylists(pls);
+  },
+  getPlaylistTracksNewestFirst(playlistId) {
+    const pl = this.getPlaylist(playlistId);
+    if (!pl) return [];
+    return this._sortNewestFirst(pl.tracks || []);
   },
   removeTrackFromPlaylist(playlistId, trackId) {
     const sid = String(playlistId);
@@ -324,21 +345,29 @@ const Store = {
   setSettings(v)  { this._set(this.keys.settings, { ...this.getSettings(), ...v }); },
 
   /* История поиска */
-  getHistory()    { return this._get(this.keys.history, []); },
-  addHistory(q)   {
-    const t = (q || '').trim();
+  getHistory() {
+    const raw = this._get(this.keys.history, []);
+    return Array.isArray(raw) ? raw.map(h => String(h || '')).filter(Boolean) : [];
+  },
+  addHistory(q) {
+    const t = String(q || '').trim();
     if (t.length < 2) return;
     const tl = t.toLowerCase();
-    // Drop prefix/incomplete siblings so "pla" / "play" don't sit next to "playboi carti"
     let arr = this.getHistory().filter(h => {
       const hl = String(h || '').trim().toLowerCase();
       if (!hl || hl === tl) return false;
-      if (tl.startsWith(hl) || hl.startsWith(tl)) return false;
+      // убираем только короткие префиксы текущего запроса ("tra" → "travis")
+      if (hl.length < tl.length && tl.startsWith(hl)) return false;
+      if (tl.length < hl.length && hl.startsWith(tl)) return false;
       return true;
     });
     arr.unshift(t);
     if (arr.length > 12) arr = arr.slice(0, 12);
-    this._set(this.keys.history, arr);
+    try {
+      localStorage.setItem(this.keys.history, JSON.stringify(arr));
+    } catch (e) {
+      console.warn('[MRF] history save failed', e);
+    }
   },
   clearHistory()  { this._set(this.keys.history, []); },
   pruneHistory()  {
@@ -349,13 +378,17 @@ const Store = {
       if (t.length < 2) return;
       const tl = t.toLowerCase();
       const worse = kept.findIndex(x => {
-        const xl = x.toLowerCase();
-        return xl.startsWith(tl) || tl.startsWith(xl);
+        const xl = String(x || '').toLowerCase();
+        return (xl.length < tl.length && tl.startsWith(xl)) || (tl.length < xl.length && xl.startsWith(tl));
       });
       if (worse === -1) kept.push(t);
       else if (t.length > kept[worse].length) kept[worse] = t;
     });
-    this._set(this.keys.history, kept.slice(0, 12));
+    try {
+      localStorage.setItem(this.keys.history, JSON.stringify(kept.slice(0, 12)));
+    } catch (e) {
+      console.warn('[MRF] history prune failed', e);
+    }
     return kept;
   },
 

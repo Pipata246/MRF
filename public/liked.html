@@ -49,7 +49,10 @@ whenDomReady(() => {
 });
 
 function renderLikedPage() {
-  const favs = Store.getFavs();
+  // getFavs уже newest-first; на всякий случай ещё раз сортируем
+  const favs = (typeof Store._sortNewestFirst === 'function'
+    ? Store._sortNewestFirst(Store.getFavs())
+    : Store.getFavs());
   const box = document.getElementById('liked-list');
   const countEl = document.getElementById('liked-count');
   const playBtn = document.getElementById('play-all-btn');

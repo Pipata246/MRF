@@ -113,29 +113,49 @@ function renderLib(tab) {
 
   if (activeTab === 'all' || activeTab === 'tracks') {
     let favs = filterByQuery(Store.getFavs(), ['title', 'artist']);
-    html += `<div class="section"><div class="section-header">
-      <h3 class="section-title" style="font-size:16px">Любимые треки <span style="font-size:12px;color:var(--text-3)">${favs.length}</span></h3>
-      ${favs.length ? `<button class="btn-primary" style="padding:7px 14px;font-size:12px" onclick="playFavs()">Слушать</button>` : ''}
-    </div>`;
-    if (!favs.length) {
-      html += `<div class="search-empty" style="padding:12px 0 8px"><p style="color:var(--text-3)">Добавляй треки в избранное сердечком</p></div>`;
+    const likedHref = typeof mrfUrl === 'function' ? mrfUrl('liked') : 'liked.html';
+    const cover = favs.find(f => f.cover)?.cover || '';
+
+    if (activeTab === 'all') {
+      // Mobile-style featured card; desktop still uses the same entry point
+      html += `<div class="section lib-featured-section">
+        <button type="button" class="lib-featured" onclick="(window.mrfGo||function(u){location.href=u})('${likedHref}')">
+          <span class="lib-featured-text">
+            <span class="lib-featured-title">Любимые треки</span>
+            <span class="lib-featured-sub">${favs.length} треков</span>
+          </span>
+          <span class="lib-featured-cover" aria-hidden="true">
+            ${cover
+              ? `<img src="${cover}" alt="">`
+              : `<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`}
+          </span>
+        </button>
+      </div>`;
     } else {
-      const fake = favs.map(f => ({
-        id: f.id || 0,
-        title: f.title,
-        artist: { id: f.artistId || null, name: f.artist },
-        artistId: f.artistId || null,
-        album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
-        duration: f.duration || 0,
-        preview: f.preview || null
-      }));
-      _src['favs'] = fake;
-      html += `<div id="fav-list" class="track-list">${fake.map((t,i) => {
-        const row = rowHTML(t,i,'favs');
-        return row.replace('<div class="track-num">', `${libCheckHTML(t.id)}<div class="track-num">`);
-      }).join('')}</div>`;
+      html += `<div class="section"><div class="section-header">
+        <h3 class="section-title" style="font-size:16px">Любимые треки <span style="font-size:12px;color:var(--text-3)">${favs.length}</span></h3>
+        ${favs.length ? `<button class="btn-primary" style="padding:7px 14px;font-size:12px" onclick="playFavs()">Слушать</button>` : ''}
+      </div>`;
+      if (!favs.length) {
+        html += `<div class="search-empty" style="padding:12px 0 8px"><p style="color:var(--text-3)">Добавляй треки в избранное сердечком</p></div>`;
+      } else {
+        const fake = favs.map(f => ({
+          id: f.id || 0,
+          title: f.title,
+          artist: { id: f.artistId || null, name: f.artist },
+          artistId: f.artistId || null,
+          album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
+          duration: f.duration || 0,
+          preview: f.preview || null
+        }));
+        _src['favs'] = fake;
+        html += `<div id="fav-list" class="track-list">${fake.map((t,i) => {
+          const row = rowHTML(t,i,'favs');
+          return row.replace('<div class="track-num">', `${libCheckHTML(t.id)}<div class="track-num">`);
+        }).join('')}</div>`;
+      }
+      html += `</div>`;
     }
-    html += `</div>`;
   }
 
   if (activeTab === 'all' || activeTab === 'playlists') {

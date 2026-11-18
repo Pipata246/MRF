@@ -448,16 +448,19 @@ function bindNavPersist() {
 ══════════════════════════════════ */
 function goSearchPage(q) {
   const query = (q || '').trim();
+  if (query && typeof Store?.addHistory === 'function') {
+    try { Store.addHistory(query); } catch (_) {}
+  }
   // already on search page with page script — use doSearch / reset home
   if (/search(\.html)?$/i.test(location.pathname)) {
-    if (query && typeof doSearch === 'function') doSearch(query);
+    if (query && typeof doSearch === 'function') doSearch(query, { save: true });
     else if (typeof resetSearchHome === 'function') resetSearchHome();
     else if (typeof showSearchInitial === 'function') showSearchInitial();
     return;
   }
   const url = typeof mrfUrl === 'function'
     ? mrfUrl('search', query ? { q: query } : null)
-    : (query ? `search?q=${encodeURIComponent(query)}` : 'search.html');
+    : (query ? `search.html?q=${encodeURIComponent(query)}` : 'search.html');
   (typeof mrfGo === 'function' ? mrfGo : (u) => { location.href = u; })(url);
 }
 

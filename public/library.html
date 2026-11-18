@@ -14,7 +14,14 @@
   <div class="feed">
 
     <div class="library-header">
-      <h2 class="section-title" style="font-size:24px">Моя библиотека</h2>
+      <div class="mobile-page-head library-mobile-head">
+        <button type="button" class="mobile-page-avatar" onclick="goProfile()" aria-label="Профиль" id="library-mobile-avatar"></button>
+        <h2 class="section-title library-title">Медиатека</h2>
+        <button type="button" class="mobile-head-action" onclick="showCreatePlaylist()" aria-label="Создать плейлист" title="Создать плейлист">
+          <svg viewBox="0 0 24 24" fill="none" width="22" height="22"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <h2 class="section-title library-title-desktop" style="font-size:24px">Моя библиотека</h2>
       <div class="library-controls">
         <button class="lib-view-btn active" id="lib-view-grid" onclick="setLibView('grid')" title="Сетка">
           <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/></svg>
@@ -23,7 +30,7 @@
           <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </button>
         <button type="button" class="btn-secondary lib-select-btn" id="lib-select-btn" onclick="toggleSelectMode()" aria-pressed="false">Выбрать</button>
-        <button class="btn-primary" style="padding:8px 16px;font-size:12px" onclick="showCreatePlaylist()">
+        <button class="btn-primary lib-create-desktop" style="padding:8px 16px;font-size:12px" onclick="showCreatePlaylist()">
           <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           Плейлист
         </button>

@@ -213,12 +213,19 @@
     const justLoadedSearch = externals.some(s => String(s).includes('search-page'));
     const justLoadedLib = externals.some(s => String(s).includes('library-page'));
 
-    if (pname === 'search' && typeof bootSearchPage === 'function' && !justLoadedSearch) {
-      if (typeof initSearchPage === 'function') initSearchPage();
+    if (pname === 'search') {
       const q = absUrl.searchParams.get('q');
-      if (q && typeof doSearch === 'function') doSearch(q);
-      else if (typeof resetSearchHome === 'function') resetSearchHome({ replaceUrl: false });
-      else if (typeof showSearchInitial === 'function') showSearchInitial();
+      if (typeof bindMobileSearchField === 'function') bindMobileSearchField();
+      if (!justLoadedSearch && typeof bootSearchPage === 'function') {
+        // re-enter search without reloading search-page.js
+        if (typeof initSearchPage === 'function') initSearchPage();
+        if (q && typeof doSearch === 'function') doSearch(q, { save: true });
+        else if (typeof resetSearchHome === 'function') resetSearchHome({ replaceUrl: false });
+        else if (typeof showSearchInitial === 'function') showSearchInitial();
+      } else if (justLoadedSearch && q && typeof doSearch === 'function') {
+        // script just loaded & may have booted; ensure query still applied
+        doSearch(q, { save: true });
+      }
     } else if (pname === 'library' && typeof bootLibrary === 'function' && !justLoadedLib) {
       bootLibrary();
     } else if (pname === 'playlist' && typeof loadPlaylistPage === 'function') {
@@ -227,7 +234,7 @@
       renderPlaylistsPage();
     } else if (pname === 'liked' && typeof renderLikedPage === 'function') {
       renderLikedPage();
-    } else if (pname === 'artist' && typeof window.loadArtistPage === 'function') {
+    } else if (pname === 'artist') {
       let id = absUrl.searchParams.get('id') || '';
       let name = absUrl.searchParams.get('name') || '';
       if (!id && !name) {
@@ -237,7 +244,11 @@
           name = saved.name || '';
         } catch {}
       }
-      void window.loadArtistPage({ id, name });
+      if (typeof window.loadArtistPage === 'function') {
+        void window.loadArtistPage({ id, name });
+      } else if (typeof openArtist === 'function') {
+        void openArtist(id || null, name || '');
+      }
     } else if (pname === 'album' && typeof window.loadAlbumPage === 'function') {
       let id = absUrl.searchParams.get('id') || '';
       let title = absUrl.searchParams.get('title') || '';
@@ -351,6 +362,8 @@
       if (typeof syncFavIcons === 'function') syncFavIcons();
       if (typeof syncPlayingRows === 'function') syncPlayingRows();
       if (typeof updateSearchModeUI === 'function') updateSearchModeUI();
+      if (typeof updateMobileNavActive === 'function') updateMobileNavActive(toPage);
+      if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
       updateChromeNavButtons();
     } catch (err) {
       console.warn('[MRF soft-nav] fallback hard nav', err);

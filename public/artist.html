@@ -26,6 +26,9 @@ var _artistPageId = null;
 var _artistPageName = '';
 var _artistPageTab = 'tracks';
 var _artistAlbums = [];
+var _artistRelated = [];
+var _artistInfo = null;
+var _artistTracksExpanded = false;
 
 function bootArtistPage() {
   initShared();
@@ -104,15 +107,17 @@ async function loadArtistPage(forced) {
     if (feed) feed.innerHTML = `<div class="loading-placeholder"><div class="spinner"></div><span>Загружаем артиста…</span></div>`;
   }
 
-  // BACKEND TODO: Получение информации об исполнителе + альбомы
+  // BACKEND TODO: Получение информации об исполнителе + альбомы + похожие
   let artInfo = {};
   let tracksRaw = [];
   let albumsRaw = [];
+  let relatedRaw = [];
   try {
-    [artInfo, tracksRaw, albumsRaw] = await Promise.all([
+    [artInfo, tracksRaw, albumsRaw, relatedRaw] = await Promise.all([
       dzObj(`/artist/${id}`),
       dzArr(`/artist/${id}/top?limit=50`),
-      dzArr(`/artist/${id}/albums?limit=40`)
+      dzArr(`/artist/${id}/albums?limit=40`),
+      dzArr(`/artist/${id}/related?limit=12`)
     ]);
   } catch (_) {}
   if (!stillHere()) return;
@@ -128,10 +133,11 @@ async function loadArtistPage(forced) {
       const exact = found.find(a => (a.name || '').toLowerCase() === name.toLowerCase()) || found[0];
       if (exact?.id) {
         id = String(exact.id);
-        [artInfo, tracksRaw, albumsRaw] = await Promise.all([
+        [artInfo, tracksRaw, albumsRaw, relatedRaw] = await Promise.all([
           dzObj(`/artist/${id}`),
           dzArr(`/artist/${id}/top?limit=50`),
-          dzArr(`/artist/${id}/albums?limit=40`)
+          dzArr(`/artist/${id}/albums?limit=40`),
+          dzArr(`/artist/${id}/related?limit=12`)
         ]);
         if (artInfo && artInfo.error) artInfo = {};
         try { history.replaceState({ mrfSoft: 1 }, '', mrfUrl('artist', { id, name: artInfo.name || name })); } catch (_) {}
@@ -153,55 +159,142 @@ async function loadArtistPage(forced) {
   }
 
   const img   = artInfo.picture_xl || artInfo.picture_medium || '';
-  const fans  = artInfo.nb_fan ? (+artInfo.nb_fan).toLocaleString('ru') + ' фанатов' : '';
+  const fansN = artInfo.nb_fan ? (+artInfo.nb_fan) : 0;
+  const fans  = fansN ? fansN.toLocaleString('ru') + ' слушателей' : '';
+  const albumsN = artInfo.nb_album ? (+artInfo.nb_album) : (albumsRaw || []).length;
   const aName = artInfo.name || name;
   const key   = `art_${id}`;
   _src[key]   = (tracksRaw || []).map(normDZ);
   _artistAlbums = albumsRaw || [];
+  _artistRelated = relatedRaw || [];
+  _artistInfo = artInfo;
   _artistPageId = String(id);
   _artistPageName = aName;
   _artistPageTab = 'tracks';
+  _artistTracksExpanded = false;
 
   document.title = aName + ' — MRF';
   const isFollowing = Store.isFollowing(id);
   const feed = liveFeed();
   if (!feed || !stillHere()) return;
 
+  const latestYear = (_artistAlbums[0]?.release_date || '').toString().slice(0, 4);
+  const statsBits = [
+    fans,
+    albumsN ? albumsN + ' ' + (albumsN === 1 ? 'релиз' : albumsN < 5 ? 'релиза' : 'релизов') : '',
+    latestYear ? 'с ' + latestYear : ''
+  ].filter(Boolean);
+
   feed.innerHTML = `
-    <div class="artist-page-hero">
-      ${img ? `<img class="artist-page-avatar" src="${img}" alt="">` : `<div class="artist-page-avatar artist-page-avatar-ph">${(aName||'?')[0]}</div>`}
-      <div class="artist-page-meta">
-        <div class="artist-page-kicker">Артист</div>
-        <h1 class="artist-page-title">${escHtml(aName)}</h1>
-        <div class="artist-page-fans">${fans}</div>
-        <div class="artist-page-actions">
-          <button class="btn-primary" onclick="playFromSrc('${key}',0)" style="padding:10px 20px;font-size:13px" ${!_src[key].length ? 'disabled' : ''}>
-            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
-            Слушать
-          </button>
-          <button class="btn-secondary" id="follow-btn" onclick="toggleArtistFollow()" style="padding:10px 18px;font-size:13px">
-            ${isFollowing ? 'Вы подписаны' : 'Подписаться'}
-          </button>
+    <section class="artist-spotify-hero${img ? ' has-bg' : ''}">
+      ${img ? `<div class="artist-spotify-hero-bg" style="background-image:url('${img}')" aria-hidden="true"></div>` : ''}
+      <div class="artist-spotify-hero-shade" aria-hidden="true"></div>
+      <div class="artist-spotify-hero-inner">
+        ${img ? `<img class="artist-page-avatar" src="${img}" alt="">` : `<div class="artist-page-avatar artist-page-avatar-ph">${(aName||'?')[0]}</div>`}
+        <div class="artist-page-meta">
+          <div class="artist-page-kicker">Исполнитель</div>
+          <h1 class="artist-page-title">${escHtml(aName)}</h1>
+          <div class="artist-page-fans">${statsBits.map(escHtml).join(' · ')}</div>
+          <div class="artist-page-actions">
+            <button class="btn-primary" onclick="playFromSrc('${key}',0)" style="padding:10px 20px;font-size:13px" ${!_src[key].length ? 'disabled' : ''}>
+              <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
+              Слушать
+            </button>
+            <button class="btn-secondary" id="follow-btn" onclick="toggleArtistFollow()" style="padding:10px 18px;font-size:13px">
+              ${isFollowing ? 'Вы подписаны' : 'Подписаться'}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
 
     <div class="artist-page-tabs" role="tablist">
-      <button type="button" class="artist-page-tab active" id="artist-tab-tracks" onclick="switchArtistTab('tracks')">Популярные треки</button>
-      <button type="button" class="artist-page-tab" id="artist-tab-albums" onclick="switchArtistTab('albums')">Альбомы и релизы${_artistAlbums.length ? ` · ${_artistAlbums.length}` : ''}</button>
+      <button type="button" class="artist-page-tab active" id="artist-tab-tracks" onclick="switchArtistTab('tracks')">Популярное</button>
+      <button type="button" class="artist-page-tab" id="artist-tab-albums" onclick="switchArtistTab('albums')">Дискография${_artistAlbums.length ? ` · ${_artistAlbums.length}` : ''}</button>
+      <button type="button" class="artist-page-tab" id="artist-tab-about" onclick="switchArtistTab('about')">О исполнителе</button>
     </div>
-    <div id="artist-tab-panel"></div>`;
+    <div id="artist-tab-panel"></div>
+    <div id="artist-related-wrap"></div>`;
 
   renderArtistTab();
+  renderArtistRelated();
 }
 
 function switchArtistTab(tab) {
-  _artistPageTab = tab === 'albums' ? 'albums' : 'tracks';
+  _artistPageTab = tab === 'albums' ? 'albums' : (tab === 'about' ? 'about' : 'tracks');
   document.getElementById('artist-tab-tracks')?.classList.toggle('active', _artistPageTab === 'tracks');
   document.getElementById('artist-tab-albums')?.classList.toggle('active', _artistPageTab === 'albums');
+  document.getElementById('artist-tab-about')?.classList.toggle('active', _artistPageTab === 'about');
   renderArtistTab();
 }
 window.switchArtistTab = switchArtistTab;
+
+function toggleArtistTracksExpand() {
+  _artistTracksExpanded = !_artistTracksExpanded;
+  renderArtistTab();
+}
+window.toggleArtistTracksExpand = toggleArtistTracksExpand;
+
+function artistRelatedNavHTML() {
+  return `
+    <button type="button" class="genre-nav-btn rail-prev" aria-label="Назад">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button type="button" class="genre-nav-btn rail-next" aria-label="Вперёд">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>`;
+}
+
+function bindArtistRelatedRail() {
+  const nav = document.querySelector('.rail-nav[data-rail="artist-related-rail"]');
+  const rail = document.getElementById('artist-related-rail');
+  if (!nav || !rail) return;
+  if (!nav.querySelector('.rail-prev')) nav.innerHTML = artistRelatedNavHTML();
+  const prev = nav.querySelector('.rail-prev');
+  const next = nav.querySelector('.rail-next');
+  const step = () => Math.max(180, Math.floor(rail.clientWidth * 0.75));
+  const sync = () => {
+    const max = rail.scrollWidth - rail.clientWidth - 2;
+    const canScroll = max > 4;
+    prev.disabled = !canScroll || rail.scrollLeft <= 2;
+    next.disabled = !canScroll || rail.scrollLeft >= max;
+    nav.classList.toggle('is-idle', !canScroll);
+  };
+  prev.onclick = () => rail.scrollBy({ left: -step(), behavior: 'smooth' });
+  next.onclick = () => rail.scrollBy({ left: step(), behavior: 'smooth' });
+  rail.onscroll = sync;
+  requestAnimationFrame(sync);
+}
+
+function renderArtistRelated() {
+  const wrap = document.getElementById('artist-related-wrap');
+  if (!wrap) return;
+  if (!_artistRelated.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `
+    <section class="artist-related-section">
+      <div class="section-header">
+        <h3 class="section-title">Похожие исполнители</h3>
+        <div class="section-header-actions">
+          <div class="rail-nav" data-rail="artist-related-rail"></div>
+        </div>
+      </div>
+      <div class="rail-wrap">
+        <div class="artist-related-rail" id="artist-related-rail">
+          ${_artistRelated.map(a => {
+            const aid = a.id != null ? String(a.id) : '';
+            const aname = String(a.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return `<button type="button" class="artist-chip" onclick="event.stopPropagation();openArtist('${aid}','${aname}')">
+              ${a.picture_medium
+                ? `<img class="artist-chip-img" src="${a.picture_medium}" alt="">`
+                : `<span class="artist-chip-img artist-chip-fallback">${escHtml((a.name||'?')[0])}</span>`}
+              <span class="artist-chip-name">${escHtml(a.name || '')}</span>
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+    </section>`;
+  bindArtistRelatedRail();
+}
 
 function renderArtistTab() {
   const panel = document.getElementById('artist-tab-panel');
@@ -213,31 +306,82 @@ function renderArtistTab() {
       panel.innerHTML = `<div class="search-empty" style="padding:28px 0"><p style="color:var(--text-3)">Альбомы и релизы не найдены</p></div>`;
       return;
     }
-    panel.innerHTML = `<div class="albums-grid artist-albums-grid">${_artistAlbums.map(a => {
-      const url = mrfUrl('album', { id: a.id, title: a.title, artist: _artistPageName });
-      const saved = Store.isAlbumSaved(a.id);
-      return `
-      <div class="album-card" onclick="(window.mrfGo||function(u){location.href=u})('${url}')">
-        ${a.cover_medium ? `<img class="album-cover" src="${a.cover_medium}" alt="" loading="lazy">` : `<div class="album-cover-placeholder">${noteSVGShared()}</div>`}
-        <div class="album-body">
-          <div class="album-title">${escHtml(a.title || '')}</div>
-          <div class="album-artist">${a.release_date ? String(a.release_date).slice(0, 4) : ''}${saved ? ' · в библиотеке' : ''}</div>
+    const albums = _artistAlbums.filter(a => String(a.record_type || '').toLowerCase() === 'album' || !a.record_type);
+    const singles = _artistAlbums.filter(a => {
+      const t = String(a.record_type || '').toLowerCase();
+      return t === 'single' || t === 'ep';
+    });
+    const rest = _artistAlbums.filter(a => !albums.includes(a) && !singles.includes(a));
+    const blocks = [
+      { title: 'Альбомы', list: albums.length ? albums : (singles.length || rest.length ? [] : _artistAlbums) },
+      { title: 'Синглы и EP', list: singles },
+      { title: 'Другое', list: rest }
+    ].filter(b => b.list.length);
+
+    panel.innerHTML = blocks.map(b => `
+      <div class="artist-discog-block">
+        <div class="section-header" style="margin-bottom:12px">
+          <h3 class="section-title" style="font-size:16px">${escHtml(b.title)} <span style="font-size:12px;color:var(--text-3);font-weight:400">(${b.list.length})</span></h3>
         </div>
-        <button type="button" class="album-save-chip${saved ? ' is-on' : ''}" onclick="event.stopPropagation();toggleArtistAlbumSave('${a.id}', this)" title="${saved ? 'Убрать' : 'Сохранить'}">
-          ${saved ? '✓' : '+'}
-        </button>
-      </div>`;
-    }).join('')}</div>`;
+        <div class="albums-grid artist-albums-grid">${b.list.map(a => {
+          const url = mrfUrl('album', { id: a.id, title: a.title, artist: _artistPageName });
+          const saved = Store.isAlbumSaved(a.id);
+          const type = a.record_type ? String(a.record_type) : '';
+          return `
+          <div class="album-card" onclick="(window.mrfGo||function(u){location.href=u})('${url}')">
+            ${a.cover_medium ? `<img class="album-cover" src="${a.cover_medium}" alt="" loading="lazy">` : `<div class="album-cover-placeholder">${noteSVGShared()}</div>`}
+            <div class="album-body">
+              <div class="album-title">${escHtml(a.title || '')}</div>
+              <div class="album-artist">${a.release_date ? String(a.release_date).slice(0, 4) : ''}${type ? ' · ' + escHtml(type) : ''}${saved ? ' · в библиотеке' : ''}</div>
+            </div>
+            <button type="button" class="album-save-chip${saved ? ' is-on' : ''}" onclick="event.stopPropagation();toggleArtistAlbumSave('${a.id}', this)" title="${saved ? 'Убрать' : 'Сохранить'}">
+              ${saved ? '✓' : '+'}
+            </button>
+          </div>`;
+        }).join('')}</div>
+      </div>`).join('');
     return;
   }
 
+  if (_artistPageTab === 'about') {
+    const info = _artistInfo || {};
+    const fans = info.nb_fan ? (+info.nb_fan).toLocaleString('ru') : '—';
+    const albums = info.nb_album ? (+info.nb_album).toLocaleString('ru') : String(_artistAlbums.length || '—');
+    const tracks = (_src[key] || []).length;
+    panel.innerHTML = `
+      <div class="artist-about-grid">
+        <article class="artist-about-card">
+          <h3 class="artist-about-title">Об исполнителе</h3>
+          <p class="artist-about-text">
+            ${escHtml(_artistPageName)} — исполнитель в каталоге MRF.
+            Здесь собраны популярные треки, релизы и похожие артисты.
+          </p>
+          <dl class="artist-about-stats">
+            <div><dt>Слушатели</dt><dd>${fans}</dd></div>
+            <div><dt>Релизы</dt><dd>${albums}</dd></div>
+            <div><dt>В топе</dt><dd>${tracks}</dd></div>
+          </dl>
+        </article>
+        <article class="artist-about-card artist-about-card-soft">
+          <h3 class="artist-about-title">Дискография</h3>
+          <p class="artist-about-text">Альбомы, синглы и EP доступны во вкладке «Дискография». Сохраняй релизы в библиотеку кнопкой +.</p>
+          <button type="button" class="btn-secondary" style="padding:8px 14px;font-size:12px;width:fit-content" onclick="switchArtistTab('albums')">Открыть дискографию</button>
+        </article>
+      </div>`;
+    return;
+  }
+
+  const all = _src[key] || [];
+  const limit = _artistTracksExpanded ? all.length : Math.min(5, all.length);
+  const shown = all.slice(0, limit);
   panel.innerHTML = `
     <div class="section-header" style="margin-bottom:12px">
-      <h3 class="section-title" style="font-size:16px">Популярные треки <span style="font-size:12px;color:var(--text-3);font-weight:400">(${(_src[key]||[]).length})</span></h3>
+      <h3 class="section-title" style="font-size:16px">Популярные треки <span style="font-size:12px;color:var(--text-3);font-weight:400">(${all.length})</span></h3>
     </div>
-    <div class="track-list">${(_src[key]||[]).length
-      ? _src[key].map((t,i) => rowHTML(t,i,key)).join('')
-      : `<div class="search-empty" style="padding:20px 0"><p style="color:var(--text-3)">Треки не найдены</p></div>`}</div>`;
+    <div class="track-list">${shown.length
+      ? shown.map((t,i) => rowHTML(t,i,key)).join('')
+      : `<div class="search-empty" style="padding:20px 0"><p style="color:var(--text-3)">Треки не найдены</p></div>`}</div>
+    ${all.length > 5 ? `<button type="button" class="artist-show-more" onclick="toggleArtistTracksExpand()">${_artistTracksExpanded ? 'Свернуть' : 'Показать ещё'}</button>` : ''}`;
   if (typeof syncPlayingRows === 'function') syncPlayingRows();
 }
 

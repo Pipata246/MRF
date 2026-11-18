@@ -2,16 +2,47 @@
 var _searchPageTimer = null;
 var _searchPageResults = { tracks: [], artists: [], albums: [] };
 
+function syncMobileSearchInput(query) {
+  const mob = document.getElementById('mobile-search-input');
+  if (mob && mob.value !== (query || '')) mob.value = query || '';
+}
+
+function bindMobileSearchField() {
+  const mob = document.getElementById('mobile-search-input');
+  if (!mob || mob.dataset.bound === '1') return;
+  mob.dataset.bound = '1';
+  mob.addEventListener('input', () => {
+    const q = mob.value.trim();
+    const top = document.getElementById('main-search-input');
+    if (top) top.value = mob.value;
+    document.getElementById('topbar-search-clear')?.classList.toggle('hidden', !q);
+    clearTimeout(_searchPageTimer);
+    _searchPageTimer = setTimeout(() => {
+      if (!q) showSearchInitial();
+      else doSearch(q, { save: false });
+    }, 280);
+  });
+  mob.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    doSearch(mob.value.trim(), { save: true });
+  });
+}
+window.bindMobileSearchField = bindMobileSearchField;
+
 function bootSearchPage() {
   initShared();
   initSearchPage();
+  bindMobileSearchField();
   const q = new URLSearchParams(location.search).get('q');
   const top = document.getElementById('main-search-input');
   if (q) {
     if (top) top.value = q;
+    syncMobileSearchInput(q);
     document.getElementById('topbar-search-clear')?.classList.remove('hidden');
     doSearch(q, { save: true });
   } else if (top?.value.trim()) {
+    syncMobileSearchInput(top.value.trim());
     // Restore results from typed query without re-saving drafts
     doSearch(top.value.trim(), { save: false });
   } else {
@@ -162,6 +193,7 @@ function resetSearchHome(opts) {
   const replaceUrl = !opts || opts.replaceUrl !== false;
   const top = document.getElementById('main-search-input');
   if (top) top.value = '';
+  syncMobileSearchInput('');
   const hidden = document.getElementById('search-input');
   if (hidden) hidden.value = '';
   document.getElementById('topbar-search-clear')?.classList.add('hidden');
@@ -211,6 +243,7 @@ function doSearch(q, opts) {
   if (hidden) hidden.value = query;
   const top = document.getElementById('main-search-input');
   if (top && top.value.trim() !== query) top.value = query;
+  syncMobileSearchInput(query);
   document.getElementById('topbar-search-clear')?.classList.toggle('hidden', !query);
   if (!query) { showSearchInitial(); return; }
   showSearchResults();
@@ -301,7 +334,7 @@ function renderSearchAll() {
   if (artists.length) {
     html += `<div class="section"><div class="section-header"><h3 class="section-title" style="font-size:16px">Артисты</h3></div>
       <div class="artists-grid">${artists.slice(0, 6).map(a => `
-        <div class="artist-card" onclick="location.href='${mrfUrl('artist',{id:a.id,name:a.name})}'">
+        <div class="artist-card" onclick="openArtist('${String(a.id||'').replace(/'/g,"\\'")}','${String(a.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
           ${a.picture_medium ? `<img class="artist-img" src="${a.picture_medium}" alt="" loading="lazy">` : `<div class="artist-img-placeholder">${(a.name || '?')[0]}</div>`}
           <div class="artist-name">${escHtml(a.name)}</div>
           <div class="artist-listeners">${a.nb_fan ? (+a.nb_fan).toLocaleString('ru') + ' фанатов' : ''}</div>
@@ -310,7 +343,7 @@ function renderSearchAll() {
   if (albums.length) {
     html += `<div class="section"><div class="section-header"><h3 class="section-title" style="font-size:16px">Альбомы</h3></div>
       <div class="albums-grid">${albums.slice(0, 6).map(a => `
-        <div class="album-card" onclick="location.href='${mrfUrl('album',{id:a.id,title:a.title,artist:a.artist?.name||''})}'">
+        <div class="album-card" onclick="(window.mrfGo||function(u){location.href=u})('${mrfUrl('album',{id:a.id,title:a.title,artist:a.artist?.name||''})}')">
           ${a.cover_medium ? `<img class="album-cover" src="${a.cover_medium}" alt="" loading="lazy">` : `<div class="album-cover-placeholder">${noteSVGShared()}</div>`}
           <div class="album-body"><div class="album-title">${escHtml(a.title)}</div><div class="album-artist">${escHtml(a.artist?.name || '')}</div></div>
         </div>`).join('')}</div></div>`;
@@ -337,7 +370,7 @@ function renderSearchArtists() {
   if (!box) return;
   box.innerHTML = _searchPageResults.artists.length
     ? `<div class="artists-grid">${_searchPageResults.artists.map(a => `
-        <div class="artist-card" onclick="location.href='${mrfUrl('artist',{id:a.id,name:a.name})}'">
+        <div class="artist-card" onclick="openArtist('${String(a.id||'').replace(/'/g,"\\'")}','${String(a.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
           ${a.picture_medium ? `<img class="artist-img" src="${a.picture_medium}" alt="" loading="lazy">` : `<div class="artist-img-placeholder">${(a.name || '?')[0]}</div>`}
           <div class="artist-name">${escHtml(a.name)}</div>
           <div class="artist-listeners">${a.nb_fan ? (+a.nb_fan).toLocaleString('ru') + ' фанатов' : ''}</div>
@@ -366,11 +399,17 @@ function renderSearchHistory() {
 
   if (!history.length) { section.style.display = 'none'; list.innerHTML = ''; return; }
   section.style.display = '';
-  list.innerHTML = history.slice(0, 8).map(h => {
+  list.innerHTML = history.slice(0, 12).map(h => {
     const safe = escHtml(h).replace(/'/g, "\\'");
     return `
-    <button type="button" class="search-history-chip" onclick="doSearch('${safe}',{save:true})">
-      <span class="search-history-chip-text">${escHtml(h)}</span>
+    <button type="button" class="search-history-chip search-history-row" onclick="doSearch('${safe}',{save:true})">
+      <span class="search-history-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </span>
+      <span class="search-history-meta">
+        <span class="search-history-chip-text">${escHtml(h)}</span>
+        <span class="search-history-sub">Запрос</span>
+      </span>
       <span class="search-history-chip-x" onclick="event.stopPropagation();removeHistoryItem('${safe}')" title="Удалить" aria-label="Удалить">✕</span>
     </button>`;
   }).join('');

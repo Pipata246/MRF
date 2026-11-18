@@ -81,7 +81,10 @@ function renderPlaylist(id) {
   document.title = pl.name + ' — MRF';
 
   const key = playlistSrcKey(pl.id);
-  const tracks = normalizePlaylistTracks(pl.tracks);
+  const ordered = typeof Store._sortNewestFirst === 'function'
+    ? Store._sortNewestFirst(pl.tracks || [])
+    : (pl.tracks || []);
+  const tracks = normalizePlaylistTracks(ordered);
   _src[key] = tracks;
   const count = tracks.length;
 

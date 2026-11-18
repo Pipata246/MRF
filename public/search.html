@@ -12,18 +12,24 @@
 <main class="main-content" id="main-content">
   <div id="topbar-root"></div>
   <div class="feed" id="feed">
+    <input type="hidden" id="search-input" value=""/>
+
+    <header class="search-home-head" id="search-mobile-chrome">
+      <div class="mobile-page-head">
+        <button type="button" class="mobile-page-avatar" onclick="goProfile()" aria-label="Профиль" id="search-mobile-avatar"></button>
+        <h2 class="search-home-title">Поиск</h2>
+      </div>
+      <label class="mobile-search-field" for="mobile-search-input">
+        <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input type="search" id="mobile-search-input" placeholder="Поиск людей, треков и альбомов" autocomplete="off" enterkeyhint="search"/>
+      </label>
+      <p class="search-home-sub">Пиши в поле сверху — результаты появятся здесь</p>
+    </header>
 
     <div id="search-initial" class="search-home">
-      <input type="hidden" id="search-input" value=""/>
-
-      <header class="search-home-head">
-        <h2 class="search-home-title">Поиск</h2>
-        <p class="search-home-sub">Пиши в поле сверху — результаты появятся здесь</p>
-      </header>
-
       <section id="search-history-section" class="section search-history-section" style="display:none">
         <div class="section-header">
-          <h3 class="section-title">Недавние запросы</h3>
+          <h3 class="section-title">Недавно искали</h3>
           <button type="button" class="section-link" onclick="clearSearchHistory()">Очистить</button>
         </div>
         <div class="search-history-chips" id="search-history-list"></div>

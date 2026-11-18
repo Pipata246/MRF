@@ -42,6 +42,7 @@ function updateSidebarActive(pageId) {
   document.querySelectorAll('.sidebar .nav-item[data-page]').forEach(a => {
     a.classList.toggle('active', a.getAttribute('data-page') === id);
   });
+  if (typeof updateMobileNavActive === 'function') updateMobileNavActive(id);
 }
 window.updateSidebarActive = updateSidebarActive;
 
@@ -241,6 +242,7 @@ function injectTopbar() {
 
   updateSearchModeUI();
   bindTopbarSearchFlyout();
+  updateTopbarAvatar();
 
   // Restore back/forward active state after topbar rebuild (soft-nav)
   if (typeof updateChromeNavButtons === 'function') updateChromeNavButtons();
@@ -248,15 +250,21 @@ function injectTopbar() {
 }
 
 function updateTopbarAvatar() {
-  const btn = document.getElementById('topbar-avatar');
-  if (!btn) return;
   const profile = Store.getProfile();
-  if (profile.avatar) {
-    btn.innerHTML = `<img src="${profile.avatar}" alt="">`;
-  } else {
-    btn.textContent = (profile.name || 'П')[0].toUpperCase();
-  }
-  btn.title = profile.name || 'Профиль';
+  const letter = (profile.name || 'П')[0].toUpperCase();
+  const fill = (el) => {
+    if (!el) return;
+    if (profile.avatar) el.innerHTML = `<img src="${profile.avatar}" alt="">`;
+    else el.textContent = letter;
+    el.title = profile.name || 'Профиль';
+  };
+  fill(document.getElementById('topbar-avatar'));
+  fill(document.getElementById('search-mobile-avatar'));
+  fill(document.getElementById('library-mobile-avatar'));
+  document.querySelectorAll('.mobile-page-avatar').forEach(el => {
+    if (el.id === 'search-mobile-avatar' || el.id === 'library-mobile-avatar') return;
+    fill(el);
+  });
 }
 window.updateTopbarAvatar = updateTopbarAvatar;
 
@@ -266,8 +274,11 @@ function isSearchPage() {
 }
 
 function updateSearchModeUI() {
-  document.body.classList.toggle('is-search-page', isSearchPage());
-  if (isSearchPage()) closeSearchFlyout();
+  const page = typeof getPageId === 'function' ? getPageId() : '';
+  document.body.classList.toggle('is-search-page', page === 'search' || isSearchPage());
+  document.body.classList.toggle('is-library-page', page === 'library');
+  document.body.classList.toggle('is-liked-page', page === 'liked');
+  if (page === 'search' || isSearchPage()) closeSearchFlyout();
 }
 
 function goProfile() {
@@ -623,6 +634,54 @@ function injectPlayer() {
 /* ══════════════════════════════════
    ИНИЦИАЛИЗАЦИЯ SHARED
 ══════════════════════════════════ */
+function mobileNavGroup(pageId) {
+  const p = pageId || getPageId();
+  if (p === 'search') return 'search';
+  if (['library', 'liked', 'playlists', 'albums', 'artists', 'playlist', 'album', 'artist', 'profile'].includes(p)) {
+    return 'library';
+  }
+  return 'home';
+}
+window.mobileNavGroup = mobileNavGroup;
+
+function updateMobileNavActive(pageId) {
+  const group = mobileNavGroup(pageId);
+  document.querySelectorAll('.mobile-nav-item[data-nav]').forEach(a => {
+    a.classList.toggle('active', a.getAttribute('data-nav') === group);
+  });
+}
+window.updateMobileNavActive = updateMobileNavActive;
+
+function injectMobileNav() {
+  let root = document.getElementById('mobile-nav-root');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'mobile-nav-root';
+    document.body.appendChild(root);
+  }
+  if (root.querySelector('.mobile-nav')) {
+    updateMobileNavActive(getPageId());
+    return;
+  }
+  root.innerHTML = `
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Мобильная навигация">
+      <a href="index.html" class="mobile-nav-item" data-nav="home" data-page="index">
+        <svg viewBox="0 0 24 24" fill="none" width="22" height="22" aria-hidden="true"><path d="M3 12L12 3L21 12V20H15V14H9V20H3V12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        <span>Главная</span>
+      </a>
+      <a href="search.html" class="mobile-nav-item" data-nav="search" data-page="search">
+        <svg viewBox="0 0 24 24" fill="none" width="22" height="22" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>Поиск</span>
+      </a>
+      <a href="library.html" class="mobile-nav-item" data-nav="library" data-page="library">
+        <svg viewBox="0 0 24 24" fill="none" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>Медиатека</span>
+      </a>
+    </nav>`;
+  updateMobileNavActive(getPageId());
+}
+window.injectMobileNav = injectMobileNav;
+
 function initShared() {
   console.log('[MRF] initShared started');
   
@@ -636,6 +695,7 @@ function initShared() {
   injectSidebar();
   injectTopbar();
   injectPlayer();
+  injectMobileNav();
   ensurePlaylistModals();
 
   // bind progress/volume after player DOM exists
@@ -806,21 +866,26 @@ function renderFavPickerCreate() {
     box.innerHTML = `<div class="modal-pl-search-hint">В избранном пока пусто — добавь треки сердечком</div>`;
     return;
   }
-  if (!favs.length) {
-    box.innerHTML = `<div class="modal-pl-search-hint">Ничего не найдено в избранном</div>`;
+  // Уже выбранные показываем только сверху — без дублей в списке
+  const pickedIds = new Set(_createPlDraftTracks.map(x => String(x.id)));
+  const available = favs.filter(f => !pickedIds.has(String(f.id)));
+  if (!available.length) {
+    box.innerHTML = favs.length
+      ? `<div class="modal-pl-search-hint">Все найденные треки уже добавлены</div>`
+      : `<div class="modal-pl-search-hint">Ничего не найдено в избранном</div>`;
+    _src['create_pl_favs'] = [];
     return;
   }
-  _src['create_pl_favs'] = favs.map(favToTrack);
+  _src['create_pl_favs'] = available.map(favToTrack);
   box.innerHTML = _src['create_pl_favs'].map((t, i) => {
     const cover = t.cover || '';
-    const picked = _createPlDraftTracks.some(x => String(x.id) === String(t.id));
-    return `<button type="button" class="modal-pl-search-row${picked ? ' is-picked' : ''}" onclick="pickCreatePlaylistTrack(${i})">
+    return `<button type="button" class="modal-pl-search-row" onclick="pickCreatePlaylistTrack(${i})">
       ${cover ? `<img src="${cover}" alt="">` : `<span class="modal-pl-picked-ph"></span>`}
       <span class="modal-pl-picked-meta">
         <span class="modal-pl-picked-title">${escHtml(t.title || '')}</span>
         <span class="modal-pl-picked-artist">${escHtml(t.artist?.name || '')}</span>
       </span>
-      <span class="modal-pl-search-add">${picked ? '✓' : '+'}</span>
+      <span class="modal-pl-search-add">+</span>
     </button>`;
   }).join('');
 }
@@ -829,9 +894,8 @@ window.renderFavPickerCreate = renderFavPickerCreate;
 function pickCreatePlaylistTrack(i) {
   const t = _src['create_pl_favs']?.[i];
   if (!t) return;
-  const idx = _createPlDraftTracks.findIndex(x => String(x.id) === String(t.id));
-  if (idx >= 0) _createPlDraftTracks.splice(idx, 1);
-  else _createPlDraftTracks.push(t);
+  if (_createPlDraftTracks.some(x => String(x.id) === String(t.id))) return;
+  _createPlDraftTracks.unshift(t);
   renderCreatePlaylistPicked();
   renderFavPickerCreate();
 }
@@ -841,9 +905,10 @@ function confirmCreatePlaylist() {
   if (!name) { showNotif('Введи название'); return; }
 
   const pl = Store.createPlaylist(name, '');
-  _createPlDraftTracks.forEach(t => Store.addTrackToPlaylist(pl.id, t));
+  // reverse: addTrackToPlaylist кладёт в начало, сохраняем порядок выбора (новые сверху)
+  _createPlDraftTracks.slice().reverse().forEach(t => Store.addTrackToPlaylist(pl.id, t));
   if (window._bulkPending?.length) {
-    window._bulkPending.forEach(f => Store.addTrackToPlaylist(pl.id, favToTrack(f)));
+    window._bulkPending.slice().reverse().forEach(f => Store.addTrackToPlaylist(pl.id, favToTrack(f)));
     window._bulkPending = [];
   }
 
