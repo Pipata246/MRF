@@ -6,13 +6,22 @@ let _pageSelectMode = false;
 let _pageSelected = new Set();
 let _libTracksExpanded = false;
 
+function syncLibGuestChrome(isGuest) {
+  document.body.classList.toggle('is-lib-guest', !!isGuest);
+  document.querySelectorAll('.library-controls, .lib-toolbar, .lib-filters, .lib-bulk-bar, .mobile-head-action').forEach((el) => {
+    if (!el) return;
+    if (isGuest) el.setAttribute('hidden', '');
+    else el.removeAttribute('hidden');
+  });
+}
+
 function bootLibrary() {
   if (typeof initShared === 'function') initShared();
   if (typeof updateSearchModeUI === 'function') updateSearchModeUI();
   if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
   if (typeof updateMobileNavActive === 'function') updateMobileNavActive('library');
   const params = new URLSearchParams(location.search);
-  if (params.get('tab')) {
+  if (params.get('tab') && typeof mrfIsLoggedIn === 'function' && mrfIsLoggedIn()) {
     const tab = params.get('tab');
     const btn = [...document.querySelectorAll('.lib-filter')].find(b => b.textContent.toLowerCase().includes(
       tab === 'tracks' ? 'любим' : tab === 'playlists' ? 'плейл' : tab === 'albums' ? 'альбом' : tab === 'artists' ? 'исполн' : 'всё'
@@ -25,6 +34,10 @@ window.bootLibrary = bootLibrary;
 if (typeof whenDomReady === 'function') whenDomReady(bootLibrary);
 else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootLibrary);
 else bootLibrary();
+
+window.addEventListener('mrf:auth', () => {
+  if (document.getElementById('lib-content')) renderLib(_pageLibTab || 'all');
+});
 
 function setLibView(v) {
   _pageLibView = v;
@@ -179,6 +192,16 @@ function renderLib(tab) {
   if (!box) return;
   const activeTab = tab || _pageLibTab || 'all';
   _pageLibTab = activeTab;
+
+  const guest = typeof mrfIsLoggedIn === 'function' ? !mrfIsLoggedIn() : false;
+  syncLibGuestChrome(guest);
+  if (guest) {
+    box.innerHTML = typeof mrfGuestGateHTML === 'function'
+      ? mrfGuestGateHTML()
+      : `<div class="search-empty"><p>Войди в аккаунт</p></div>`;
+    return;
+  }
+
   const isDesktopLib = isDesktopLibrary();
   let html = '';
 

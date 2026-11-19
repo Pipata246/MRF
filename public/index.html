@@ -163,8 +163,8 @@
   </div>
 </main>
 <div id="player-root"></div>
-
 <script src="mock.js"></script>
+<script src="backend.js"></script>
 <script src="shared.js"></script>
 <script src="app.js"></script>
 <script src="mrf-ready.js"></script>
@@ -174,6 +174,12 @@ whenDomReady(() => {
   initShared();
   if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
   else if (typeof applyAccentColor === 'function') applyAccentColor(Store.getSettings().accentColor);
+  if (window.MrfAuth && typeof MrfAuth.onChange === 'function' && !window.__mrfHomeAuthBound) {
+    window.__mrfHomeAuthBound = true;
+    MrfAuth.onChange(() => {
+      if (typeof renderHomeRecent === 'function') renderHomeRecent();
+    });
+  }
   // Soft-nav calls loadHomePage itself — avoid duplicate parallel Deezer flood
   if (window.__mrfSoftNavigating) return;
   loadHomePage();
@@ -208,10 +214,24 @@ window.loadHomePage = loadHomePage;
 function renderHomeRecent() {
   const box = document.getElementById('recent-rail');
   if (!box) return;
+  const loggedIn = typeof mrfIsLoggedIn === 'function' ? mrfIsLoggedIn() : !!(window.MrfAuth?.session?.user);
+  const hint = !!(window.MrfAuth && typeof MrfAuth.hasAuthHint === 'function' && MrfAuth.hasAuthHint());
+  const authReady = !!(window.MrfAuth && MrfAuth.ready);
+  if (!loggedIn) {
+    _src['recent'] = [];
+    if (hint && !authReady) {
+      box.innerHTML = '';
+      return;
+    }
+    box.innerHTML = `<div class="rail-guest-hint" role="status">
+      <p class="rail-guest-hint-text">Войдите в аккаунт</p>
+      <button type="button" class="btn-secondary rail-guest-hint-btn" onclick="goProfile()">Войти</button>
+    </div>`;
+    if (typeof bindHomeRails === 'function') bindHomeRails();
+    return;
+  }
   const recent = Store.getRecent();
-  const items = recent.length
-    ? recent
-    : MOCK.tracks.slice(0, 8).map(t => ({ id: t.id, title: t.title, artist: t.artistName, cover: t.cover, preview: t.preview, duration: t.duration }));
+  const items = recent;
   if (!items.length) {
     _src['recent'] = [];
     box.innerHTML = '<p style="color:var(--text-3);font-size:13px">Пока ничего нет</p>';

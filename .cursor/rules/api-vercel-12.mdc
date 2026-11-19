@@ -1,0 +1,27 @@
+---
+description: Backend ONLY via /api (max 12 Vercel function files). Group by domain — never one tiny file per CRUD.
+alwaysApply: true
+---
+
+# API LOCK — Vercel 12-file hard limit
+
+## Non-negotiable
+
+1. **All backend logic lives under `/api`**. The browser must talk only to `/api/*`, never directly to Supabase.
+2. **Maximum 12 serverless entry files** in `/api/*.js` (Vercel limit). Count only top-level handlers in `/api/` — not `/lib`, not `/scripts`.
+3. **Do not create a 13th `/api/*.js` file.** Extend an existing domain handler (`?action=` / `?resource=` / method branch).
+4. **Group by product domain, not by table.** One file = one domain (profile+settings together; library together; music/stream later). Never a new file for ~30 lines of CRUD.
+5. Shared server code goes in `/lib/*` (not counted as API functions). Local tooling in `/scripts/*` (not counted).
+6. **Secrets only in server env** (`.env`, Vercel env). Never commit them. Never put `service_role` in `public/`.
+7. Frontend may call same-origin `/api/...` only. No Supabase JS SDK in the browser.
+
+## Current API slots (keep ≤ 12)
+
+| # | File | Responsibility |
+|---|------|----------------|
+| 1 | `api/auth.js` | Register / login / logout / session / health |
+| 2 | `api/me.js` | Profile + settings (`?resource=profile\|settings`) |
+| 3 | `api/library.js` | Likes / follows / albums / playlists (`?resource=...`) |
+| 4–12 | **RESERVED** | Future domains only (e.g. stream/music, search proxy, recommendations) — one domain per file |
+
+When adding a feature: prefer extending slots 1–3. Open a new reserved slot only for a **new domain** that cannot fit cleanly.

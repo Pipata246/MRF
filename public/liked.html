@@ -59,6 +59,7 @@
 </main>
 <div id="player-root"></div>
 <script src="mock.js"></script>
+<script src="backend.js"></script>
 <script src="shared.js"></script>
 <script src="app.js"></script>
 <script src="mrf-ready.js"></script>
@@ -69,6 +70,9 @@ var _likedAllTracks = [];
 whenDomReady(() => {
   initShared();
   renderLikedPage();
+});
+window.addEventListener('mrf:auth', () => {
+  if (document.getElementById('liked-list')) renderLikedPage();
 });
 
 function favToTrack(f) {
@@ -134,9 +138,6 @@ function filterLikedTracks() {
 window.filterLikedTracks = filterLikedTracks;
 
 function renderLikedPage() {
-  const favs = (typeof Store._sortNewestFirst === 'function'
-    ? Store._sortNewestFirst(Store.getFavs())
-    : Store.getFavs());
   const countEl = document.getElementById('liked-count');
   const playBtn = document.getElementById('play-all-btn');
   const shuffleBtn = document.getElementById('shuffle-liked-btn');
@@ -144,6 +145,29 @@ function renderLikedPage() {
   const hero = document.getElementById('liked-hero');
   const searchWrap = document.getElementById('liked-search-wrap');
   const searchInput = document.getElementById('liked-search');
+  const listBox = document.getElementById('liked-list');
+
+  if (typeof mrfIsLoggedIn === 'function' && !mrfIsLoggedIn()) {
+    if (countEl) countEl.textContent = 'Нужен вход в аккаунт';
+    if (playBtn) playBtn.style.display = 'none';
+    if (shuffleBtn) shuffleBtn.style.display = 'none';
+    if (searchWrap) searchWrap.hidden = true;
+    if (hero) hero.classList.add('is-empty');
+    if (mosaic) { mosaic.innerHTML = ''; mosaic.hidden = true; }
+    document.getElementById('liked-sticky-bar')?.classList.add('is-ready');
+    document.getElementById('liked-list-label') && (document.getElementById('liked-list-label').hidden = true);
+    if (listBox) {
+      listBox.innerHTML = typeof mrfGuestGateHTML === 'function' ? mrfGuestGateHTML() : '';
+    }
+    _likedAllTracks = [];
+    _src['liked'] = [];
+    if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
+    return;
+  }
+
+  const favs = (typeof Store._sortNewestFirst === 'function'
+    ? Store._sortNewestFirst(Store.getFavs())
+    : Store.getFavs());
 
   const n = favs.length;
   if (countEl) {

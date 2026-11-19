@@ -1,0 +1,24 @@
+---
+description: Backend/product work is near-production — no placeholders, no security holes, polished copy.
+alwaysApply: true
+---
+
+# PROD-QUALITY LOCK — backend & product surfaces
+
+This project is treated as **almost production**. Temporary hacks are forbidden.
+
+## Non-negotiable
+
+1. **No временки**: no stub copy, debug leftovers, “TODO later” UX, fake buttons, or half-wired flows left for the user to see.
+2. **Copy must be final**: short, clear, user-facing Russian. No internal jargon (облако, схема, миграция, API, env) in UI unless the user is explicitly in a developer/settings context.
+3. **No security holes**: auth, cookies, secrets, RLS assumptions, and `/api` handlers must be production-minded. Never expose `service_role` / secrets to the browser. Never weaken auth “for now”.
+4. **Complete surfaces**: login/register, errors, empty states, and gated actions must look and behave finished — consistent wording, no dead fields on the wrong tab, no broken states.
+5. **Ship the real path**: if something cannot be done securely yet, hide or disable it cleanly — do not ship a leaky workaround.
+
+## Checklist before finishing backend/UI auth work
+
+- [ ] User-visible text is polished and necessary
+- [ ] No placeholder/debug strings in the UI
+- [ ] Auth fields match the mode (login vs register)
+- [ ] Secrets stay server-only; browser talks only to `/api`
+- [ ] Errors are clear and safe (no stack traces / internal details)

@@ -4,8 +4,12 @@
   "description": "MRF — Music Streaming",
   "private": true,
   "scripts": {
-    "dev": "npx serve public -l 3000",
-    "build": "echo 'Static site, no build step'"
+    "dev": "node scripts/dev-server.js",
+    "start": "node scripts/dev-server.js",
+    "check:api": "node -e \"const fs=require('fs');const n=fs.readdirSync('api').filter(f=>f.endsWith('.js')).length;if(n>12){console.error('API files',n,'> 12');process.exit(1)}console.log('API files',n+'/12 OK')\""
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.8"
   },
   "devDependencies": {
     "serve": "14.2.3",

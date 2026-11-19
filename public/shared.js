@@ -434,13 +434,21 @@ function updateMobileBackFab() {
 window.updateMobileBackFab = updateMobileBackFab;
 
 function updateTopbarAvatar() {
-  const profile = Store.getProfile();
-  const letter = (profile.name || 'П')[0].toUpperCase();
+  const logged = !!(window.MrfAuth && typeof MrfAuth.isLoggedIn === 'function' && MrfAuth.isLoggedIn());
+  const profile = (typeof Store !== 'undefined' && Store.getProfile) ? Store.getProfile() : {};
+  const avatar = logged ? (profile.avatar || null) : null;
+  const letter = logged
+    ? String(profile.name || profile.username || 'П').replace(/^@+/, '')[0].toUpperCase()
+    : 'П';
+  const title = logged ? (profile.name || 'Профиль') : 'Профиль';
   const fill = (el) => {
     if (!el) return;
-    if (profile.avatar) el.innerHTML = `<img src="${profile.avatar}" alt="">`;
-    else el.textContent = letter;
-    el.title = profile.name || 'Профиль';
+    if (avatar) el.innerHTML = `<img src="${avatar}" alt="">`;
+    else {
+      el.innerHTML = '';
+      el.textContent = letter || 'П';
+    }
+    el.title = title;
   };
   fill(document.getElementById('topbar-avatar'));
   fill(document.getElementById('search-mobile-avatar'));
@@ -509,6 +517,43 @@ function goProfile() {
   if (typeof mrfGo === 'function') mrfGo(url);
   else location.href = url;
 }
+
+function mrfIsLoggedIn() {
+  return !!(window.MrfAuth && typeof MrfAuth.isLoggedIn === 'function' && MrfAuth.isLoggedIn());
+}
+window.mrfIsLoggedIn = mrfIsLoggedIn;
+
+/** Returns true if logged in; otherwise toast (+ optional go to profile) and false. */
+function mrfRequireLogin(opts) {
+  if (mrfIsLoggedIn()) return true;
+  const o = opts || {};
+  const msg = o.message || 'Сначала войди в аккаунт';
+  if (typeof showNotif === 'function') showNotif(msg);
+  if (o.goProfile) goProfile();
+  return false;
+}
+window.mrfRequireLogin = mrfRequireLogin;
+
+function mrfGuestGateHTML(opts) {
+  const o = opts || {};
+  const title = o.title || 'Войди в аккаунт';
+  const text = o.text || 'Сохранять музыку можно после входа';
+  const homeHref = typeof mrfUrl === 'function' ? mrfUrl('index') : 'index.html';
+  return `<div class="lib-guest-gate" role="status">
+    <div class="lib-guest-gate-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+      </svg>
+    </div>
+    <h2 class="lib-guest-gate-title">${title}</h2>
+    <p class="lib-guest-gate-text">${text}</p>
+    <div class="lib-guest-gate-actions">
+      <button type="button" class="btn-primary lib-guest-gate-cta" onclick="goProfile()">Войти</button>
+      <button type="button" class="btn-secondary lib-guest-gate-secondary" onclick="(window.mrfGo||function(u){location.href=u})('${homeHref}')">На главную</button>
+    </div>
+  </div>`;
+}
+window.mrfGuestGateHTML = mrfGuestGateHTML;
 
 function toggleUserMenu() { goProfile(); }
 
@@ -1103,7 +1148,13 @@ function initShared() {
   } else if (hadPlayer && typeof updateFavBtn === 'function') {
     updateFavBtn();
   }
-  
+  if (typeof syncActiveTrackClass === 'function') {
+    const t = (typeof queue !== 'undefined' && typeof queueIndex === 'number' && queueIndex >= 0)
+      ? queue[queueIndex]
+      : null;
+    syncActiveTrackClass(t || null);
+  }
+
   console.log('[MRF] initShared completed');
 }
 
@@ -1144,10 +1195,27 @@ function loaderHTMLShared(msg) {
 function showNotif(msg, duration = 2500) {
   const n = document.getElementById('notification');
   if (!n) return;
-  n.textContent = msg;
-  n.classList.remove('hidden');
+  const text = String(msg || '');
+  n.innerHTML = `<div class="notification-inner">
+    <span class="notification-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M9 18V6l12-3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="6" cy="18" r="2.6" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="15" r="2.6" stroke="currentColor" stroke-width="1.8"/></svg>
+    </span>
+    <span class="notification-msg">${typeof escHtml === 'function' ? escHtml(text) : text}</span>
+  </div>`;
+  n.classList.remove('hidden', 'is-leaving', 'is-show');
   clearTimeout(showNotif._t);
-  showNotif._t = setTimeout(() => n.classList.add('hidden'), duration);
+  clearTimeout(showNotif._t2);
+  requestAnimationFrame(() => {
+    n.classList.add('is-show');
+  });
+  showNotif._t = setTimeout(() => {
+    n.classList.add('is-leaving');
+    n.classList.remove('is-show');
+    showNotif._t2 = setTimeout(() => {
+      n.classList.add('hidden');
+      n.classList.remove('is-leaving');
+    }, 220);
+  }, duration);
 }
 
 
@@ -1214,6 +1282,7 @@ function filterFavsByQuery(q) {
 }
 
 function showCreatePlaylist() {
+  if (typeof mrfRequireLogin === 'function' && !mrfRequireLogin({ message: 'Чтобы создать плейлист, войди в аккаунт' })) return;
   ensurePlaylistModals();
   const modal = document.getElementById('modal-create-playlist');
   const overlay = document.getElementById('modal-overlay');
@@ -1421,6 +1490,7 @@ function confirmRenamePlaylist() {
 window.confirmRenamePlaylist = confirmRenamePlaylist;
 
 function showAddToPlaylist(track) {
+  if (typeof mrfRequireLogin === 'function' && !mrfRequireLogin({ message: 'Чтобы сохранить в плейлист, войди в аккаунт' })) return;
   _pendingTrackForPlaylist = track;
   const modal = document.getElementById('modal-add-to-playlist');
   const overlay = document.getElementById('modal-overlay');

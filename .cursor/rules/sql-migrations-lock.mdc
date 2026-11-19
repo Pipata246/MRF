@@ -1,0 +1,22 @@
+---
+description: ALL SQL must live in the project (supabase/) and stay migration-ready. Never leave DB changes only in chat.
+alwaysApply: true
+---
+
+# SQL LOCK — always save SQL in the project
+
+## Non-negotiable
+
+1. **Any SQL you write or change MUST be saved in the repo** under `supabase/` (schema / migrations). Never leave SQL only in chat, comments, or ephemeral scratch.
+2. **Every DB change** (tables, columns, indexes, RLS, functions, triggers — even tiny ones) updates project files so the schema stays the **current source of truth**.
+3. Prefer:
+   - `supabase/schema.sql` — full current schema (always keep it accurate)
+   - `supabase/migrations/` — dated incremental files when changing an already-applied DB (`YYYYMMDDHHMMSS_short_name.sql`)
+4. If you alter the DB via API logic assumptions, **update the SQL files in the same turn**.
+5. Do **not** tell the user “run this SQL” without also writing that SQL into the project.
+
+## Checklist before finishing any DB-related work
+
+- [ ] SQL is on disk under `supabase/`
+- [ ] `schema.sql` matches the intended live DB
+- [ ] Small tweaks are not skipped — they are committed to files too

@@ -38,6 +38,7 @@
 </main>
 <div id="player-root"></div>
 <script src="mock.js"></script>
+<script src="backend.js"></script>
 <script src="shared.js"></script>
 <script src="app.js"></script>
 <script src="mrf-ready.js"></script>
@@ -47,14 +48,23 @@ whenDomReady(() => {
   initShared();
   renderArtistsPage();
 });
+window.addEventListener('mrf:auth', () => {
+  if (document.getElementById('artists-grid')) renderArtistsPage();
+});
 
 window.renderArtistsPage = renderArtistsPage;
 function renderArtistsPage() {
-  const followed = Store.getFollowed();
   const countEl = document.getElementById('artists-count');
   const box = document.getElementById('artists-grid');
   if (!box) return;
 
+  if (typeof mrfIsLoggedIn === 'function' && !mrfIsLoggedIn()) {
+    if (countEl) countEl.textContent = 'Нужен вход';
+    box.innerHTML = typeof mrfGuestGateHTML === 'function' ? mrfGuestGateHTML() : '';
+    return;
+  }
+
+  const followed = Store.getFollowed();
   if (countEl) countEl.textContent = followed.length + ' ' + (followed.length === 1 ? 'подписка' : followed.length < 5 ? 'подписки' : 'подписок');
 
   if (!followed.length) {

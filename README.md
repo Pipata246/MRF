@@ -30,13 +30,25 @@ MRF/
 └── README.md
 ```
 
-## Запуск локально
+## Backend (`/api` only — max 12 files on Vercel)
+
+Браузер ходит **только** в `/api/*`. Supabase/секреты — только на сервере.
+
+Слоты сейчас (**3/12**): `auth` (логин + health), `me` (профиль + настройки), `library` (лайки / подписки / альбомы / плейлисты). Остальное — резерв под музыку/поиск и т.д.
+
+1. Создай проект в [Supabase](https://supabase.com)
+2. SQL Editor → выполни `supabase/schema.sql`
+3. Auth → Email: для удобства локально можно выключить Confirm email (или задай `SERVICE_ROLE`)
+4. Скопируй URL + anon + **service_role** в `.env` (не в `public/`)
 
 ```bash
+cp .env.example .env
+npm install
+npm run check:api
 npm run dev
 ```
 
-Приложение откроется на `http://localhost:3000`
+Открой `http://localhost:3000` → Профиль → регистрация по `@нику`.
 
 ## Основные функции
 

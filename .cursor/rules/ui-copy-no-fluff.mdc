@@ -1,0 +1,14 @@
+---
+description: No explanatory fluff under UI labels. Short labels only — production copy.
+alwaysApply: true
+---
+
+# UI COPY — no dumb clarifications
+
+## Non-negotiable
+
+1. **No helper/subtitle fluff** under fields and rows like «Можно менять», «Логин навсегда», «Отображается в профиле», «Безвозвратно удалит…» unless the user explicitly asks for help text.
+2. Labels stay short: **Имя**, **Никнейм**, **Тема**, **Выйти**, **Удалить аккаунт**.
+3. Prefer clean controls over paragraphs of explanation.
+4. Errors/toasts stay short and actionable — not essays.
+5. If something is immutable (e.g. @ник), show it as a locked control — **do not** lecture about it in grey text.

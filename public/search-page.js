@@ -249,6 +249,12 @@ function bindSearchRails() {
 function initSearchPage() {
   if (typeof Store?.pruneHistory === 'function') Store.pruneHistory();
   renderSearchHistory();
+  if (window.MrfAuth && typeof MrfAuth.onChange === 'function' && !window.__mrfSearchAuthBound) {
+    window.__mrfSearchAuthBound = true;
+    MrfAuth.onChange(() => {
+      if (typeof renderSearchHistory === 'function') renderSearchHistory();
+    });
+  }
   if (typeof updateSearchModeUI === 'function') updateSearchModeUI();
   if (typeof closeSearchFlyout === 'function') closeSearchFlyout();
   // Results are driven by topbar #main-search-input via bindTopbarSearchFlyout
@@ -511,11 +517,32 @@ function renderSearchAlbums() {
 }
 
 function renderSearchHistory() {
-  if (typeof Store?.pruneHistory === 'function') Store.pruneHistory();
-  const history = Store.getHistory().filter(h => String(h || '').trim().length >= 2);
   const section = document.getElementById('search-history-section');
   const list = document.getElementById('search-history-list');
   if (!section || !list) return;
+
+  const loggedIn = typeof mrfIsLoggedIn === 'function' ? mrfIsLoggedIn() : !!(window.MrfAuth?.session?.user);
+  const hint = !!(window.MrfAuth && typeof MrfAuth.hasAuthHint === 'function' && MrfAuth.hasAuthHint());
+  const authReady = !!(window.MrfAuth && MrfAuth.ready);
+  const clearBtn = document.getElementById('search-history-clear');
+  if (!loggedIn) {
+    if (hint && !authReady) {
+      section.style.display = 'none';
+      list.innerHTML = '';
+      return;
+    }
+    section.style.display = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+    list.innerHTML = `<div class="rail-guest-hint" role="status">
+      <p class="rail-guest-hint-text">Войдите в аккаунт</p>
+      <button type="button" class="btn-secondary rail-guest-hint-btn" onclick="goProfile()">Войти</button>
+    </div>`;
+    return;
+  }
+  if (clearBtn) clearBtn.style.display = '';
+
+  if (typeof Store?.pruneHistory === 'function') Store.pruneHistory();
+  const history = Store.getHistory().filter(h => String(h || '').trim().length >= 2);
 
   if (!history.length) { section.style.display = 'none'; list.innerHTML = ''; return; }
   section.style.display = '';
@@ -530,6 +557,7 @@ function renderSearchHistory() {
     </button>`;
   }).join('');
 }
+window.renderSearchHistory = renderSearchHistory;
 
 function clearSearchHistory() {
   Store.clearHistory();
@@ -537,8 +565,11 @@ function clearSearchHistory() {
 }
 
 function removeHistoryItem(q) {
-  const arr = Store.getHistory().filter(h => h !== q);
-  Store._set(Store.keys.history, arr);
+  if (typeof Store.removeHistory === 'function') Store.removeHistory(q);
+  else {
+    const arr = Store.getHistory().filter(h => h !== q);
+    Store._set(Store.keys.history, arr);
+  }
   renderSearchHistory();
 }
 

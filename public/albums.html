@@ -32,6 +32,7 @@
 </main>
 <div id="player-root"></div>
 <script src="mock.js"></script>
+<script src="backend.js"></script>
 <script src="shared.js"></script>
 <script src="app.js"></script>
 <script src="mrf-ready.js"></script>
@@ -41,6 +42,9 @@ whenDomReady(() => {
   initShared();
   renderSavedAlbums();
 });
+window.addEventListener('mrf:auth', () => {
+  if (document.getElementById('albums-box')) renderSavedAlbums();
+});
 
 function renderAlbumsPage() { renderSavedAlbums(); }
 window.renderAlbumsPage = renderAlbumsPage;
@@ -48,6 +52,11 @@ window.renderSavedAlbums = renderSavedAlbums;
 
 function renderSavedAlbums() {
   const box = document.getElementById('albums-box');
+  if (!box) return;
+  if (typeof mrfIsLoggedIn === 'function' && !mrfIsLoggedIn()) {
+    box.innerHTML = typeof mrfGuestGateHTML === 'function' ? mrfGuestGateHTML() : '';
+    return;
+  }
   const albs = Store.getAlbums();
   if (!albs.length) {
     box.innerHTML = `<div class="search-empty" style="padding:60px 0">

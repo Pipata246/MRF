@@ -1,7 +1,17 @@
-# Environment
+# Environment & secrets — NEVER commit
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
+public/env.js
+
+# Legacy client env generator output
+scripts/gen-env.js.bak
+
+# Supabase local (if used)
+supabase/.branches
+supabase/.temp
 
 # Vercel
 .vercel
@@ -16,3 +26,8 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Editor
+.idea/
+.vscode/
+*.swp

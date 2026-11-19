@@ -1175,11 +1175,20 @@ function runTrackFlowAnim(dir) {
 }
 window.runTrackFlowAnim = runTrackFlowAnim;
 
+function syncActiveTrackClass(track) {
+  const t = track || (queueIndex >= 0 ? queue[queueIndex] : null);
+  const on = !!(t && (t.title || t.id || t.preview));
+  document.body.classList.toggle('has-active-track', on);
+}
+window.syncActiveTrackClass = syncActiveTrackClass;
+
 function updatePlayerUI(t) {
   const flowDir = _trackFlowDir || window._trackFlowDir || 0;
   _trackFlowDir = 0;
   window._trackFlowDir = 0;
   if (flowDir) runTrackFlowAnim(flowDir);
+
+  syncActiveTrackClass(t);
 
   const titleEl = el('player-title');
   const artistEl = el('player-artist');
@@ -1381,7 +1390,11 @@ function restorePlayerState() {
       updateFavBtn();
       renderQueuePanel();
       syncPlayingRows();
+    } else {
+      syncActiveTrackClass(null);
     }
+  } else {
+    syncActiveTrackClass(null);
   }
   const defVol = (typeof Store !== 'undefined' && Store.getSettings().defaultVolume != null)
     ? Store.getSettings().defaultVolume
@@ -1631,14 +1644,11 @@ function updateNavBtns() {
 }
 
 /* ══════════════════════════════════
-   NOTIFICATION
+   NOTIFICATION — alias to shared showNotif (one toast style)
 ══════════════════════════════════ */
-let _nt=null;
 function showNotification(msg){
-  const n=el('notification');
-  if (!n) { console.log('[MRF]', msg); return; }
-  n.textContent=msg; n.classList.remove('hidden');
-  clearTimeout(_nt); _nt=setTimeout(()=>n.classList.add('hidden'),2800);
+  if (typeof showNotif === 'function') return showNotif(msg, 2800);
+  console.log('[MRF]', msg);
 }
 
 /* ══════════════════════════════════

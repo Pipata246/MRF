@@ -6,7 +6,7 @@
   if (window.__mrfSoftNav) return;
   window.__mrfSoftNav = true;
 
-  const CORE = new Set(['mock.js', 'shared.js', 'app.js', 'mrf-ready.js', 'soft-nav.js']);
+  const CORE = new Set(['backend.js', 'mock.js', 'shared.js', 'app.js', 'mrf-ready.js', 'soft-nav.js']);
   const loadedScripts = new Set(
     [...document.querySelectorAll('script[src]')].map(s => {
       try { return new URL(s.src, location.href).pathname.split('/').pop(); } catch { return ''; }

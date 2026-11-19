@@ -47,7 +47,7 @@
       <section id="search-history-section" class="section search-history-section" style="display:none">
         <div class="section-header">
           <h3 class="section-title">Недавно искали</h3>
-          <button type="button" class="section-link" onclick="clearSearchHistory()">Очистить</button>
+          <button type="button" class="section-link" id="search-history-clear" onclick="clearSearchHistory()">Очистить</button>
         </div>
         <div class="search-history-chips" id="search-history-list"></div>
       </section>
@@ -114,8 +114,8 @@
   </div>
 </main>
 <div id="player-root"></div>
-
 <script src="mock.js"></script>
+<script src="backend.js"></script>
 <script src="shared.js"></script>
 <script src="app.js"></script>
 <script src="mrf-ready.js"></script>

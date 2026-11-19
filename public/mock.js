@@ -317,6 +317,10 @@ const Store = {
 
   /* Недавно прослушанное */
   getRecent()     { return this._get(this.keys.recent, []); },
+  setRecent(v) {
+    const arr = Array.isArray(v) ? v.slice(0, 40) : [];
+    this._set(this.keys.recent, arr);
+  },
   addRecent(track) {
     let arr = this.getRecent();
     arr = arr.filter(t => String(t.id) !== String(track.id));
@@ -333,7 +337,7 @@ const Store = {
       addedAt: Date.now()
     });
     if (arr.length > 20) arr = arr.slice(0, 20);
-    this._set(this.keys.recent, arr);
+    this.setRecent(arr);
   },
 
   /* Профиль */
@@ -370,6 +374,11 @@ const Store = {
     }
   },
   clearHistory()  { this._set(this.keys.history, []); },
+  removeHistory(q) {
+    const target = String(q || '').trim();
+    const arr = this.getHistory().filter(h => String(h || '').trim() !== target);
+    this._set(this.keys.history, arr);
+  },
   pruneHistory()  {
     const raw = this.getHistory();
     const kept = [];
