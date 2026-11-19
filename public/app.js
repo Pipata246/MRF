@@ -724,6 +724,9 @@ async function openArtist(id, name, fromTrackName) {
   if (!document.getElementById('page-search')) {
     const go = typeof mrfGo === 'function' ? mrfGo : (u) => { location.href = u; };
     if (!aid && !aname) { showNotif?.('Артист не найден'); return; }
+    try {
+      sessionStorage.setItem('mrf_route_artist', JSON.stringify({ id: aid || '', name: aname || '' }));
+    } catch (_) {}
     go(typeof mrfUrl === 'function'
       ? mrfUrl('artist', aid ? { id: aid, name: aname } : { name: aname })
       : (aid
@@ -1188,10 +1191,23 @@ function updatePlayerUI(t) {
   const artistEl = el('player-artist');
   if (titleEl) titleEl.textContent = t.title || '—';
   if (artistEl) {
-    // Mini-player: plain text only — no artist navigation
-    artistEl.textContent = (typeof formatArtistsText === 'function'
-      ? formatArtistsText(t)
-      : (t.artist?.name || t.artist || '')) || '—';
+    const mobileUi = (typeof isMobileLayout === 'function')
+      ? isMobileLayout()
+      : (document.documentElement.getAttribute('data-ui') === 'mobile'
+        || window.matchMedia('(max-width: 900px)').matches);
+    if (mobileUi) {
+      // Mobile mini-player: plain text only
+      artistEl.textContent = (typeof formatArtistsText === 'function'
+        ? formatArtistsText(t)
+        : (t.artist?.name || t.artist || '')) || '—';
+    } else if (typeof artistsLinksHTML === 'function') {
+      // PC: clickable artists like in track lists
+      artistEl.innerHTML = artistsLinksHTML(t, 'artist-link player-artist-link');
+    } else {
+      artistEl.textContent = (typeof formatArtistsText === 'function'
+        ? formatArtistsText(t)
+        : (t.artist?.name || t.artist || '')) || '—';
+    }
   }
   const c = el('player-cover');
   const cover = bestCoverUrl(t, 500);

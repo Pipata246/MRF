@@ -179,16 +179,27 @@
     try {
       const p = pageName(absUrl);
       if (p === 'artist') {
-        sessionStorage.setItem('mrf_route_artist', JSON.stringify({
-          id: absUrl.searchParams.get('id') || '',
-          name: absUrl.searchParams.get('name') || ''
-        }));
+        const id = absUrl.searchParams.get('id') || '';
+        const name = absUrl.searchParams.get('name') || '';
+        // Don't wipe a good route with empty query (broken href / stripped ?)
+        if (!id && !name) {
+          try {
+            const prev = JSON.parse(sessionStorage.getItem('mrf_route_artist') || '{}');
+            if (prev.id || prev.name) return;
+          } catch (_) {}
+        }
+        sessionStorage.setItem('mrf_route_artist', JSON.stringify({ id, name }));
       } else if (p === 'album') {
-        sessionStorage.setItem('mrf_route_album', JSON.stringify({
-          id: absUrl.searchParams.get('id') || '',
-          title: absUrl.searchParams.get('title') || '',
-          artist: absUrl.searchParams.get('artist') || ''
-        }));
+        const id = absUrl.searchParams.get('id') || '';
+        const title = absUrl.searchParams.get('title') || '';
+        const artist = absUrl.searchParams.get('artist') || '';
+        if (!id && !title && !artist) {
+          try {
+            const prev = JSON.parse(sessionStorage.getItem('mrf_route_album') || '{}');
+            if (prev.id || prev.title) return;
+          } catch (_) {}
+        }
+        sessionStorage.setItem('mrf_route_album', JSON.stringify({ id, title, artist }));
       }
     } catch {}
   }

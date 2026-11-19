@@ -178,12 +178,26 @@ function notifyQueueChanged() {
 }
 window.notifyQueueChanged = notifyQueueChanged;
 
+function isDesktopRp() {
+  try {
+    if (typeof isMobilePlayerUi === 'function') return !isMobilePlayerUi();
+    return window.matchMedia('(min-width: 901px)').matches
+      || document.documentElement.getAttribute('data-ui') === 'desktop';
+  } catch (_) {
+    return false;
+  }
+}
+
 function rpArtistChipsHTML(t) {
   const arts = typeof trackArtists === 'function' ? trackArtists(t) : [];
+  const desktop = isDesktopRp();
   if (!arts.length) {
     const name = t?.artist?.name || (typeof t?.artist === 'string' ? t.artist : '') || '';
     if (!name) return '';
-    return `<div class="rp-artist-row"><button type="button" class="rp-artist-pill" onclick="openArtist(null,'${ejsonReady(name)}')"><span class="rp-artist-pill-ph">${escHtml(name[0] || '?')}</span><span>${escHtml(name)}</span></button></div>`;
+    const click = desktop
+      ? `selectRpArtist(null,'${ejsonReady(name)}')`
+      : `openArtist(null,'${ejsonReady(name)}')`;
+    return `<div class="rp-artist-row"><button type="button" class="rp-artist-pill" onclick="${click}"><span class="rp-artist-pill-ph">${escHtml(name[0] || '?')}</span><span>${escHtml(name)}</span></button></div>`;
   }
   return `<div class="rp-artist-row">${arts.map(a => {
     const idArg = a.id != null ? `'${ejsonReady(a.id)}'` : 'null';
@@ -191,7 +205,10 @@ function rpArtistChipsHTML(t) {
     const avatar = pic
       ? `<img class="rp-artist-pill-ava" src="${pic}" alt="">`
       : `<span class="rp-artist-pill-ph">${escHtml((a.name || '?')[0])}</span>`;
-    return `<button type="button" class="rp-artist-pill" onclick="openArtist(${idArg},'${ejsonReady(a.name)}')">${avatar}<span>${escHtml(a.name)}</span></button>`;
+    const click = desktop
+      ? `selectRpArtist(${idArg},'${ejsonReady(a.name)}')`
+      : `openArtist(${idArg},'${ejsonReady(a.name)}')`;
+    return `<button type="button" class="rp-artist-pill" onclick="${click}">${avatar}<span>${escHtml(a.name)}</span></button>`;
   }).join('')}</div>`;
 }
 
@@ -257,10 +274,10 @@ function renderRpNow(box) {
         </div>
       </div>
 
-      <div class="rp-now-actions">
+      ${isDesktopRp() ? '' : `<div class="rp-now-actions">
         <button type="button" class="rp-action" onclick="setRightPanelTab('lyrics')">Текст</button>
         <button type="button" class="rp-action" onclick="setRightPanelTab('artist')">Артисты</button>
-      </div>
+      </div>`}
       <div class="rp-section-title">Похожие</div>
       <div id="rp-similar" class="rp-similar">${loaderHTMLShared('Ищем похожие…')}</div>
     </div>`;
@@ -483,6 +500,18 @@ function startFakeLyricSync(n) {
 }
 
 let _rpArtistGen = 0;
+let _rpSelectedArtistId = null;
+let _rpSelectedArtistName = '';
+let _rpArtistTrackId = null;
+
+/** PC: switch artist inside right panel (do not navigate to artist page) */
+function selectRpArtist(id, name) {
+  _rpSelectedArtistId = id != null && String(id) !== '' && String(id) !== 'null' ? String(id) : null;
+  _rpSelectedArtistName = name || '';
+  openRightPanel('artist');
+  setRightPanelTab('artist');
+}
+window.selectRpArtist = selectRpArtist;
 
 async function resolveArtistId(track) {
   let id = track?.artist?.id || track?.artistId || null;
@@ -513,6 +542,11 @@ async function renderRpArtist(box) {
   const t = getCurrentTrack();
   if (!t) { box.innerHTML = `<div class="rp-empty">Нет активного трека</div>`; return; }
   const trackId = t.id;
+  if (_rpArtistTrackId !== trackId) {
+    _rpArtistTrackId = trackId;
+    _rpSelectedArtistId = null;
+    _rpSelectedArtistName = '';
+  }
   const gen = ++_rpArtistGen;
   box.innerHTML = loaderHTMLShared('Загружаем артиста…');
 
@@ -523,13 +557,31 @@ async function renderRpArtist(box) {
   if (getCurrentTrack()?.id !== trackId) return;
 
   const arts = typeof trackArtists === 'function' ? trackArtists(t) : [];
-  const name = arts[0]?.name || t.artist?.name || (typeof t.artist === 'string' ? t.artist : '') || '';
+  const desktop = isDesktopRp();
+  const selectedFromList = _rpSelectedArtistId
+    ? arts.find(a => String(a.id) === String(_rpSelectedArtistId))
+    : (_rpSelectedArtistName
+      ? arts.find(a => String(a.name || '').toLowerCase() === String(_rpSelectedArtistName).toLowerCase())
+      : null);
+  const name = selectedFromList?.name
+    || _rpSelectedArtistName
+    || arts[0]?.name
+    || t.artist?.name
+    || (typeof t.artist === 'string' ? t.artist : '')
+    || '';
   let art = {};
   let top = [];
   let albs = [];
-  let id = arts[0]?.id || null;
+  let id = selectedFromList?.id || _rpSelectedArtistId || arts[0]?.id || null;
   try {
-    if (!id) id = await resolveArtistId(t);
+    if (!id && !_rpSelectedArtistName) id = await resolveArtistId(t);
+    if (!id && name) {
+      try {
+        const found = await dzArr(`/search/artist?q=${encodeURIComponent(name)}&limit=8`);
+        const exact = found.find(a => (a.name || '').toLowerCase() === String(name).toLowerCase()) || found[0];
+        if (exact?.id) id = String(exact.id);
+      } catch (_) {}
+    }
     if (id) {
       [art, top, albs] = await Promise.all([
         dzObj(`/artist/${id}`),
@@ -537,6 +589,8 @@ async function renderRpArtist(box) {
         dzArr(`/artist/${id}/albums?limit=8`)
       ]);
       if (art?.id) {
+        _rpSelectedArtistId = String(art.id);
+        _rpSelectedArtistName = art.name || name;
         enrichQueueArtist(trackId, {
           id: art.id,
           name: art.name || name,
@@ -550,7 +604,7 @@ async function renderRpArtist(box) {
   if (gen !== _rpArtistGen) return;
   if (getCurrentTrack()?.id !== trackId) return;
 
-  const pic = art.picture_xl || art.picture_medium || t.artist?.picture_medium || arts[0]?.picture_medium || '';
+  const pic = art.picture_xl || art.picture_medium || selectedFromList?.picture_medium || t.artist?.picture_medium || arts[0]?.picture_medium || '';
   const aName = art.name || name || 'Артист';
   const aid = art.id || id;
   const following = aid ? Store.isFollowing(aid) : false;
@@ -569,8 +623,14 @@ async function renderRpArtist(box) {
     ? `<div class="rp-artists-on-track">
         <div class="rp-section-title" style="margin-top:0">На этом треке</div>
         <div class="rp-artist-row">${arts.map((a, i) => {
-          const isActive = (aid && String(a.id) === String(aid)) || (!aid && i === 0);
-          return `<button type="button" class="rp-artist-pill${isActive ? ' is-active' : ''}" onclick="openArtist(${a.id != null ? `'${ejsonReady(a.id)}'` : 'null'},'${ejsonReady(a.name)}')">
+          const isActive = (aid && String(a.id) === String(aid))
+            || (!aid && _rpSelectedArtistName && String(a.name || '').toLowerCase() === String(_rpSelectedArtistName).toLowerCase())
+            || (!aid && !_rpSelectedArtistName && i === 0);
+          const idArg = a.id != null ? `'${ejsonReady(a.id)}'` : 'null';
+          const click = desktop
+            ? `selectRpArtist(${idArg},'${ejsonReady(a.name)}')`
+            : `openArtist(${idArg},'${ejsonReady(a.name)}')`;
+          return `<button type="button" class="rp-artist-pill${isActive ? ' is-active' : ''}" onclick="${click}">
             ${a.picture_medium ? `<img class="rp-artist-pill-ava" src="${a.picture_medium}" alt="">` : `<span class="rp-artist-pill-ph">${escHtml((a.name||'?')[0])}</span>`}
             <span>${escHtml(a.name)}</span>
           </button>`;
@@ -1338,7 +1398,11 @@ function bindMiniPlayerOpen() {
   if (!mini || mini.dataset.openBound === '1') return;
   mini.dataset.openBound = '1';
   mini.addEventListener('click', (e) => {
-    if (e.target.closest('button, a, input')) return;
+    if (e.target.closest('button, a, input, .progress-bar, .volume-bar, .player-right')) return;
+    // PC: right panel opens only via its dock button — never by clicking the player bar
+    if (typeof isMobilePlayerUi === 'function' ? !isMobilePlayerUi() : !window.matchMedia('(max-width: 900px)').matches) {
+      return;
+    }
     openNowPlaying();
   });
 }
@@ -1377,8 +1441,8 @@ window.ensureFsPlayerChrome = ensureFsPlayerChrome;
 
 /* Override openNowPlaying / toggleQueue — mobile uses Spotify-style sheet */
 function openNowPlaying() {
+  // PC: never open right panel from player bar — only mobile FS player
   if (isMobilePlayerUi()) openFsPlayer();
-  else openRightPanel('now');
 }
 function closeNowPlaying() {
   if (isMobilePlayerUi()) closeFsPlayer();

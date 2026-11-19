@@ -519,13 +519,19 @@ async function renderHomeArtists() {
   const box = document.getElementById('home-artists-row');
   if (!box) return;
   const artists = await dzArr('/chart/0/artists?limit=10');
-  box.innerHTML = artists.map(a => `
-    <button type="button" class="artist-chip" onclick="location.href='${mrfUrl('artist',{id:a.id,name:a.name})}'">
+  const js = typeof jsStr === 'function' ? jsStr : (s => String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+  box.innerHTML = artists.map(a => {
+    const idArg = a.id != null && String(a.id) !== '' ? `'${js(a.id)}'` : 'null';
+    const nameArg = `'${js(a.name || '')}'`;
+    // Use openArtist — never inline location.href?id=&name= (HTML eats bare &)
+    return `
+    <button type="button" class="artist-chip" onclick="openArtist(${idArg},${nameArg})">
       ${a.picture_medium
         ? `<img class="artist-chip-img" src="${a.picture_medium}" alt="">`
         : `<span class="artist-chip-img artist-chip-fallback">${escHtml((a.name||'?')[0])}</span>`}
       <span class="artist-chip-name">${escHtml(a.name)}</span>
-    </button>`).join('');
+    </button>`;
+  }).join('');
 }
 
 async function playFromMockTrack(id) {

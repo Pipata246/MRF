@@ -60,11 +60,18 @@ async function loadArtistPage(forced) {
   let name = '';
 
   if (hasForced) {
-    // Soft-nav pass: trust ONLY forced args (never stale sessionStorage)
     rawId = forced.id != null && String(forced.id) !== '' ? String(forced.id) : '';
     name = forced.name != null && String(forced.name) !== '' ? String(forced.name) : '';
     if (!rawId) rawId = String(params.get('id') || '');
     if (!name) name = String(params.get('name') || '');
+    // Soft-nav sometimes arrives with empty forced+URL (broken ? query) — last resort
+    if (!rawId && !name) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem('mrf_route_artist') || '{}');
+        rawId = saved.id || '';
+        name = saved.name || '';
+      } catch (_) {}
+    }
   } else {
     rawId = String(params.get('id') || '');
     name = String(params.get('name') || '');

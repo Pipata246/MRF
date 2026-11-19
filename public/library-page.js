@@ -4,6 +4,7 @@ let _pageLibTab  = 'all';
 let _pageLibQuery = '';
 let _pageSelectMode = false;
 let _pageSelected = new Set();
+let _libTracksExpanded = false;
 
 function bootLibrary() {
   if (typeof initShared === 'function') initShared();
@@ -34,11 +35,23 @@ function setLibView(v) {
 
 function switchLibTab(tab, btn) {
   _pageLibTab = tab;
+  _libTracksExpanded = false;
   document.querySelectorAll('.lib-filter').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   clearLibSelection();
   renderLib(tab);
 }
+
+function expandLibTracks() {
+  _libTracksExpanded = true;
+  renderLib(_pageLibTab || 'tracks');
+}
+function collapseLibTracks() {
+  _libTracksExpanded = false;
+  renderLib(_pageLibTab || 'tracks');
+}
+window.expandLibTracks = expandLibTracks;
+window.collapseLibTracks = collapseLibTracks;
 
 function onLibSearch() {
   _pageLibQuery = (document.getElementById('lib-search')?.value || '').trim().toLowerCase();
@@ -117,10 +130,15 @@ function isDesktopLibrary() {
   }
 }
 
-/** Tracks block for library (PC: 5 + «Показать ещё»; mobile tracks tab: full list) */
-function libTracksSectionHTML(favs) {
+/**
+ * Tracks block for library.
+ * PC «Всё»: 5 + «Показать ещё» (preview=true).
+ * PC «Треки»: полный список без кнопки.
+ * Mobile tracks tab: полный список (без preview).
+ */
+function libTracksSectionHTML(favs, opts) {
   const isDesktopLib = isDesktopLibrary();
-  const likedHref = typeof mrfUrl === 'function' ? mrfUrl('liked') : 'liked.html';
+  const preview = !!(opts && opts.preview) && isDesktopLib;
   const sectionTitle = isDesktopLib ? 'Треки' : 'Любимые треки';
   let html = `<div class="section lib-tracks-section"><div class="section-header">
     <h3 class="section-title" style="font-size:16px">${sectionTitle} <span style="font-size:12px;color:var(--text-3)">${favs.length}</span></h3>
@@ -139,14 +157,16 @@ function libTracksSectionHTML(favs) {
       preview: f.preview || null
     }));
     _src['favs'] = fake;
-    const shown = isDesktopLib ? fake.slice(0, 5) : fake;
+    const shown = (preview && !_libTracksExpanded) ? fake.slice(0, 5) : fake;
     html += `<div id="fav-list" class="track-list">${shown.map((t, i) => {
       const row = rowHTML(t, i, 'favs');
       return row.replace('<div class="track-num">', `${libCheckHTML(t.id)}<div class="track-num">`);
     }).join('')}</div>`;
-    if (isDesktopLib && fake.length > 5) {
+    if (preview && fake.length > 5) {
       html += `<div style="padding:14px 0 4px;display:flex;justify-content:center">
-        <button type="button" class="btn-secondary" style="padding:9px 18px;font-size:13px" onclick="(window.mrfGo||function(u){location.href=u})('${likedHref}')">Показать ещё</button>
+        ${_libTracksExpanded
+          ? `<button type="button" class="btn-secondary" style="padding:9px 18px;font-size:13px" onclick="collapseLibTracks()">Свернуть</button>`
+          : `<button type="button" class="btn-secondary" style="padding:9px 18px;font-size:13px" onclick="expandLibTracks()">Показать ещё</button>`}
       </div>`;
     }
   }
@@ -182,9 +202,12 @@ function renderLib(tab) {
           </span>
         </button>
       </div>`;
-    } else if (activeTab === 'tracks' || (activeTab === 'all' && isDesktopLib)) {
-      // PC: always real tracks (5 + show more). Mobile tracks tab: full list.
-      html += libTracksSectionHTML(favs);
+    } else if (activeTab === 'all' && isDesktopLib) {
+      // PC «Всё»: 5 треков + «Показать ещё»
+      html += libTracksSectionHTML(favs, { preview: true });
+    } else if (activeTab === 'tracks') {
+      // PC «Треки» / mobile tracks: полный список, без «Показать ещё»
+      html += libTracksSectionHTML(favs, { preview: false });
     }
   }
 

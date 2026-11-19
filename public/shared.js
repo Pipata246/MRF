@@ -492,6 +492,7 @@ function updateSearchModeUI() {
   document.body.classList.toggle('is-search-page', onSearch);
   document.body.classList.toggle('is-library-page', page === 'library');
   document.body.classList.toggle('is-liked-page', page === 'liked');
+  document.body.classList.toggle('is-playlist-page', page === 'playlist');
   document.body.classList.toggle('is-home-page', home);
   document.body.classList.toggle('is-profile-page', page === 'profile');
   document.body.classList.toggle('is-deep-page', isMobileDeepPage(page));
