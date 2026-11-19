@@ -68,7 +68,14 @@
           </div>
         </div>
         <p class="auth-error" id="auth-error" hidden></p>
-        <button type="button" class="btn-primary auth-submit" id="auth-submit-btn" onclick="submitAuth()">Войти</button>
+        <button type="button" class="btn-primary auth-submit" id="auth-submit-btn" onclick="submitAuth()" aria-busy="false">
+          <span class="auth-submit-label" id="auth-submit-label">Войти</span>
+          <span class="auth-submit-spin" aria-hidden="true">
+            <span class="auth-ball-spin">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </span>
+          </span>
+        </button>
         <p class="auth-hint" id="auth-config-hint" hidden>Сервер не подключён. В Vercel задай env и сделай Redeploy.</p>
       </div>
 
@@ -270,8 +277,10 @@ function switchAuthTab(tab) {
       ? 'Создай аккаунт по своему @нику'
       : 'Войди по своему @нику';
   }
-  const submit = document.getElementById('auth-submit-btn');
-  if (submit) submit.textContent = isReg ? 'Создать аккаунт' : 'Войти';
+  const submitLabel = document.getElementById('auth-submit-label');
+  if (submitLabel && !document.getElementById('auth-submit-btn')?.classList.contains('is-loading')) {
+    submitLabel.textContent = isReg ? 'Создать аккаунт' : 'Войти';
+  }
   const nameRow = document.getElementById('auth-name-row');
   if (nameRow) {
     nameRow.hidden = !isReg;
@@ -319,6 +328,18 @@ function toggleAuthPassword(inputId, btn) {
 }
 window.toggleAuthPassword = toggleAuthPassword;
 
+function setAuthSubmitLoading(on) {
+  const btn = document.getElementById('auth-submit-btn');
+  if (!btn) return;
+  btn.classList.toggle('is-loading', !!on);
+  btn.disabled = !!on;
+  btn.setAttribute('aria-busy', on ? 'true' : 'false');
+  const label = document.getElementById('auth-submit-label');
+  if (label && !on) {
+    label.textContent = __authTab === 'register' ? 'Создать аккаунт' : 'Войти';
+  }
+}
+
 async function submitAuth() {
   setAuthError('');
   const username = document.getElementById('auth-username')?.value || '';
@@ -331,8 +352,7 @@ async function submitAuth() {
       return;
     }
   }
-  const btn = document.getElementById('auth-submit-btn');
-  if (btn) btn.disabled = true;
+  setAuthSubmitLoading(true);
   try {
     const res = __authTab === 'register'
       ? await MrfAuth.register({ username, password, displayName })
@@ -346,7 +366,7 @@ async function submitAuth() {
   } catch (e) {
     setAuthError(e.message || 'Ошибка сети');
   } finally {
-    if (btn) btn.disabled = false;
+    setAuthSubmitLoading(false);
   }
 }
 window.submitAuth = submitAuth;
