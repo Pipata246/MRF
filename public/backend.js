@@ -42,7 +42,12 @@
     let data = null;
     try { data = await res.json(); } catch (_) { data = null; }
     if (!res.ok) {
-      const err = new Error((data && data.error) || res.statusText || 'API error');
+      const msg = (data && (data.error || data.message))
+        || (res.status === 404 ? 'API не найден на сервере' : '')
+        || (res.status === 500 || res.status === 503 ? 'Сервер не настроен (проверь env и Redeploy)' : '')
+        || res.statusText
+        || `Ошибка API (${res.status || '?'})`;
+      const err = new Error(msg);
       err.status = res.status;
       err.data = data;
       throw err;
@@ -406,8 +411,12 @@
     await refreshSession();
     try {
       const h = await api('/api/auth?action=health');
-      MrfAuth._health = h;
+      MrfAuth._health = h && typeof h === 'object'
+        ? h
+        : { ok: false, supabaseConfigured: false };
     } catch (_) {
+      // On Vercel this usually means env missing on this deployment (need Redeploy)
+      // or /api route not reachable.
       MrfAuth._health = { ok: false, supabaseConfigured: false };
     }
     MrfAuth.ready = true;
