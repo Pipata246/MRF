@@ -23,7 +23,7 @@
 <main class="main-content" id="main-content">
   <div id="topbar-root"></div>
   <div class="feed" id="album-feed">
-    <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем альбом…</span></div>
+    <div class="loading-placeholder"><span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
   </div>
 </main>
 <div id="player-root"></div>
@@ -91,7 +91,7 @@ async function loadAlbumPage(forced) {
 
   // Resolve by title+artist if id missing/stale
   if (!id && (albumTitle || artistName)) {
-    feed.innerHTML = `<div class="loading-placeholder"><div class="spinner"></div><span>Ищем альбом…</span></div>`;
+    feed.innerHTML = `<div class="loading-placeholder"><span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`;
     try {
       const q = [albumTitle, artistName].filter(Boolean).join(' ');
       const found = await dzArr(`/search/album?q=${encodeURIComponent(q)}&limit=10`);
@@ -119,7 +119,7 @@ async function loadAlbumPage(forced) {
     return;
   }
 
-  feed.innerHTML = `<div class="loading-placeholder"><div class="spinner"></div><span>Загружаем альбом…</span></div>`;
+  feed.innerHTML = `<div class="loading-placeholder"><span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`;
 
   // BACKEND TODO: Получение информации об альбоме
   let album = {};

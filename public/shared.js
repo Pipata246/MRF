@@ -435,7 +435,15 @@ window.updateMobileBackFab = updateMobileBackFab;
 
 function updateTopbarAvatar() {
   const logged = !!(window.MrfAuth && typeof MrfAuth.isLoggedIn === 'function' && MrfAuth.isLoggedIn());
-  const profile = (typeof Store !== 'undefined' && Store.getProfile) ? Store.getProfile() : {};
+  const local = (typeof Store !== 'undefined' && Store.getProfile) ? Store.getProfile() : {};
+  const cloud = (window.MrfAuth && MrfAuth.profile) ? MrfAuth.profile : null;
+  const profile = {
+    ...local,
+    ...(cloud || {}),
+    avatar: (cloud && cloud.avatar) || local.avatar || null,
+    name: (cloud && cloud.name) || local.name || '',
+    username: (cloud && cloud.username) || local.username || ''
+  };
   const avatar = logged ? (profile.avatar || null) : null;
   const letter = logged
     ? String(profile.name || profile.username || 'П').replace(/^@+/, '')[0].toUpperCase()
@@ -523,8 +531,41 @@ function mrfIsLoggedIn() {
 }
 window.mrfIsLoggedIn = mrfIsLoggedIn;
 
+function mrfAuthIsReady() {
+  return !!(window.MrfAuth && MrfAuth.ready);
+}
+window.mrfAuthIsReady = mrfAuthIsReady;
+
+function mrfAuthHintLogged() {
+  return !!(window.MrfAuth && typeof MrfAuth.hasAuthHint === 'function' && MrfAuth.hasAuthHint());
+}
+window.mrfAuthHintLogged = mrfAuthHintLogged;
+
+/** Session still restoring — never flash guest UI yet */
+function mrfAuthPending() {
+  return !mrfAuthIsReady();
+}
+window.mrfAuthPending = mrfAuthPending;
+
+/** True only after auth ready and user is guest */
+function mrfShouldShowGuestGate() {
+  if (mrfAuthPending()) return false;
+  return !mrfIsLoggedIn();
+}
+window.mrfShouldShowGuestGate = mrfShouldShowGuestGate;
+
+function mrfAuthBootHTML(opts) {
+  const compact = !!(opts && opts.compact);
+  const spin = typeof mrfBallSpinHTML === 'function'
+    ? mrfBallSpinHTML()
+    : '<span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>';
+  return `<div class="auth-content-boot${compact ? ' is-compact' : ''}" role="status" aria-live="polite">${spin}</div>`;
+}
+window.mrfAuthBootHTML = mrfAuthBootHTML;
+
 /** Returns true if logged in; otherwise toast (+ optional go to profile) and false. */
 function mrfRequireLogin(opts) {
+  if (mrfAuthPending()) return false;
   if (mrfIsLoggedIn()) return true;
   const o = opts || {};
   const msg = o.message || 'Сначала войди в аккаунт';
@@ -730,6 +771,7 @@ function playlistModalsHTML() {
       <div class="modal-header"><span>Создать плейлист</span><button onclick="closeModal()">✕</button></div>
       <div class="modal-body modal-create-pl-body">
         <input type="text" class="modal-input" id="playlist-name-input" placeholder="Название плейлиста" maxlength="60"/>
+        <input type="search" class="modal-input modal-pl-track-search" id="playlist-track-search" placeholder="Поиск" autocomplete="off" enterkeyhint="search"/>
         <div class="modal-pl-add-block">
           <div class="modal-pl-picked" id="playlist-picked-tracks"></div>
           <div class="modal-pl-search-results" id="playlist-track-results"></div>
@@ -743,6 +785,7 @@ function playlistModalsHTML() {
     <div class="modal hidden" id="modal-add-tracks">
       <div class="modal-header"><span>Добавить из избранного</span><button onclick="closeModal()">✕</button></div>
       <div class="modal-body modal-create-pl-body">
+        <input type="search" class="modal-input modal-pl-track-search" id="add-tracks-search" placeholder="Поиск" autocomplete="off" enterkeyhint="search"/>
         <div class="modal-pl-search-results" id="add-tracks-results"></div>
       </div>
       <div class="modal-footer">
@@ -772,6 +815,8 @@ function playlistModalsHTML() {
 /** Keep playlist modals up to date even when player DOM is preserved across soft-nav */
 function ensurePlaylistModals() {
   const needCreate = !document.getElementById('playlist-picked-tracks')
+    || !document.getElementById('playlist-track-search')
+    || !document.getElementById('add-tracks-search')
     || !document.getElementById('modal-add-tracks')
     || !document.getElementById('modal-rename-playlist');
   if (!needCreate) return;
@@ -1112,6 +1157,11 @@ window.updateMobileNavActive = updateMobileNavActive;
 ══════════════════════════════════ */
 function initShared() {
   console.log('[MRF] initShared started');
+  const coldBoot = !window.__mrfSharedInited;
+  window.__mrfSharedInited = true;
+  if (coldBoot) {
+    try { showPageBoot(); } catch (_) {}
+  }
 
   applyUiLayoutMode();
 
@@ -1156,6 +1206,7 @@ function initShared() {
   }
 
   console.log('[MRF] initShared completed');
+  if (coldBoot) hidePageBootWhenAuthReady();
 }
 
 /* ══════════════════════════════════
@@ -1188,11 +1239,79 @@ function fmtDur(sec) {
 function noteSVGShared() {
   return `<svg viewBox="0 0 24 24" fill="none" width="22" height="22" style="color:var(--text-3)"><path d="M9 18V6l12-3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="15" r="3" stroke="currentColor" stroke-width="1.8"/></svg>`;
 }
+function mrfBallSpinHTML(extraClass) {
+  const cls = extraClass ? `mrf-ball-spin ${extraClass}` : 'mrf-ball-spin';
+  return `<span class="${cls}" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>`;
+}
+window.mrfBallSpinHTML = mrfBallSpinHTML;
+
 function loaderHTMLShared(msg) {
-  return `<div class="loading-placeholder"><div class="spinner"></div><span>${msg}</span></div>`;
+  const label = msg ? `<span>${msg}</span>` : '';
+  return `<div class="loading-placeholder">${mrfBallSpinHTML()}${label}</div>`;
 }
 
-function showNotif(msg, duration = 2500) {
+function showPageBoot() {
+  if (document.getElementById('mrf-page-boot')) {
+    document.body.classList.add('is-page-booting');
+    document.getElementById('mrf-page-boot').classList.remove('is-done');
+    return;
+  }
+  if (!document.body) return;
+  document.body.classList.add('is-page-booting');
+  const el = document.createElement('div');
+  el.id = 'mrf-page-boot';
+  el.className = 'page-boot';
+  el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = mrfBallSpinHTML();
+  document.body.appendChild(el);
+}
+window.showPageBoot = showPageBoot;
+
+function hidePageBoot() {
+  document.body.classList.remove('is-page-booting');
+  const el = document.getElementById('mrf-page-boot');
+  if (!el) return;
+  el.classList.add('is-done');
+  setTimeout(() => {
+    if (el.parentNode) el.remove();
+  }, 260);
+}
+window.hidePageBoot = hidePageBoot;
+
+/** Keep centered boot until auth session is known (kills guest flash on refresh) */
+function hidePageBootWhenAuthReady() {
+  try { showPageBoot(); } catch (_) {}
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener('mrf:auth', onAuth);
+    if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
+    hidePageBoot();
+  };
+  const onAuth = () => {
+    if (mrfAuthIsReady()) finish();
+  };
+  if (mrfAuthIsReady()) {
+    requestAnimationFrame(finish);
+    return;
+  }
+  window.addEventListener('mrf:auth', onAuth);
+  setTimeout(finish, 8000);
+}
+window.hidePageBootWhenAuthReady = hidePageBootWhenAuthReady;
+
+// Always refresh chrome avatar when session/profile settles (refresh / soft-nav)
+if (!window.__mrfAvatarAuthBound) {
+  window.__mrfAvatarAuthBound = true;
+  window.addEventListener('mrf:auth', () => {
+    if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
+  });
+}
+
+try { showPageBoot(); } catch (_) {}
+
+function showNotif(msg, duration = 1400) {
   const n = document.getElementById('notification');
   if (!n) return;
   const text = String(msg || '');
@@ -1275,10 +1394,32 @@ function filterFavsByQuery(q) {
   const query = String(q || '').trim().toLowerCase();
   const favs = Store.getFavs();
   if (!query) return favs;
-  return favs.filter(f =>
-    String(f.title || '').toLowerCase().includes(query) ||
-    String(f.artist || '').toLowerCase().includes(query)
-  );
+  return favs.filter(f => {
+    const title = String(f.title || '').toLowerCase();
+    const artist = String(f.artist || f.artistName || f.artist?.name || '').toLowerCase();
+    const album = String(f.albumTitle || f.album?.title || '').toLowerCase();
+    return title.includes(query) || artist.includes(query) || album.includes(query);
+  });
+}
+
+function bindCreatePlaylistSearch() {
+  const input = document.getElementById('playlist-track-search');
+  if (!input || input.dataset.bound === '1') return;
+  input.dataset.bound = '1';
+  input.addEventListener('input', () => {
+    clearTimeout(_createPlSearchTimer);
+    _createPlSearchTimer = setTimeout(() => renderFavPickerCreate(), 80);
+  });
+}
+
+function bindAddTracksSearch() {
+  const input = document.getElementById('add-tracks-search');
+  if (!input || input.dataset.bound === '1') return;
+  input.dataset.bound = '1';
+  input.addEventListener('input', () => {
+    clearTimeout(_addTracksSearchTimer);
+    _addTracksSearchTimer = setTimeout(() => renderFavPickerAdd(), 80);
+  });
 }
 
 function showCreatePlaylist() {
@@ -1287,11 +1428,14 @@ function showCreatePlaylist() {
   const modal = document.getElementById('modal-create-playlist');
   const overlay = document.getElementById('modal-overlay');
   const nameInput = document.getElementById('playlist-name-input');
+  const searchInput = document.getElementById('playlist-track-search');
   _createPlDraftTracks = [];
   if (_pendingTrackForPlaylist) {
     _createPlDraftTracks.push(_pendingTrackForPlaylist);
   }
   if (nameInput) nameInput.value = '';
+  if (searchInput) searchInput.value = '';
+  bindCreatePlaylistSearch();
   renderCreatePlaylistPicked();
   renderFavPickerCreate();
   if (modal) modal.classList.remove('hidden');
@@ -1341,9 +1485,10 @@ function removeCreatePlaylistDraft(i) {
 function renderFavPickerCreate() {
   const box = document.getElementById('playlist-track-results');
   if (!box) return;
-  const allFavs = dedupeTracksById(filterFavsByQuery('').map(favToTrack));
+  const q = document.getElementById('playlist-track-search')?.value || '';
+  const allFavs = dedupeTracksById(filterFavsByQuery(q).map(favToTrack));
   if (!Store.getFavs().length) {
-    box.innerHTML = `<div class="modal-pl-search-hint">В избранном пока пусто — добавь треки сердечком</div>`;
+    box.innerHTML = `<div class="modal-pl-search-hint">В избранном пока пусто</div>`;
     return;
   }
   // PC logic: already-picked tracks stay only in the top selection — no duplicates below
@@ -1351,7 +1496,10 @@ function renderFavPickerCreate() {
   const available = allFavs.filter(t => !pickedIds.has(String(t.id)));
   _src['create_pl_favs'] = available;
   if (!available.length) {
-    box.innerHTML = `<div class="modal-pl-search-hint">${pickedIds.size ? 'Все треки из избранного уже выбраны' : 'Ничего не найдено в избранном'}</div>`;
+    const hint = String(q || '').trim()
+      ? 'Ничего не найдено'
+      : (pickedIds.size ? 'Все треки уже выбраны' : 'Ничего не найдено');
+    box.innerHTML = `<div class="modal-pl-search-hint">${hint}</div>`;
     return;
   }
   box.innerHTML = available.map((t, i) => {
@@ -1405,6 +1553,9 @@ function showAddTracksToPlaylist(playlistId) {
   _addTracksPlaylistId = playlistId;
   const modal = document.getElementById('modal-add-tracks');
   const overlay = document.getElementById('modal-overlay');
+  const searchInput = document.getElementById('add-tracks-search');
+  if (searchInput) searchInput.value = '';
+  bindAddTracksSearch();
   renderFavPickerAdd();
   if (modal) modal.classList.remove('hidden');
   if (overlay) overlay.classList.remove('hidden');
@@ -1415,13 +1566,14 @@ function renderFavPickerAdd() {
   const box = document.getElementById('add-tracks-results');
   if (!box || !_addTracksPlaylistId) return;
   const pl = Store.getPlaylist(_addTracksPlaylistId);
-  const favs = filterFavsByQuery('');
+  const q = document.getElementById('add-tracks-search')?.value || '';
+  const favs = filterFavsByQuery(q);
   if (!Store.getFavs().length) {
     box.innerHTML = `<div class="modal-pl-search-hint">В избранном пока пусто</div>`;
     return;
   }
   if (!favs.length) {
-    box.innerHTML = `<div class="modal-pl-search-hint">Ничего не найдено в избранном</div>`;
+    box.innerHTML = `<div class="modal-pl-search-hint">Ничего не найдено</div>`;
     return;
   }
   _src['add_pl_favs'] = dedupeTracksById(favs.map(favToTrack));

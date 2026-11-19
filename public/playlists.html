@@ -61,7 +61,13 @@ function renderPlaylistsPage() {
   if (!box) return;
 
   const createBtn = document.querySelector('.feed .btn-primary[onclick*="showCreatePlaylist"]');
-  if (typeof mrfIsLoggedIn === 'function' && !mrfIsLoggedIn()) {
+  if (typeof mrfAuthPending === 'function' && mrfAuthPending()) {
+    if (countEl) countEl.textContent = '';
+    if (createBtn) createBtn.hidden = true;
+    box.innerHTML = typeof mrfAuthBootHTML === 'function' ? mrfAuthBootHTML() : '';
+    return;
+  }
+  if (typeof mrfShouldShowGuestGate === 'function' ? mrfShouldShowGuestGate() : (typeof mrfIsLoggedIn === 'function' && !mrfIsLoggedIn())) {
     if (countEl) countEl.textContent = 'Нужен вход';
     if (createBtn) createBtn.hidden = true;
     box.innerHTML = typeof mrfGuestGateHTML === 'function' ? mrfGuestGateHTML() : '';

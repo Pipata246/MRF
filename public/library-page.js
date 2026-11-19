@@ -36,6 +36,7 @@ else if (document.readyState === 'loading') document.addEventListener('DOMConten
 else bootLibrary();
 
 window.addEventListener('mrf:auth', () => {
+  if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
   if (document.getElementById('lib-content')) renderLib(_pageLibTab || 'all');
 });
 
@@ -193,7 +194,14 @@ function renderLib(tab) {
   const activeTab = tab || _pageLibTab || 'all';
   _pageLibTab = activeTab;
 
-  const guest = typeof mrfIsLoggedIn === 'function' ? !mrfIsLoggedIn() : false;
+  if (typeof mrfAuthPending === 'function' && mrfAuthPending()) {
+    syncLibGuestChrome(false);
+    box.innerHTML = typeof mrfAuthBootHTML === 'function' ? mrfAuthBootHTML() : '';
+    return;
+  }
+  const guest = typeof mrfShouldShowGuestGate === 'function'
+    ? mrfShouldShowGuestGate()
+    : (typeof mrfIsLoggedIn === 'function' ? !mrfIsLoggedIn() : false);
   syncLibGuestChrome(guest);
   if (guest) {
     box.innerHTML = typeof mrfGuestGateHTML === 'function'

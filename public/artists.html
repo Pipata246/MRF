@@ -58,7 +58,12 @@ function renderArtistsPage() {
   const box = document.getElementById('artists-grid');
   if (!box) return;
 
-  if (typeof mrfIsLoggedIn === 'function' && !mrfIsLoggedIn()) {
+  if (typeof mrfAuthPending === 'function' && mrfAuthPending()) {
+    if (countEl) countEl.textContent = '';
+    box.innerHTML = typeof mrfAuthBootHTML === 'function' ? mrfAuthBootHTML() : '';
+    return;
+  }
+  if (typeof mrfShouldShowGuestGate === 'function' ? mrfShouldShowGuestGate() : (typeof mrfIsLoggedIn === 'function' && !mrfIsLoggedIn())) {
     if (countEl) countEl.textContent = 'Нужен вход';
     box.innerHTML = typeof mrfGuestGateHTML === 'function' ? mrfGuestGateHTML() : '';
     return;

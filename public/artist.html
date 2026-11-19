@@ -23,7 +23,7 @@
 <main class="main-content" id="main-content">
   <div id="topbar-root"></div>
   <div class="feed" id="artist-feed">
-    <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем артиста…</span></div>
+    <div class="loading-placeholder"><span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
   </div>
 </main>
 <div id="player-root"></div>
@@ -102,7 +102,7 @@ async function loadArtistPage(forced) {
 
   if (!id && name) {
     const feed = liveFeed();
-    if (feed) feed.innerHTML = `<div class="loading-placeholder"><div class="spinner"></div><span>Ищем артиста…</span></div>`;
+    if (feed) feed.innerHTML = `<div class="loading-placeholder"><span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`;
     try {
       const found = await dzArr(`/search/artist?q=${encodeURIComponent(name)}&limit=10`);
       if (!stillHere()) return;
@@ -130,7 +130,7 @@ async function loadArtistPage(forced) {
 
   {
     const feed = liveFeed();
-    if (feed) feed.innerHTML = `<div class="loading-placeholder"><div class="spinner"></div><span>Загружаем артиста…</span></div>`;
+    if (feed) feed.innerHTML = `<div class="loading-placeholder"><span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`;
   }
 
   // BACKEND TODO: Получение информации об исполнителе + альбомы + похожие

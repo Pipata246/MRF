@@ -102,6 +102,7 @@
     } finally {
       MrfCloud._quiet = false;
     }
+    if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
   }
 
   async function pullLibrary() {

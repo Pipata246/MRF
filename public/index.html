@@ -59,7 +59,7 @@
           <a href="charts.html" class="section-link">Все треки →</a>
         </div>
         <div id="home-charts-list">
-          <div class="loading-placeholder"><div class="spinner"></div><span>Загружаем чарты…</span></div>
+          <div class="loading-placeholder"><span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
         </div>
       </section>
 
@@ -128,7 +128,7 @@
         </div>
         <div class="rail-wrap">
           <div class="horiz-scroll" id="for-you-row">
-            <div class="skeleton-row" style="width:150px;height:150px;flex-shrink:0"></div>
+            <div class="loading-placeholder" style="width:100%;min-height:150px;padding:24px 0"><span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
           </div>
         </div>
       </section>
@@ -214,15 +214,14 @@ window.loadHomePage = loadHomePage;
 function renderHomeRecent() {
   const box = document.getElementById('recent-rail');
   if (!box) return;
+  if (typeof mrfAuthPending === 'function' && mrfAuthPending()) {
+    _src['recent'] = [];
+    box.innerHTML = typeof mrfAuthBootHTML === 'function' ? mrfAuthBootHTML({ compact: true }) : '';
+    return;
+  }
   const loggedIn = typeof mrfIsLoggedIn === 'function' ? mrfIsLoggedIn() : !!(window.MrfAuth?.session?.user);
-  const hint = !!(window.MrfAuth && typeof MrfAuth.hasAuthHint === 'function' && MrfAuth.hasAuthHint());
-  const authReady = !!(window.MrfAuth && MrfAuth.ready);
   if (!loggedIn) {
     _src['recent'] = [];
-    if (hint && !authReady) {
-      box.innerHTML = '';
-      return;
-    }
     box.innerHTML = `<div class="rail-guest-hint" role="status">
       <p class="rail-guest-hint-text">Войдите в аккаунт</p>
       <button type="button" class="btn-secondary rail-guest-hint-btn" onclick="goProfile()">Войти</button>

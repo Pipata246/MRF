@@ -38,6 +38,10 @@ let _wantPlaying = false;
 let _persistPosTimer = null;
 let _audioBound = false;
 let _navHandlersBound = false;
+/** Ignore pause UI while swapping track src (pause→load→play) */
+let _switchingTrack = false;
+/** Bumps on every playNow to ignore stale play/error callbacks */
+let _playToken = 0;
 
 /* ══════════════════════════════════
    INIT (multipage-safe)
@@ -388,6 +392,7 @@ function bindAudio() {
   audio.addEventListener('play', () => {
     isPlaying = true;
     _wantPlaying = true;
+    _switchingTrack = false;
     setPlayIcon(true);
     startProgress();
     persistPlayer();
@@ -395,7 +400,11 @@ function bindAudio() {
   });
   audio.addEventListener('pause', () => {
     isPlaying = false;
-    setPlayIcon(false);
+    // Track swap always pauses first — don't flip icon / clear intent
+    if (_switchingTrack) {
+      syncPlayingRows();
+      return;
+    }
     stopProgress();
     // Unload/navigation also fires pause — keep _wantPlaying so next page can resume
     if (document.visibilityState === 'hidden') {
@@ -404,33 +413,32 @@ function bindAudio() {
       return;
     }
     _wantPlaying = false;
+    setPlayIcon(false);
     persistPlayer();
     syncPlayingRows();
   });
   audio.addEventListener('ended', () => {
     stopProgress();
     if (isRepeat === 'one') {
+      _wantPlaying = true;
       audio.currentTime = 0;
-      audio.play().catch(() => {});
+      audio.play().catch(() => {
+        showNotification('Трек недоступен');
+        stopPlaybackUi();
+      });
       return;
     }
-    const autoplay = typeof Store !== 'undefined' ? Store.getSettings().autoplay === true : false;
-    if (!autoplay && isRepeat !== 'all') {
-      isPlaying = false;
-      _wantPlaying = false;
-      setPlayIcon(false);
-      persistPlayer(true);
-      syncPlayingRows();
-      return;
-    }
-    nextTrack();
+    // off: stop after last track. all: wrap. Never use settings.autoplay for this.
+    nextTrack({ auto: true });
   });
   audio.addEventListener('error', () => {
-    isPlaying = false;
-    _wantPlaying = false;
-    setPlayIcon(false);
-    showNotification('Ошибка воспроизведения');
-    syncPlayingRows();
+    if (!_wantPlaying && !_switchingTrack) return;
+    const token = _playToken;
+    showNotification('Трек недоступен');
+    setTimeout(() => {
+      if (token !== _playToken) return;
+      advancePastUnavailable();
+    }, 0);
   });
   audio.addEventListener('timeupdate', () => {
     tickProgress();
@@ -971,8 +979,81 @@ function playFromSrc(key, index) {
   playNow();
 }
 
+function stopPlaybackUi() {
+  _switchingTrack = false;
+  _wantPlaying = false;
+  isPlaying = false;
+  setPlayIcon(false);
+  stopProgress();
+  try { audio.pause(); } catch (_) {}
+  persistPlayer(true);
+  syncPlayingRows();
+}
+
+/** Pause on the last track at the end (repeat off). */
+function stopAtEndOfQueue() {
+  _switchingTrack = false;
+  _wantPlaying = false;
+  isPlaying = false;
+  setPlayIcon(false);
+  stopProgress();
+  try {
+    if (audio.duration && isFinite(audio.duration)) audio.currentTime = audio.duration;
+  } catch (_) {}
+  persistPlayer(true);
+  syncPlayingRows();
+  if (typeof renderFsNextTrack === 'function') renderFsNextTrack();
+}
+
+/**
+ * After an unavailable track: notify already shown by caller.
+ * Skip forward until a playable preview is found (respects repeat wrap).
+ */
+function advancePastUnavailable() {
+  const n = queue.length;
+  if (!n || queueIndex < 0) {
+    stopPlaybackUi();
+    return;
+  }
+  if (isRepeat === 'one') {
+    stopPlaybackUi();
+    return;
+  }
+  const wrap = isRepeat === 'all';
+  const start = queueIndex;
+  for (let step = 1; step <= n; step++) {
+    let i = start + step;
+    if (i >= n) {
+      if (!wrap) {
+        queueIndex = n - 1;
+        const last = queue[queueIndex];
+        if (last) updatePlayerUI(last);
+        stopAtEndOfQueue();
+        return;
+      }
+      i = i % n;
+    }
+    if (i === start) {
+      showNotification('Нет доступных треков');
+      stopPlaybackUi();
+      return;
+    }
+    const cand = queue[i];
+    if (cand?.preview) {
+      queueIndex = i;
+      _trackFlowDir = 1;
+      window._trackFlowDir = 1;
+      playNow();
+      return;
+    }
+    showNotification('Трек недоступен');
+  }
+  stopPlaybackUi();
+}
+
 function playNow() {
-  if (queueIndex<0 || queueIndex>=queue.length) return;
+  if (queueIndex < 0 || queueIndex >= queue.length) return;
+  const token = ++_playToken;
   const t = queue[queueIndex];
   updatePlayerUI(t);
   addToRecent(t);
@@ -984,27 +1065,37 @@ function playNow() {
   // Load full contributor list (Deezer search often returns only 1 artist)
   const playId = t.id;
   enrichTrackArtists(t).then(enriched => {
+    if (token !== _playToken) return;
     if (queue[queueIndex]?.id !== playId) return;
     Object.assign(queue[queueIndex], enriched);
     updatePlayerUI(queue[queueIndex]);
     if (typeof syncRightPanel === 'function') syncRightPanel();
   }).catch(() => {});
   if (!t.preview) {
-    _wantPlaying = false;
-    showNotification('Нет превью для этого трека');
-    syncPlayingRows();
+    showNotification('Трек недоступен');
+    advancePastUnavailable();
     return;
   }
-  audio.pause();
-  audio.src    = t.preview;
+  _switchingTrack = true;
+  try { audio.pause(); } catch (_) {}
+  audio.src = t.preview;
   audio.volume = isMuted ? 0 : volume;
   audio.load();
   audio.play()
-    .then(() => { _wantPlaying = true; syncPlayingRows(); })
-    .catch(() => {
-      _wantPlaying = false;
-      showNotification('Не удалось воспроизвести');
+    .then(() => {
+      if (token !== _playToken) return;
+      _switchingTrack = false;
+      _wantPlaying = true;
+      isPlaying = true;
+      setPlayIcon(true);
+      startProgress();
       syncPlayingRows();
+    })
+    .catch(() => {
+      if (token !== _playToken) return;
+      _switchingTrack = false;
+      showNotification('Трек недоступен');
+      advancePastUnavailable();
     });
 }
 
@@ -1029,25 +1120,57 @@ window.persistPlayer = persistPlayer;
 
 function togglePlay() {
   if (!queue[queueIndex]) return;
-  if (!audio.src || audio.readyState===0) { playNow(); return; }
-  if (isPlaying) {
+  if (!audio.src || audio.readyState === 0) { playNow(); return; }
+  // Trust the element — isPlaying can desync after failed/unavailable tracks
+  const playing = !audio.paused && !audio.ended;
+  if (playing) {
     _wantPlaying = false;
+    _switchingTrack = false;
     audio.pause();
   } else {
     _wantPlaying = true;
-    audio.play().catch(() => { _wantPlaying = false; });
+    audio.play()
+      .then(() => { setPlayIcon(true); })
+      .catch(() => {
+        _wantPlaying = false;
+        setPlayIcon(false);
+        showNotification('Трек недоступен');
+      });
   }
 }
 let _trackFlowDir = 0; // 1 = next (swipe left), -1 = prev (swipe right)
 window._trackFlowDir = 0;
 
-function nextTrack() {
+/**
+ * @param {{ auto?: boolean }} [opts]
+ * auto=true — from track end: wrap only if repeat=all; stop at end if repeat=off
+ * manual (default) — always advance; wrap to start for convenience
+ */
+function nextTrack(opts) {
   if (!queue.length) return;
+  const auto = !!(opts && opts.auto);
   _trackFlowDir = 1;
   window._trackFlowDir = 1;
+
+  if (auto) {
+    if (queueIndex >= queue.length - 1) {
+      if (isRepeat === 'all') {
+        queueIndex = 0;
+        playNow();
+      } else {
+        stopAtEndOfQueue();
+      }
+      return;
+    }
+    queueIndex += 1;
+    playNow();
+    return;
+  }
+
   queueIndex = (queueIndex + 1) % queue.length;
   playNow();
 }
+window.nextTrack = nextTrack;
 function prevTrack() {
   if (!queue.length) return;
   if (audio.currentTime>3) { audio.currentTime=0; return; }
@@ -1647,7 +1770,7 @@ function updateNavBtns() {
    NOTIFICATION — alias to shared showNotif (one toast style)
 ══════════════════════════════════ */
 function showNotification(msg){
-  if (typeof showNotif === 'function') return showNotif(msg, 2800);
+  if (typeof showNotif === 'function') return showNotif(msg, 1400);
   console.log('[MRF]', msg);
 }
 
@@ -1677,7 +1800,11 @@ function noteSVG(){
   </svg>`;
 }
 function loaderHTML(msg){
-  return`<div class="loading-placeholder"><div class="spinner"></div><span>${msg}</span></div>`;
+  if (typeof loaderHTMLShared === 'function') return loaderHTMLShared(msg);
+  const spin = typeof mrfBallSpinHTML === 'function'
+    ? mrfBallSpinHTML()
+    : '<span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>';
+  return `<div class="loading-placeholder">${spin}${msg ? `<span>${msg}</span>` : ''}</div>`;
 }
 
 /* ══════════════════════════════════

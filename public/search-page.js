@@ -522,15 +522,14 @@ function renderSearchHistory() {
   if (!section || !list) return;
 
   const loggedIn = typeof mrfIsLoggedIn === 'function' ? mrfIsLoggedIn() : !!(window.MrfAuth?.session?.user);
-  const hint = !!(window.MrfAuth && typeof MrfAuth.hasAuthHint === 'function' && MrfAuth.hasAuthHint());
-  const authReady = !!(window.MrfAuth && MrfAuth.ready);
   const clearBtn = document.getElementById('search-history-clear');
+  if (typeof mrfAuthPending === 'function' && mrfAuthPending()) {
+    section.style.display = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+    list.innerHTML = typeof mrfAuthBootHTML === 'function' ? mrfAuthBootHTML({ compact: true }) : '';
+    return;
+  }
   if (!loggedIn) {
-    if (hint && !authReady) {
-      section.style.display = 'none';
-      list.innerHTML = '';
-      return;
-    }
     section.style.display = '';
     if (clearBtn) clearBtn.style.display = 'none';
     list.innerHTML = `<div class="rail-guest-hint" role="status">
