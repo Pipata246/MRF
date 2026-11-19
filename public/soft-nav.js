@@ -172,6 +172,9 @@
     if (toPage !== 'album') {
       try { sessionStorage.removeItem('mrf_route_album'); } catch (_) {}
     }
+    if (toPage !== 'playlist') {
+      try { sessionStorage.removeItem('mrf_route_playlist'); } catch (_) {}
+    }
     window.__mrfNavGen = (window.__mrfNavGen || 0) + 1;
   }
 
@@ -200,6 +203,15 @@
           } catch (_) {}
         }
         sessionStorage.setItem('mrf_route_album', JSON.stringify({ id, title, artist }));
+      } else if (p === 'playlist') {
+        const id = absUrl.searchParams.get('id') || '';
+        if (!id) {
+          try {
+            const prev = JSON.parse(sessionStorage.getItem('mrf_route_playlist') || '{}');
+            if (prev.id) return;
+          } catch (_) {}
+        }
+        if (id) sessionStorage.setItem('mrf_route_playlist', JSON.stringify({ id }));
       }
     } catch {}
   }
@@ -259,7 +271,14 @@
       if (typeof bootLibrary === 'function') bootLibrary();
       else if (typeof renderLib === 'function') renderLib('all');
     } else if (pname === 'playlist' && typeof loadPlaylistPage === 'function') {
-      loadPlaylistPage();
+      let id = absUrl.searchParams.get('id') || '';
+      if (!id) {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem('mrf_route_playlist') || '{}');
+          id = saved.id || '';
+        } catch (_) {}
+      }
+      loadPlaylistPage(id || undefined);
     } else if (pname === 'playlists' && typeof renderPlaylistsPage === 'function') {
       renderPlaylistsPage();
     } else if (pname === 'liked' && typeof renderLikedPage === 'function') {

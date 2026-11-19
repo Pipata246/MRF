@@ -799,11 +799,11 @@ function fsPlayerMarkup() {
               </button>
             </div>
             <div class="fs-tools">
-              <span class="fs-tools-spacer" aria-hidden="true"></span>
-              <button type="button" class="fs-tool-ico" onclick="if(typeof shareTrack==='function'&&queue[queueIndex])shareTrack(queue[queueIndex])" aria-label="Поделиться" title="Поделиться">
+              <button type="button" class="fs-tool-ico fs-tool-share" onclick="if(typeof shareTrack==='function'&&queue[queueIndex])shareTrack(queue[queueIndex])" aria-label="Поделиться" title="Поделиться">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M12 3v10" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8.5 6.5L12 3l3.5 3.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12v6.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
               </button>
-              <button type="button" class="fs-tool-ico" onclick="openFsQueueSheet()" aria-label="Очередь" title="Очередь">
+              <span class="fs-tools-spacer" aria-hidden="true"></span>
+              <button type="button" class="fs-tool-ico fs-tool-queue" onclick="openFsQueueSheet()" aria-label="Очередь" title="Очередь">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M17 15.5v5l4-2.5-4-2.5z" fill="currentColor"/></svg>
               </button>
             </div>
@@ -871,8 +871,11 @@ function injectPlayer() {
   const root = document.getElementById('player-root');
   if (!root) return;
   // Never rebuild player DOM while soft-navigating — that would glitch audio UX
-  if (root.querySelector('.player')) {
+  // Mini-player may live on <body> (mobile) — check globally
+  if (document.getElementById('player') || root.querySelector('.player')) {
     ensurePlaylistModals();
+    if (typeof ensureMobilePlayerHost === 'function') ensureMobilePlayerHost();
+    if (typeof ensureFsPlayerDom === 'function') ensureFsPlayerDom();
     return;
   }
 
@@ -907,7 +910,7 @@ function injectPlayer() {
             <path d="M10 16V8L16 12L10 16Z" fill="currentColor"/>
           </svg>
         </button>
-        <button class="ctrl-btn" onclick="nextTrack()" title="Следующий">
+        <button type="button" class="ctrl-btn ctrl-next" onclick="event.stopPropagation();nextTrack()" title="Следующий">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
         </button>
         <button class="ctrl-btn" id="btn-repeat" onclick="toggleRepeat()" title="Повтор">
@@ -973,7 +976,7 @@ function injectPlayer() {
       </div>
     </div>
 
-    ${fsPlayerMarkup()}
+    <!-- FS player mounts on <body> via ensureFsPlayerDom — not inside player-root -->
 
     <!-- NOTIFICATION -->
     <div class="notification hidden" id="notification"></div>
@@ -1077,7 +1080,7 @@ function initShared() {
     document.body.classList.remove('sidebar-collapsed');
   }
 
-  const hadPlayer = !!document.querySelector('#player-root .player');
+  const hadPlayer = !!(document.getElementById('player') || document.querySelector('#player-root .player'));
 
   injectSidebar();
   injectTopbar();
@@ -1085,6 +1088,8 @@ function initShared() {
   injectMobileNav();
   ensurePlaylistModals();
   applyUiLayoutMode();
+  if (typeof ensureMobilePlayerHost === 'function') ensureMobilePlayerHost();
+  if (typeof ensureFsPlayerDom === 'function') ensureFsPlayerDom();
 
   // bind progress/volume after player DOM exists
   if (typeof bindPlayerUIControls === 'function') bindPlayerUIControls();

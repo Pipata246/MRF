@@ -219,7 +219,7 @@ function loadProfilePage() {
   pf('pf-username', profile.username || '@mrf_user');
 
   const tog = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
-  tog('s-autoplay', settings.autoplay !== false);
+  tog('s-autoplay', settings.autoplay === true);
   tog('s-shuffle', !!settings.shuffleOnPlay);
   tog('s-position', settings.rememberPosition !== false);
 

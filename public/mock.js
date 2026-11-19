@@ -19,7 +19,7 @@ const MOCK = {
 
   /* ── Настройки ─────────────────────────────────── */
   settings: {
-    autoplay: true,
+    autoplay: false,
     shuffleOnPlay: false,
     rememberPosition: true,
     defaultVolume: 70,

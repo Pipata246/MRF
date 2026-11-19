@@ -1,0 +1,18 @@
+---
+description: STRICT mobile-only work — never touch PC/desktop UI
+alwaysApply: true
+---
+
+# MOBILE-ONLY LOCK
+
+The user is working **strictly on the mobile version**. Desktop/PC must not change.
+
+Before every edit, verify all five:
+
+1. Change is mobile-only (≤900px / `data-ui="mobile"` / mobile JS branches).
+2. Do **not** edit `@media (min-width: 901px)` or DESKTOP PC LOCK blocks.
+3. Do **not** change desktop-only markup, classes, or JS paths meant for PC.
+4. Gate new CSS/JS with `max-width: 900px` and/or `data-ui === 'mobile'` / `isMobile*` checks.
+5. After the edit, PC look and behavior must stay identical.
+
+If a fix could affect both, implement the mobile-only path and leave the desktop path untouched.

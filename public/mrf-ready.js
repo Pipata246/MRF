@@ -932,7 +932,7 @@ function closeFsSheets(immediate) {
     });
   };
   if (immediate) hide();
-  else _fsSheetCloseTimer = setTimeout(hide, 320);
+  else _fsSheetCloseTimer = setTimeout(hide, 480);
 }
 window.closeFsSheets = closeFsSheets;
 
@@ -958,7 +958,68 @@ function openFsSheet(id) {
   }
 }
 
+function resetFsLayoutTransforms() {
+  const root = document.getElementById('fs-player');
+  if (!root) return;
+  root.querySelectorAll(
+    '.fs-cover, .fs-cover-img, .fs-hero, .fs-stage, .fs-dock, .fs-meta, .fs-meta-row, .fs-scroll, .fs-controls, .fs-tools'
+  ).forEach((n) => {
+    n.classList.remove('track-flow-next', 'track-flow-prev');
+    n.style.transform = '';
+    n.style.translate = '';
+    n.style.willChange = '';
+    n.style.left = '';
+    n.style.right = '';
+    n.style.marginLeft = '';
+    n.style.marginRight = '';
+  });
+  const sc = document.getElementById('fs-scroll');
+  if (sc) sc.scrollLeft = 0;
+}
+window.resetFsLayoutTransforms = resetFsLayoutTransforms;
+
+/** Mobile: hoist mini-player onto <body> so #player-root never paints a grid slab */
+function ensureMobilePlayerHost() {
+  const player = document.getElementById('player');
+  const root = document.getElementById('player-root');
+  if (!player) return;
+  const mobile = typeof isMobilePlayerUi === 'function'
+    ? isMobilePlayerUi()
+    : window.matchMedia('(max-width: 900px)').matches;
+  if (mobile) {
+    if (player.parentElement !== document.body) {
+      document.body.appendChild(player);
+    }
+    // Toast must not stay inside #player-root (z-index 280) — mini-player is 281
+    const note = document.getElementById('notification');
+    if (note && note.parentElement !== document.body) {
+      document.body.appendChild(note);
+    }
+    // Relocate FS leftovers out of the zero-box root
+    if (typeof ensureFsPlayerDom === 'function') ensureFsPlayerDom();
+    // Keep progress line animating after remount
+    if (typeof bindPlayerUIControls === 'function') bindPlayerUIControls();
+    if (typeof tickProgress === 'function' && typeof audio !== 'undefined' && audio && !audio.paused) {
+      try { tickProgress(); } catch (_) {}
+    }
+    if (typeof syncPlayingRows === 'function') syncPlayingRows();
+    return;
+  }
+  // Desktop: keep classic dock + toast inside player-root
+  if (root) {
+    if (player.parentElement !== root) {
+      const anchor = root.querySelector('#notification, .notification');
+      if (anchor) root.insertBefore(player, anchor);
+      else root.insertBefore(player, root.firstChild);
+    }
+    const note = document.getElementById('notification');
+    if (note && note.parentElement !== root) root.appendChild(note);
+  }
+}
+window.ensureMobilePlayerHost = ensureMobilePlayerHost;
+
 function syncFsPlayer(track) {
+  resetFsLayoutTransforms();
   const t = track || (typeof getCurrentTrack === 'function' ? getCurrentTrack() : null)
     || (typeof queue !== 'undefined' ? queue[queueIndex] : null);
   const panel = document.getElementById('fs-player');
@@ -1211,22 +1272,38 @@ async function loadFsAboutCard(t) {
 }
 
 let _fsPlayerCloseTimer = null;
+const FS_PLAYER_ANIM_MS = 520;
+
 function openFsPlayer() {
   ensureFsPlayerChrome();
   const panel = document.getElementById('fs-player');
   if (!panel) {
-    openRightPanel('now');
+    // Mobile-only chrome; never open desktop right panel as a fallback here
+    if (typeof isMobilePlayerUi === 'function' && !isMobilePlayerUi()) return;
     return;
   }
   clearTimeout(_fsPlayerCloseTimer);
   closeFsSheets(true);
+  resetFsLayoutTransforms();
   syncFsPlayer();
-  panel.classList.remove('hidden');
+  // Start off-screen, then animate up like a finger swipe
+  panel.classList.remove('hidden', 'is-open');
+  panel.style.transform = '';
   panel.setAttribute('aria-hidden', 'false');
   document.body.classList.add('fs-player-open');
   scrollFsPlayerToTop(false);
+  // Force layout so transform transition always runs
+  panel.style.willChange = 'transform';
+  void panel.offsetHeight;
   requestAnimationFrame(() => {
-    requestAnimationFrame(() => panel.classList.add('is-open'));
+    requestAnimationFrame(() => {
+      panel.classList.add('is-open');
+      // Drop will-change after settle — prevents blurry rasterized text
+      clearTimeout(panel._fsWillClear);
+      panel._fsWillClear = setTimeout(() => {
+        if (panel.classList.contains('is-open')) panel.style.willChange = 'auto';
+      }, FS_PLAYER_ANIM_MS + 40);
+    });
   });
 }
 window.openFsPlayer = openFsPlayer;
@@ -1241,7 +1318,7 @@ function closeFsPlayer() {
     _fsPlayerCloseTimer = setTimeout(() => {
       if (!panel.classList.contains('is-open')) panel.classList.add('hidden');
       document.body.classList.remove('fs-player-open');
-    }, 320);
+    }, FS_PLAYER_ANIM_MS);
   } else {
     document.body.classList.remove('fs-player-open');
   }
@@ -1266,24 +1343,30 @@ function openFsMoreSheet() {
   }
   const liked = typeof Store !== 'undefined' && Store.isFav(t);
   if (list) {
+    const shareSvg = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true"><path d="M12 3v11" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8.2 6.8L12 3l3.8 3.8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 13v5.2A1.8 1.8 0 0 0 6.8 20h10.4A1.8 1.8 0 0 0 19 18.2V13" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>`;
+    const lyricsSvg = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h10" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>`;
+    const heartSvg = `<svg viewBox="0 0 24 24" width="22" height="22" fill="${liked ? 'currentColor' : 'none'}" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/></svg>`;
+    const addSvg = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>`;
+    const queueSvg = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M17 15.2v5.1l4.2-2.55L17 15.2z" fill="currentColor"/></svg>`;
+    const aboutSvg = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.2" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="8.2" r="1.15" fill="currentColor"/><path d="M12 11.2v5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
     list.innerHTML = `
       <button type="button" class="fs-more-item" onclick="closeFsSheets();if(typeof shareTrack==='function')shareTrack(queue[queueIndex])">
-        <span class="fs-more-ico">⤴</span><span>Поделиться</span>
+        <span class="fs-more-ico">${shareSvg}</span><span>Поделиться</span>
       </button>
       <button type="button" class="fs-more-item" onclick="closeFsSheets();fsScrollTo('#fs-block-lyrics')">
-        <span class="fs-more-ico">☰</span><span>Текст</span>
+        <span class="fs-more-ico">${lyricsSvg}</span><span>Текст</span>
       </button>
       <button type="button" class="fs-more-item" onclick="closeFsSheets();toggleFavPlayer()">
-        <span class="fs-more-ico">♥</span><span>${liked ? 'Убрать из любимых' : 'Добавить в любимые'}</span>
+        <span class="fs-more-ico">${heartSvg}</span><span>${liked ? 'Убрать из любимых' : 'Добавить в любимые'}</span>
       </button>
       <button type="button" class="fs-more-item" onclick="closeFsSheets();if(typeof showAddToPlaylist==='function')showAddToPlaylist(queue[queueIndex])">
-        <span class="fs-more-ico">＋</span><span>Добавить в плейлист</span>
+        <span class="fs-more-ico">${addSvg}</span><span>Добавить в плейлист</span>
       </button>
       <button type="button" class="fs-more-item" onclick="closeFsSheets();openFsQueueSheet()">
-        <span class="fs-more-ico">≡</span><span>Перейти в очередь</span>
+        <span class="fs-more-ico">${queueSvg}</span><span>Перейти в очередь</span>
       </button>
       <button type="button" class="fs-more-item" onclick="closeFsSheets();fsScrollTo('#fs-block-about')">
-        <span class="fs-more-ico">◎</span><span>Об исполнителе</span>
+        <span class="fs-more-ico">${aboutSvg}</span><span>Об исполнителе</span>
       </button>`;
   }
   openFsSheet('fs-more-sheet');
@@ -1339,33 +1422,38 @@ function openFsQueueSheet() {
 window.openFsQueueSheet = openFsQueueSheet;
 
 function ensureFsPlayerDom() {
-  const root = document.getElementById('player-root');
-  if (!root) return;
+  // Mount FS chrome on <body> (not #player-root) so:
+  // 1) player-root stays a zero-box and never paints a slab
+  // 2) fixed FS layout is always viewport-relative (no broken containing block)
+  const host = document.body;
+  if (!host) return;
   const existing = document.getElementById('fs-player');
-  // Upgrade old FS markup (carousel / text tools / missing stage / next+similar / hi-res cover img)
-  if (existing && (
+  // Upgrade old FS markup / move out of player-root if needed
+  const mustRebuild = existing && (
     !document.getElementById('fs-scroll') ||
     !document.getElementById('fs-more-sheet') ||
     !document.querySelector('.fs-stage') ||
     !document.querySelector('.fs-tool-ico') ||
     !document.getElementById('fs-block-similar') ||
     !document.querySelector('.fs-cover-img') ||
-    document.getElementById('fs-q-repeat')
-  )) {
-    existing.remove();
+    document.getElementById('fs-q-repeat') ||
+    existing.parentElement !== host
+  );
+  if (mustRebuild) {
+    existing?.remove();
     document.getElementById('fs-sheet-overlay')?.remove();
     document.getElementById('fs-more-sheet')?.remove();
     document.getElementById('fs-queue-sheet')?.remove();
   }
+  // Relocate leftover sheets still inside player-root
+  ['fs-player', 'fs-sheet-overlay', 'fs-more-sheet', 'fs-queue-sheet'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el && el.parentElement !== host) host.appendChild(el);
+  });
   if (document.getElementById('fs-player')) return;
   const wrap = document.createElement('div');
   wrap.innerHTML = typeof fsPlayerMarkup === 'function' ? fsPlayerMarkup() : '';
-  const nodes = [...wrap.children];
-  const notif = document.getElementById('notification');
-  nodes.forEach(node => {
-    if (notif) root.insertBefore(node, notif);
-    else root.appendChild(node);
-  });
+  [...wrap.children].forEach(node => host.appendChild(node));
 }
 
 function ensureLikeBesidePlay() {
@@ -1405,12 +1493,146 @@ function bindMiniPlayerOpen() {
     }
     openNowPlaying();
   });
+
+  // Mobile: swipe up on mini-player → same sheet open as tap
+  let startY = 0;
+  let startX = 0;
+  let tracking = false;
+  mini.addEventListener('touchstart', (e) => {
+    if (!(typeof isMobilePlayerUi === 'function' ? isMobilePlayerUi() : true)) return;
+    if (e.target.closest('button, a, input')) return;
+    const t = e.touches[0];
+    startY = t.clientY;
+    startX = t.clientX;
+    tracking = true;
+  }, { passive: true });
+  mini.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    const dy = startY - t.clientY;
+    const dx = Math.abs(t.clientX - startX);
+    if (dy > 48 && dy > dx * 1.2) openNowPlaying();
+  }, { passive: true });
+}
+
+/** Mobile: drag down on top/hero to dismiss — feels like a real swipe sheet */
+function bindFsSwipeClose() {
+  const panel = document.getElementById('fs-player');
+  if (!panel || panel.dataset.swipeBound === '1') return;
+  panel.dataset.swipeBound = '1';
+  let startY = 0;
+  let dragging = false;
+  let active = false;
+
+  const onStart = (e) => {
+    if (!(typeof isMobilePlayerUi === 'function' ? isMobilePlayerUi() : true)) return;
+    if (!panel.classList.contains('is-open')) return;
+    if (e.target.closest('button, a, input, .fs-progress, .fs-controls, .fs-tools')) return;
+    const sc = document.getElementById('fs-scroll');
+    if (sc && sc.scrollTop > 4) return;
+    const zone = e.target.closest('.fs-player-top, .fs-hero, .fs-cover');
+    if (!zone) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    startY = y;
+    dragging = false;
+    active = true;
+  };
+  const onMove = (e) => {
+    if (!active) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const dy = y - startY;
+    if (!dragging) {
+      if (dy < 8) return;
+      dragging = true;
+      panel.style.transition = 'none';
+    }
+    if (dy <= 0) {
+      panel.style.transform = 'translate3d(0,0,0)';
+      return;
+    }
+    if (e.cancelable) e.preventDefault();
+    panel.style.transform = `translate3d(0,${Math.min(dy, window.innerHeight)}px,0)`;
+  };
+  const onEnd = (e) => {
+    if (!active) return;
+    active = false;
+    const y = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    const dy = y - startY;
+    panel.style.transition = '';
+    panel.style.transform = '';
+    if (dragging && dy > 110) closeFsPlayer();
+    dragging = false;
+  };
+
+  panel.addEventListener('touchstart', onStart, { passive: true });
+  panel.addEventListener('touchmove', onMove, { passive: false });
+  panel.addEventListener('touchend', onEnd, { passive: true });
+  panel.addEventListener('touchcancel', onEnd, { passive: true });
+}
+
+/** Mobile: swipe down to close queue / more sheets */
+function bindFsSheetSwipeClose() {
+  ['fs-more-sheet', 'fs-queue-sheet'].forEach((id) => {
+    const sheet = document.getElementById(id);
+    if (!sheet || sheet.dataset.swipeBound === '1') return;
+    sheet.dataset.swipeBound = '1';
+    let startY = 0;
+    let dragging = false;
+    let active = false;
+
+    sheet.addEventListener('touchstart', (e) => {
+      if (!(typeof isMobilePlayerUi === 'function' ? isMobilePlayerUi() : true)) return;
+      if (sheet.classList.contains('hidden') || !sheet.classList.contains('is-open')) return;
+      if (e.target.closest('button, a, input, .fs-sheet-list, .fs-queue-list')) {
+        // Allow swipe from handle / head only when list is scrolled? Prefer head+handle
+      }
+      const zone = e.target.closest('.fs-sheet-handle, .fs-sheet-head, .fs-queue-head, .fs-sheet-handle');
+      const atTop = !e.target.closest('.fs-sheet-list, .fs-queue-list')
+        || (e.target.closest('.fs-sheet-list, .fs-queue-list')?.scrollTop || 0) <= 0;
+      if (!zone && !atTop) return;
+      if (e.target.closest('.fs-sheet-list, .fs-queue-list') && (e.target.closest('.fs-sheet-list, .fs-queue-list').scrollTop > 2)) return;
+      startY = e.touches[0].clientY;
+      dragging = false;
+      active = true;
+    }, { passive: true });
+
+    sheet.addEventListener('touchmove', (e) => {
+      if (!active) return;
+      const dy = e.touches[0].clientY - startY;
+      if (!dragging) {
+        if (dy < 10) return;
+        dragging = true;
+        sheet.style.transition = 'none';
+      }
+      if (dy <= 0) {
+        sheet.style.transform = 'translate3d(0,0,0)';
+        return;
+      }
+      if (e.cancelable) e.preventDefault();
+      sheet.style.transform = `translate3d(0,${Math.min(dy, window.innerHeight)}px,0)`;
+    }, { passive: false });
+
+    sheet.addEventListener('touchend', (e) => {
+      if (!active) return;
+      active = false;
+      const dy = e.changedTouches[0].clientY - startY;
+      sheet.style.transition = '';
+      sheet.style.transform = '';
+      if (dragging && dy > 100) closeFsSheets();
+      dragging = false;
+    }, { passive: true });
+  });
 }
 
 function ensureFsPlayerChrome() {
+  ensureMobilePlayerHost();
   ensureFsPlayerDom();
+  resetFsLayoutTransforms();
   ensureLikeBesidePlay();
   bindMiniPlayerOpen();
+  bindFsSwipeClose();
+  bindFsSheetSwipeClose();
   const track = document.getElementById('fs-progress-track');
   if (track && track.dataset.bound !== '1') {
     track.dataset.bound = '1';

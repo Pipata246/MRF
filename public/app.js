@@ -414,7 +414,7 @@ function bindAudio() {
       audio.play().catch(() => {});
       return;
     }
-    const autoplay = typeof Store !== 'undefined' ? Store.getSettings().autoplay !== false : true;
+    const autoplay = typeof Store !== 'undefined' ? Store.getSettings().autoplay === true : false;
     if (!autoplay && isRepeat !== 'all') {
       isPlaying = false;
       _wantPlaying = false;
@@ -1150,33 +1150,27 @@ function setPlayIcon(on) {
 
 function runTrackFlowAnim(dir) {
   if (!dir || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const fsOpen = document.body.classList.contains('fs-player-open');
+  // Never animate FS cover — leftover translateX breaks layout on some tracks
+  if (document.body.classList.contains('fs-player-open')) return;
   const targets = [];
-  if (!fsOpen) {
-    const cover = document.getElementById('player-cover');
-    const info = document.querySelector('#player .player-track-info');
-    if (cover) targets.push(cover);
-    if (info) targets.push(info);
-  } else {
-    const fsCover = document.getElementById('fs-cover');
-    const fsMeta = document.querySelector('#fs-player .fs-meta');
-    if (fsCover) targets.push(fsCover);
-    if (fsMeta) targets.push(fsMeta);
-  }
+  const cover = document.getElementById('player-cover');
+  const info = document.querySelector('#player .player-track-info');
+  if (cover) targets.push(cover);
+  if (info) targets.push(info);
   if (!targets.length) return;
   const cls = dir > 0 ? 'track-flow-next' : 'track-flow-prev';
-  // single reflow restart for all targets
   targets.forEach((node) => node.classList.remove('track-flow-next', 'track-flow-prev'));
   void targets[0].offsetWidth;
   targets.forEach((node) => {
     node.classList.add(cls);
     const done = () => {
       node.classList.remove(cls);
+      node.style.transform = '';
       node.style.willChange = '';
       node.removeEventListener('animationend', done);
     };
     node.addEventListener('animationend', done, { once: true });
-    setTimeout(done, 340);
+    setTimeout(done, 420);
   });
 }
 window.runTrackFlowAnim = runTrackFlowAnim;
