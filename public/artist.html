@@ -133,23 +133,48 @@ async function loadArtistPage(forced) {
     if (feed) feed.innerHTML = `<div class="loading-placeholder"><span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`;
   }
 
-  // BACKEND TODO: Получение информации об исполнителе + альбомы + похожие
+  async function loadArtistAlbumsAll(artistId) {
+    const out = [];
+    let index = 0;
+    for (;;) {
+      const chunk = await dzArr(`/artist/${artistId}/albums?limit=50&index=${index}`);
+      if (!chunk.length) break;
+      out.push(...chunk);
+      if (chunk.length < 50) break;
+      index += 50;
+      if (index >= 500) break;
+    }
+    return out;
+  }
+
+  async function loadArtistBundle(artistId) {
+    const [info, top, radio, albums, related] = await Promise.all([
+      dzObj(`/artist/${artistId}`),
+      dzArr(`/artist/${artistId}/top?limit=50`),
+      dzArr(`/artist/${artistId}/radio`),
+      loadArtistAlbumsAll(artistId),
+      dzArr(`/artist/${artistId}/related?limit=12`)
+    ]);
+    const byId = new Map();
+    [...(top || []), ...(radio || [])].forEach((t) => {
+      if (t && t.id != null) byId.set(String(t.id), t);
+    });
+    return {
+      artInfo: info && !info.error ? info : {},
+      tracksRaw: [...byId.values()],
+      albumsRaw: albums || [],
+      relatedRaw: related || []
+    };
+  }
+
   let artInfo = {};
   let tracksRaw = [];
   let albumsRaw = [];
   let relatedRaw = [];
   try {
-    [artInfo, tracksRaw, albumsRaw, relatedRaw] = await Promise.all([
-      dzObj(`/artist/${id}`),
-      dzArr(`/artist/${id}/top?limit=50`),
-      dzArr(`/artist/${id}/albums?limit=40`),
-      dzArr(`/artist/${id}/related?limit=12`)
-    ]);
+    ({ artInfo, tracksRaw, albumsRaw, relatedRaw } = await loadArtistBundle(id));
   } catch (_) {}
   if (!stillHere()) return;
-
-  // error payload from Deezer has no usable id
-  if (artInfo && artInfo.error) artInfo = {};
 
   // If stored id is stale, retry by name
   if ((!artInfo || !artInfo.id) && name) {
@@ -159,13 +184,7 @@ async function loadArtistPage(forced) {
       const exact = found.find(a => (a.name || '').toLowerCase() === name.toLowerCase()) || found[0];
       if (exact?.id) {
         id = String(exact.id);
-        [artInfo, tracksRaw, albumsRaw, relatedRaw] = await Promise.all([
-          dzObj(`/artist/${id}`),
-          dzArr(`/artist/${id}/top?limit=50`),
-          dzArr(`/artist/${id}/albums?limit=40`),
-          dzArr(`/artist/${id}/related?limit=12`)
-        ]);
-        if (artInfo && artInfo.error) artInfo = {};
+        ({ artInfo, tracksRaw, albumsRaw, relatedRaw } = await loadArtistBundle(id));
         try { history.replaceState({ mrfSoft: 1 }, '', mrfUrl('artist', { id, name: artInfo.name || name })); } catch (_) {}
         try { sessionStorage.setItem('mrf_route_artist', JSON.stringify({ id, name: artInfo.name || name })); } catch (_) {}
       }
@@ -190,7 +209,7 @@ async function loadArtistPage(forced) {
   const albumsN = artInfo.nb_album ? (+artInfo.nb_album) : (albumsRaw || []).length;
   const aName = artInfo.name || name;
   const key   = `art_${id}`;
-  _src[key]   = (tracksRaw || []).map(normDZ);
+  _src[key]   = (tracksRaw || []).map(normDZ).filter(Boolean);
   _artistAlbums = albumsRaw || [];
   _artistRelated = relatedRaw || [];
   _artistInfo = artInfo;
@@ -350,17 +369,19 @@ function renderArtistTab() {
           <h3 class="section-title" style="font-size:16px">${escHtml(b.title)} <span style="font-size:12px;color:var(--text-3);font-weight:400">(${b.list.length})</span></h3>
         </div>
         <div class="albums-grid artist-albums-grid">${b.list.map(a => {
-          const url = mrfUrl('album', { id: a.id, title: a.title, artist: _artistPageName });
-          const saved = Store.isAlbumSaved(a.id);
+          const aid = String(a.id || '').replace(/\D/g, '');
+          const url = mrfUrl('album', { id: aid, title: a.title || '', artist: _artistPageName || '' });
+          const saved = Store.isAlbumSaved(aid);
           const type = a.record_type ? String(a.record_type) : '';
+          const goUrl = String(url).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
           return `
-          <div class="album-card" onclick="(window.mrfGo||function(u){location.href=u})('${url}')">
+          <div class="album-card" role="link" tabindex="0" data-album-url="${escHtml(url)}" onclick="(window.mrfGo||function(u){location.href=u})('${goUrl}')">
             ${a.cover_medium ? `<img class="album-cover" src="${a.cover_medium}" alt="" loading="lazy">` : `<div class="album-cover-placeholder">${noteSVGShared()}</div>`}
             <div class="album-body">
               <div class="album-title">${escHtml(a.title || '')}</div>
               <div class="album-artist">${a.release_date ? String(a.release_date).slice(0, 4) : ''}${type ? ' · ' + escHtml(type) : ''}${saved ? ' · в библиотеке' : ''}</div>
             </div>
-            <button type="button" class="album-save-chip${saved ? ' is-on' : ''}" onclick="event.stopPropagation();toggleArtistAlbumSave('${a.id}', this)" title="${saved ? 'Убрать' : 'Сохранить'}">
+            <button type="button" class="album-save-chip${saved ? ' is-on' : ''}" onclick="event.stopPropagation();toggleArtistAlbumSave('${aid}', this)" title="${saved ? 'Убрать' : 'Сохранить'}">
               ${saved ? '✓' : '+'}
             </button>
           </div>`;

@@ -109,12 +109,13 @@
     if (!MrfAuth.session || typeof Store === 'undefined') return;
     MrfCloud._quiet = true;
     try {
-      const [likes, follows, albums, settings, playlists, recent, history] = await Promise.all([
+      const [likes, follows, albums, settings, playlists, savedPlaylists, recent, history] = await Promise.all([
         api('/api/library?resource=likes'),
         api('/api/library?resource=follows'),
         api('/api/library?resource=albums'),
         api('/api/me?resource=settings'),
         api('/api/library?resource=playlists'),
+        api('/api/library?resource=savedPlaylists'),
         api('/api/library?resource=recent'),
         api('/api/library?resource=history')
       ]);
@@ -128,7 +129,11 @@
         Store.setSettings(settings.settings);
         if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
       }
-      if (playlists?.items) Store.setPlaylists(playlists.items);
+      if (playlists?.items || savedPlaylists?.items) {
+        const owned = Array.isArray(playlists?.items) ? playlists.items : [];
+        const saved = Array.isArray(savedPlaylists?.items) ? savedPlaylists.items : [];
+        Store.setPlaylists([...owned, ...saved]);
+      }
       if (recent?.items && typeof Store.setRecent === 'function') {
         Store.setRecent(recent.items);
         if (typeof recentTracks !== 'undefined') recentTracks = Store.getRecent();
@@ -172,7 +177,10 @@
           await api('/api/me?resource=settings', { method: 'PUT', body: { settings: Store.getSettings() } });
         }
         if (kind === 'playlists' || kind === 'all') {
-          await api('/api/library?resource=playlists', { method: 'PUT', body: { items: Store.getPlaylists() } });
+          const owned = typeof Store.getOwnedPlaylists === 'function'
+            ? Store.getOwnedPlaylists()
+            : (Store.getPlaylists() || []).filter((p) => p && p.origin !== 'saved' && !p.readOnly);
+          await api('/api/library?resource=playlists', { method: 'PUT', body: { items: owned } });
         }
         if (kind === 'recent' || kind === 'all') {
           await api('/api/library?resource=recent', { method: 'PUT', body: { items: Store.getRecent() } });
@@ -239,7 +247,7 @@
       'setFollowed', 'toggleFollow',
       'setAlbums', 'toggleAlbum',
       'setPlaylists', 'createPlaylist', 'updatePlaylist', 'deletePlaylist',
-      'addTrackToPlaylist', 'removeTrackFromPlaylist',
+      'addTrackToPlaylist', 'removeTrackFromPlaylist', 'savePlaylist', 'unsavePlaylist',
       'addRecent', 'setRecent', 'addHistory', 'clearHistory', 'removeHistory'
     ]);
     const silentGuest = new Set(['addRecent', 'setRecent', 'addHistory', 'clearHistory', 'removeHistory']);
@@ -252,9 +260,14 @@
             showNotif('Сначала войди в аккаунт');
           }
           if (method.indexOf('toggle') === 0) return false;
+          if (method === 'savePlaylist' || method === 'unsavePlaylist') return false;
           return method === 'createPlaylist' ? null : undefined;
         }
         const result = orig(...args);
+        if (method === 'savePlaylist' || method === 'unsavePlaylist') {
+          if (!MrfCloud._quiet) syncSavedPlaylist(method, args[0], result);
+          return result;
+        }
         schedulePush(kind);
         return result;
       };
@@ -272,12 +285,34 @@
     hook('deletePlaylist', 'playlists');
     hook('addTrackToPlaylist', 'playlists');
     hook('removeTrackFromPlaylist', 'playlists');
+    hook('savePlaylist', 'savedPlaylists');
+    hook('unsavePlaylist', 'savedPlaylists');
     hook('setProfile', 'profile');
     hook('addRecent', 'recent');
     hook('setRecent', 'recent');
     hook('addHistory', 'history');
     hook('clearHistory', 'history');
     hook('removeHistory', 'history');
+  }
+
+  function syncSavedPlaylist(method, arg, ok) {
+    if (MrfCloud._quiet || !isAuthed() || !ok) return;
+    const playlistId = method === 'savePlaylist'
+      ? String(arg && arg.id != null ? arg.id : arg || '')
+      : String(arg || '');
+    if (!playlistId) return;
+    const path = '/api/library?resource=savedPlaylists';
+    const req = method === 'savePlaylist'
+      ? api(path, { method: 'POST', body: { playlistId } })
+      : api(path, { method: 'DELETE', body: { playlistId } });
+    req.then((data) => {
+      if (method === 'savePlaylist' && data?.item && typeof Store.savePlaylist === 'function') {
+        MrfCloud._quiet = true;
+        try { Store.savePlaylist(data.item); } finally { MrfCloud._quiet = false; }
+      }
+    }).catch((e) => {
+      console.warn('[MRF] saved playlist sync', e.message);
+    });
   }
 
   async function refreshSession() {

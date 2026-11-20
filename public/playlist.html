@@ -83,24 +83,136 @@ function playlistSrcKey(id) {
 }
 
 function normalizePlaylistTracks(tracks) {
-  return (tracks || []).map(t => ({
-    id: t.id,
-    title: t.title || '',
-    artist: { name: t.artistName || t.artist?.name || t.artist || '' },
-    album: { cover_medium: t.cover || t.album?.cover_medium || '', title: t.album?.title || '' },
-    duration: t.duration || 0,
-    preview: t.preview || null
-  }));
+  return (tracks || []).map(t => {
+    const deezerId = t.deezerId
+      || (String(t.id || '').startsWith('dz_') ? String(t.id).slice(3) : null)
+      || (typeof deezerIdOf === 'function' ? deezerIdOf(t) : null)
+      || null;
+    const artistName = t.artistName || t.artist?.name || t.artist || '';
+    return {
+      id: t.id || (deezerId ? `dz_${deezerId}` : t.id),
+      deezerId: deezerId || null,
+      title: t.title || '',
+      artistName,
+      artist: typeof t.artist === 'object' && t.artist
+        ? t.artist
+        : { name: artistName },
+      album: { cover_medium: t.cover || t.album?.cover_medium || '', title: t.album?.title || '' },
+      cover: t.cover || t.album?.cover_medium || '',
+      duration: t.duration || 0,
+      preview: t.preview || null,
+      source: t.source || 'deezer'
+    };
+  });
 }
 
-function renderPlaylist(id) {
+function loadVirtualPlaylist(sid) {
+  if (!String(sid || '').startsWith('rec_')) return null;
+  try {
+    const v = JSON.parse(sessionStorage.getItem('mrf_virtual_playlist') || 'null');
+    if (v && String(v.id) === String(sid)) return v;
+  } catch (_) {}
+  return null;
+}
+
+function playlistAuthorHandle(pl) {
+  const raw = pl?.author?.username || '';
+  if (!raw) return '';
+  if (window.MrfAuth?.displayUsername) return MrfAuth.displayUsername(raw);
+  const s = String(raw).trim().replace(/^@+/, '');
+  return s ? '@' + s : '';
+}
+
+function saveVirtualPlaylistToLibrary() {
+  if (typeof mrfRequireLogin === 'function' && !mrfRequireLogin({ message: 'Чтобы сохранить микс, войди в аккаунт' })) return;
+  const sid = String(_currentPlaylistId || '');
+  const pl = loadVirtualPlaylist(sid) || Store.getPlaylist(sid);
+  if (!pl?.tracks?.length || typeof Store.createPlaylist !== 'function') {
+    if (typeof showNotif === 'function') showNotif('Нечего сохранять');
+    return;
+  }
+  const created = Store.createPlaylist(pl.name || 'Микс', '');
+  if (!created) return;
+  if (pl.cover) Store.updatePlaylist(created.id, { cover: pl.cover });
+  pl.tracks.forEach((t) => Store.addTrackToPlaylist(created.id, t));
+  if (typeof showNotif === 'function') showNotif('Микс в библиотеке');
+  const url = typeof mrfUrl === 'function' ? mrfUrl('playlist', { id: created.id }) : `playlist.html?id=${encodeURIComponent(created.id)}`;
+  if (typeof mrfGo === 'function') mrfGo(url);
+  else location.href = url;
+}
+window.saveVirtualPlaylistToLibrary = saveVirtualPlaylistToLibrary;
+
+async function toggleSavePublicPlaylist() {
+  const sid = String(_currentPlaylistId || '');
+  if (!sid || sid.startsWith('rec_')) return;
+  if (typeof mrfRequireLogin === 'function' && !mrfRequireLogin({ message: 'Чтобы добавить плейлист, войди в аккаунт' })) return;
+  const local = Store.getPlaylist(sid);
+  if (local && Store.isOwnedPlaylist?.(local)) return;
+  if (Store.isPlaylistSaved?.(sid)) {
+    Store.unsavePlaylist(sid);
+    if (typeof showNotif === 'function') showNotif('Убрано');
+    if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
+    renderPlaylist(sid);
+    return;
+  }
+  let pl = local;
+  if (!pl || pl.origin === 'public') {
+    try {
+      const data = typeof mrfApi === 'function'
+        ? await mrfApi('/api/library?resource=playlist&id=' + encodeURIComponent(sid))
+        : null;
+      if (data?.item) pl = data.item;
+    } catch (_) {}
+  }
+  if (!pl) {
+    if (typeof showNotif === 'function') showNotif('Плейлист не найден');
+    return;
+  }
+  Store.savePlaylist(pl);
+  if (typeof showNotif === 'function') showNotif('Добавлено');
+  if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
+  renderPlaylist(sid);
+}
+window.toggleSavePublicPlaylist = toggleSavePublicPlaylist;
+
+async function fetchPlaylistForPage(sid) {
+  if (!sid || String(sid).startsWith('rec_') || typeof mrfApi !== 'function') return null;
+  try {
+    const data = await mrfApi('/api/library?resource=playlist&id=' + encodeURIComponent(sid));
+    return data?.item || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function renderPlaylist(id) {
   const sid = String(id || '');
+  const feed = document.getElementById('playlist-feed');
+  if (!feed) return;
+
   let pl = Store.getPlaylist(sid);
   if (!pl && typeof MOCK !== 'undefined' && Array.isArray(MOCK.playlists)) {
     pl = MOCK.playlists.find(p => String(p.id) === sid) || null;
   }
-  const feed = document.getElementById('playlist-feed');
-  if (!feed) return;
+  if (!pl) pl = loadVirtualPlaylist(sid);
+
+  const needsLive =
+    String(sid).startsWith('pl_') &&
+    (!pl || pl.origin === 'saved' || pl.origin === 'public' || pl.readOnly);
+  if (needsLive) {
+    const remote = await fetchPlaylistForPage(sid);
+    if (remote) {
+      pl = remote;
+      if (remote.origin === 'saved' || Store.isPlaylistSaved?.(sid)) {
+        if (window.MrfCloud) MrfCloud._quiet = true;
+        try { Store.savePlaylist(remote); } finally {
+          if (window.MrfCloud) MrfCloud._quiet = false;
+        }
+      } else if (remote.origin === 'owned' && Store.isOwnedPlaylist) {
+        // keep owned local; live fetch already has tracks
+      }
+    }
+  }
 
   if (!pl) {
     feed.innerHTML = `<div class="search-empty" style="padding:60px 0"><p style="color:var(--text-3)">Плейлист не найден</p>
@@ -108,38 +220,73 @@ function renderPlaylist(id) {
     return;
   }
 
+  const isOwned = typeof Store.isOwnedPlaylist === 'function' ? Store.isOwnedPlaylist(pl) : !(pl.readOnly || pl.origin === 'saved' || pl.origin === 'public');
+  const isRecMix = String(pl.id).startsWith('rec_');
+  const isPublicForeign = !isOwned && !isRecMix && String(pl.id).startsWith('pl_');
+  const readOnly = !isOwned;
+  const isDayMix = !!(pl.kind === 'day' || String(pl.id || '').includes('playlist_of_the_day'));
+  const isMoodMix = pl.kind === 'mood';
+  const authorHandle = playlistAuthorHandle(pl);
+  const displayName = pl.name
+    || (isDayMix && typeof mrfDayPlaylistTitle === 'function' ? mrfDayPlaylistTitle(pl.localDay) : null)
+    || (isRecMix ? 'Микс' : 'Плейлист');
   _currentPlaylistId = String(pl.id);
   try { sessionStorage.setItem('mrf_route_playlist', JSON.stringify({ id: String(pl.id) })); } catch (_) {}
-  document.title = pl.name + ' — MRF';
+  document.title = displayName + ' — MRF';
 
   const key = playlistSrcKey(pl.id);
-  const ordered = typeof Store._sortNewestFirst === 'function'
-    ? Store._sortNewestFirst(pl.tracks || [])
-    : (pl.tracks || []);
+  const ordered = readOnly
+    ? (pl.tracks || [])
+    : (typeof Store._sortNewestFirst === 'function'
+      ? Store._sortNewestFirst(pl.tracks || [])
+      : (pl.tracks || []));
   const tracks = normalizePlaylistTracks(ordered);
   _src[key] = tracks;
   const count = tracks.length;
 
   const coverSrc = pl.cover ? escHtml(String(pl.cover)) : '';
   const safePlId = String(pl.id).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const saved = !!(Store.isPlaylistSaved?.(pl.id) || pl.origin === 'saved');
+  let manageBtn = '';
+  if (isOwned) {
+    manageBtn = `<button type="button" class="btn-secondary playlist-more-btn" onclick="showPlaylistManageMenu(event,'${safePlId}')" title="Ещё" aria-label="Управление плейлистом">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+          </button>`;
+  } else if (isPublicForeign) {
+    manageBtn = `<button type="button" class="btn-secondary playlist-save-btn" onclick="toggleSavePublicPlaylist()">${saved ? 'Убрать' : 'Добавить'}</button>`;
+  } else if (isRecMix) {
+    manageBtn = `<button type="button" class="btn-secondary playlist-save-btn" onclick="saveVirtualPlaylistToLibrary()">В библиотеку</button>`;
+  }
+
+  const kicker = isOwned
+    ? 'Плейлист'
+    : isPublicForeign
+      ? 'Плейлист'
+      : isDayMix
+        ? 'Микс дня'
+        : isMoodMix
+          ? 'Настроение'
+          : 'Микс';
+  const countLine = authorHandle && isPublicForeign
+    ? `${escHtml(authorHandle)} · ${count} ${count === 1 ? 'трек' : count < 5 ? 'трека' : 'треков'}`
+    : `${count} ${count === 1 ? 'трек' : count < 5 ? 'трека' : 'треков'}`;
+
   feed.innerHTML = `
-    <div class="playlist-page-header liked-header">
+    <div class="playlist-page-header liked-header${readOnly ? ' is-rec-mix' : ''}${isDayMix ? ' is-day-mix' : ''}${isMoodMix ? ' is-mood-mix' : ''}">
       ${coverSrc
         ? `<img class="playlist-page-cover" src="${coverSrc}" alt="">`
         : `<div class="liked-cover-placeholder playlist-page-cover-ph">${noteSVGShared()}</div>`}
       <div class="playlist-page-meta">
-        <div class="playlist-page-kicker">Плейлист</div>
-        <h1 class="playlist-page-title" id="pl-title-display">${escHtml(pl.name)}</h1>
-        <div class="playlist-page-count" id="pl-track-count">${count} ${count === 1 ? 'трек' : count < 5 ? 'трека' : 'треков'}</div>
+        <div class="playlist-page-kicker">${kicker}</div>
+        <h1 class="playlist-page-title" id="pl-title-display">${escHtml(displayName)}</h1>
+        <div class="playlist-page-count" id="pl-track-count">${countLine}</div>
         <div class="playlist-page-actions">
           ${count ? `<button type="button" class="btn-primary" onclick="playPlaylistNow()">
             <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" aria-hidden="true"><polygon points="5,3 19,12 5,21"/></svg>
             <span>Слушать</span>
           </button>
           <button type="button" class="btn-secondary playlist-shuffle-btn" onclick="shufflePlaylistNow()"><span>Перемешать</span></button>` : ''}
-          <button type="button" class="btn-secondary playlist-more-btn" onclick="showPlaylistManageMenu(event,'${safePlId}')" title="Ещё" aria-label="Управление плейлистом">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-          </button>
+          ${manageBtn}
         </div>
       </div>
     </div>
@@ -148,7 +295,7 @@ function renderPlaylist(id) {
         ? `<div class="track-list">${tracks.map((t,i) => rowHTMLPlaylist(t, i, key, pl.id)).join('')}</div>`
         : `<div class="search-empty" style="padding:48px 0">
             <p style="color:var(--text-3)">Плейлист пуст</p>
-            <button class="btn-primary" style="margin-top:14px;padding:10px 18px;font-size:13px" onclick="showAddTracksToPlaylist('${escHtml(String(pl.id))}')">Добавить треки</button>
+            ${readOnly ? '' : `<button class="btn-primary" style="margin-top:14px;padding:10px 18px;font-size:13px" onclick="showAddTracksToPlaylist('${escHtml(String(pl.id))}')">Добавить треки</button>`}
           </div>`}
     </div>`;
 
@@ -220,7 +367,9 @@ function toggleFavPlaylist(key, idx, btn) {
   const t = _src[key]?.[idx]; if (!t) return;
   const artist = t.artist?.name || t.artistName || '';
   const added = Store.toggleFav({
-    id: t.id, title: t.title, artistName: artist, artist: t.artist,
+    id: t.id,
+    deezerId: (typeof deezerIdOf === 'function' ? deezerIdOf(t) : null) || t.deezerId || null,
+    title: t.title, artistName: artist, artist: t.artist,
     cover: t.album?.cover_medium || t.cover, album: t.album, duration: t.duration, preview: t.preview
   });
   if (typeof applyLikeBtnState === 'function') applyLikeBtnState(btn, added);
@@ -231,8 +380,12 @@ function toggleFavPlaylist(key, idx, btn) {
 }
 
 function removeFromCurrentPlaylist(plId, trackId) {
-  Store.removeTrackFromPlaylist(plId, trackId);
-  renderPlaylist(plId);
+  const id = String(plId || '');
+  if (!id || id.startsWith('rec_')) return;
+  const pl = Store.getPlaylist?.(id);
+  if (!pl || pl.readOnly) return;
+  Store.removeTrackFromPlaylist(id, trackId);
+  renderPlaylist(id);
   if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
   showNotif('Трек удалён из плейлиста');
 }
@@ -242,6 +395,14 @@ function editPlaylistName(id) {
 }
 
 function deleteThisPlaylist(id) {
+  const pl = Store.getPlaylist?.(id);
+  if (pl && typeof Store.isOwnedPlaylist === 'function' && !Store.isOwnedPlaylist(pl)) {
+    Store.unsavePlaylist(id);
+    if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
+    if (typeof showNotif === 'function') showNotif('Убрано');
+    renderPlaylist(id);
+    return;
+  }
   if (!confirm('Удалить плейлист?')) return;
   Store.deletePlaylist(id);
   if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
@@ -254,6 +415,17 @@ function deleteThisPlaylist(id) {
 function showPlaylistManageMenu(e, plId) {
   e.preventDefault();
   e.stopPropagation();
+  const id = String(plId || _currentPlaylistId || '');
+  // Recommendation mixes are read-only — only "save to library"
+  if (id.startsWith('rec_')) {
+    saveVirtualPlaylistToLibrary();
+    return;
+  }
+  const cur = Store.getPlaylist?.(id);
+  if (cur && typeof Store.isOwnedPlaylist === 'function' && !Store.isOwnedPlaylist(cur)) {
+    toggleSavePublicPlaylist();
+    return;
+  }
   if (typeof hideTrackMenu === 'function') hideTrackMenu(true);
 
   const menu = document.createElement('div');
@@ -269,7 +441,6 @@ function showPlaylistManageMenu(e, plId) {
     y = br.bottom + 6;
   }
 
-  const id = String(plId || _currentPlaylistId || '');
   const safe = id.replace(/'/g, "\\'");
   menu.innerHTML = `
     <button type="button" class="ctx-item" data-pl="add">

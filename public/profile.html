@@ -177,10 +177,6 @@
           <div class="settings-row-info"><div class="settings-row-label">Запоминать позицию</div></div>
           <label class="toggle-switch"><input type="checkbox" id="s-position" onchange="saveSetting('rememberPosition',this.checked)"><div class="toggle-track"></div></label>
         </div>
-        <div class="settings-row">
-          <div class="settings-row-info"><div class="settings-row-label">Explicit</div></div>
-          <label class="toggle-switch"><input type="checkbox" id="s-explicit" onchange="saveSetting('showExplicit',this.checked)"><div class="toggle-track"></div></label>
-        </div>
       </div>
 
       <!-- Аккаунт -->
@@ -459,7 +455,6 @@ function loadProfilePage() {
   tog('s-autoplay', settings.autoplay === true);
   tog('s-shuffle', !!settings.shuffleOnPlay);
   tog('s-position', settings.rememberPosition !== false);
-  tog('s-explicit', settings.showExplicit !== false);
 
   syncThemeButtons(settings.theme || 'dark');
   if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();

@@ -89,6 +89,109 @@
     return (typeof getPageId === 'function' ? getPageId(url) : 'index');
   }
 
+  /* Mobile-only: remember / restore feed scroll across soft-nav (home ↔ mix/day) */
+  const scrollMemory = window.__mrfScrollMemory || Object.create(null);
+  window.__mrfScrollMemory = scrollMemory;
+
+  function isMobileUi() {
+    try {
+      return document.documentElement.getAttribute('data-ui') === 'mobile'
+        || window.matchMedia('(max-width: 900px)').matches;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /** Stable key — home URLs vary (/ vs /index.html) */
+  function scrollKeyFor(url) {
+    const p = pageName(url);
+    if (p === 'index' || p === 'home' || p === '') return 'page:index';
+    return normUrl(url);
+  }
+
+  function readScrollPos() {
+    const feed = document.querySelector('main .feed') || document.getElementById('feed');
+    const main = document.querySelector('main.main-content, main');
+    return {
+      feed: feed ? feed.scrollTop : 0,
+      main: main ? main.scrollTop : 0,
+      win: window.scrollY || window.pageYOffset || 0
+    };
+  }
+
+  function saveScrollFor(url) {
+    if (!isMobileUi()) return;
+    const key = scrollKeyFor(url || location.href);
+    if (!key) return;
+    const pos = readScrollPos();
+    scrollMemory[key] = pos;
+    // Always keep a dedicated home snapshot when leaving home
+    if (key === 'page:index' && (pos.feed > 0 || pos.main > 0 || pos.win > 0)) {
+      window.__mrfHomeFeedScroll = pos;
+    }
+  }
+
+  function applyScrollPos(pos) {
+    if (!pos) return;
+    const feed = document.querySelector('main .feed') || document.getElementById('feed');
+    const main = document.querySelector('main.main-content, main');
+    if (feed) feed.scrollTop = pos.feed || 0;
+    if (main) main.scrollTop = pos.main || 0;
+    if (pos.win) window.scrollTo(0, pos.win);
+    if (typeof updateHomeTopbarScroll === 'function') updateHomeTopbarScroll();
+  }
+
+  function savedScrollPos(url) {
+    const key = scrollKeyFor(url || location.href);
+    if (key === 'page:index' && window.__mrfHomeFeedScroll) {
+      const h = window.__mrfHomeFeedScroll;
+      if ((h.feed || 0) > 0 || (h.main || 0) > 0 || (h.win || 0) > 0) return h;
+    }
+    return scrollMemory[key] || null;
+  }
+
+  function hasSavedScroll(url) {
+    if (!isMobileUi()) return false;
+    const pos = savedScrollPos(url);
+    if (!pos) return false;
+    return (pos.feed || 0) > 0 || (pos.main || 0) > 0 || (pos.win || 0) > 0;
+  }
+
+  function restoreScrollFor(url) {
+    if (!isMobileUi()) return false;
+    const key = scrollKeyFor(url || location.href);
+    const pos = savedScrollPos(url);
+    if (!pos) return false;
+    if ((pos.feed || 0) <= 0 && (pos.main || 0) <= 0 && (pos.win || 0) <= 0) return false;
+
+    // One pending restore — home paints async; avoid timeout spam / jump-lag
+    window.__mrfPendingScroll = { key, pos, until: Date.now() + 1800 };
+    applyScrollPos(pos);
+    requestAnimationFrame(() => {
+      if (window.__mrfPendingScroll?.key !== key) return;
+      applyScrollPos(pos);
+    });
+    return true;
+  }
+
+  /** Re-apply pending restore once (after home paint). No multi-timeout thrash. */
+  function flushPendingScroll() {
+    if (!isMobileUi()) return false;
+    const pending = window.__mrfPendingScroll;
+    if (!pending || Date.now() > pending.until) return false;
+    if (scrollKeyFor(location.href) !== pending.key) return false;
+    applyScrollPos(pending.pos);
+    return true;
+  }
+
+  window.mrfSavePageScroll = () => saveScrollFor(location.href);
+  window.mrfRestorePageScroll = (url) => {
+    if (url) return restoreScrollFor(url);
+    if (flushPendingScroll()) return true;
+    return restoreScrollFor(location.href);
+  };
+  window.mrfFlushPendingScroll = flushPendingScroll;
+
   function isInternalUrl(url) {
     try {
       const u = new URL(url, location.href);
@@ -319,7 +422,9 @@
     } else if (pname === 'profile' && typeof window.loadProfilePage === 'function') {
       window.loadProfilePage();
     } else if ((pname === 'index' || pname === '' || pname === 'home') && typeof window.loadHomePage === 'function') {
-      void window.loadHomePage();
+      window.__mrfHomeBootPromise = Promise.resolve()
+        .then(() => window.loadHomePage())
+        .catch(() => {});
     } else if (pname === 'charts' && typeof window.loadCharts === 'function') {
       void window.loadCharts();
     }
@@ -359,8 +464,23 @@
     const token = ++navToken;
     busy = true;
     window.__mrfSoftNavigating = true;
-    const fromPage = pageName(location.href);
+    // On popstate location already = destination; DOM is still the old page.
+    // Never save under the destination key from stale DOM (that wiped home scroll).
+    const fromPage = fromPop
+      ? pageName(hist.stack[hist.index] || location.href)
+      : pageName(location.href);
     const toPage = pageName(abs);
+    if (!fromPop) saveScrollFor(location.href);
+    const shouldRestoreScroll = hasSavedScroll(abs.href);
+    if (shouldRestoreScroll) {
+      window.__mrfPendingScroll = {
+        key: scrollKeyFor(abs.href),
+        pos: savedScrollPos(abs.href),
+        until: Date.now() + 1800
+      };
+    } else {
+      window.__mrfPendingScroll = null;
+    }
     cancelLoadsWhenLeaving(fromPage, toPage);
     rememberRouteParams(abs);
 
@@ -402,12 +522,35 @@
       await bootFetchedPage(doc, abs);
       if (token !== navToken) return;
 
+      // Home paints async — wait for boot so restore isn't fighting empty layout
+      if (shouldRestoreScroll && (toPage === 'index' || toPage === 'home' || toPage === '')) {
+        try {
+          if (window.__mrfHomeBootPromise) {
+            await Promise.race([
+              window.__mrfHomeBootPromise,
+              new Promise((r) => setTimeout(r, 1200))
+            ]);
+          }
+        } catch (_) {}
+      }
+      if (token !== navToken) return;
+
       if (typeof window.renderSidebarPlaylists === 'function') window.renderSidebarPlaylists();
 
-      curMain.scrollTop = 0;
-      const feed = curMain.querySelector('.feed');
-      if (feed) feed.scrollTop = 0;
-      window.scrollTo(0, 0);
+      if (shouldRestoreScroll) {
+        restoreScrollFor(abs.href);
+        // One calm follow-up after layout — not a burst of jumps
+        setTimeout(() => {
+          if (token !== navToken) return;
+          flushPendingScroll();
+        }, 160);
+      } else {
+        window.__mrfPendingScroll = null;
+        curMain.scrollTop = 0;
+        const feed = curMain.querySelector('.feed');
+        if (feed) feed.scrollTop = 0;
+        window.scrollTo(0, 0);
+      }
       if (typeof updateFavBadge === 'function') updateFavBadge();
       if (typeof syncFavIcons === 'function') syncFavIcons();
       if (typeof syncPlayingRows === 'function') syncPlayingRows();

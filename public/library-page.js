@@ -161,15 +161,24 @@ function libTracksSectionHTML(favs, opts) {
   if (!favs.length) {
     html += `<div class="search-empty" style="padding:12px 0 8px"><p style="color:var(--text-3)">Добавляй треки в избранное сердечком</p></div>`;
   } else {
-    const fake = favs.map(f => ({
-      id: f.id || 0,
-      title: f.title,
-      artist: { id: f.artistId || null, name: f.artist },
-      artistId: f.artistId || null,
-      album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
-      duration: f.duration || 0,
-      preview: f.preview || null
-    }));
+    const fake = favs.map(f => {
+      const deezerId = f.deezerId
+        || (String(f.id || '').startsWith('dz_') ? String(f.id).slice(3) : null)
+        || null;
+      return {
+        id: f.id || (deezerId ? `dz_${deezerId}` : 0),
+        deezerId: deezerId || null,
+        title: f.title,
+        artist: { id: f.artistId || null, name: f.artist },
+        artistName: f.artist || '',
+        artistId: f.artistId || null,
+        album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
+        cover: f.cover || '',
+        duration: f.duration || 0,
+        preview: f.preview || null,
+        source: 'deezer'
+      };
+    });
     _src['favs'] = fake;
     const shown = (preview && !_libTracksExpanded) ? fake.slice(0, 5) : fake;
     html += `<div id="fav-list" class="track-list">${shown.map((t, i) => {
@@ -253,12 +262,25 @@ function renderLib(tab) {
       html += `<div class="${_pageLibView==='grid'?'lib-grid':'lib-list'}">`;
       pls.forEach(pl => {
         const href = typeof mrfUrl === 'function' ? mrfUrl('playlist', { id: pl.id }) : `playlist.html?id=${encodeURIComponent(pl.id)}`;
+        const owned = typeof Store.isOwnedPlaylist === 'function' ? Store.isOwnedPlaylist(pl) : !(pl.readOnly || pl.origin === 'saved');
+        let handle = '';
+        if (!owned && pl.author?.username) {
+          handle = window.MrfAuth?.displayUsername
+            ? MrfAuth.displayUsername(pl.author.username)
+            : ('@' + String(pl.author.username).replace(/^@+/, ''));
+        }
+        const sub = handle
+          ? handle
+          : `${pl.trackCount || pl.tracks?.length || 0} треков`;
+        const listSub = handle
+          ? `Плейлист · ${handle}`
+          : `Плейлист · ${pl.trackCount || pl.tracks?.length || 0} треков`;
         if (_pageLibView === 'grid') {
           html += `<div class="lib-card" onclick="(window.mrfGo||function(u){location.href=u})('${href}')">
             ${pl.cover ? `<img src="${pl.cover}" class="lib-card-cover" alt="">` : `<div class="lib-card-cover-placeholder">${noteSVGShared()}</div>`}
-            <div class="lib-card-body"><div class="lib-card-title">${escHtml(pl.name)}</div><div class="lib-card-sub">${pl.trackCount || pl.tracks?.length || 0} треков</div></div>
+            <div class="lib-card-body"><div class="lib-card-title">${escHtml(pl.name)}</div><div class="lib-card-sub">${escHtml(sub)}</div></div>
             <div class="lib-card-actions">
-              <button class="lib-card-btn" onclick="event.stopPropagation();delPlaylist('${pl.id}')" title="Удалить">
+              <button class="lib-card-btn" onclick="event.stopPropagation();delPlaylist('${pl.id}')" title="${owned ? 'Удалить' : 'Убрать'}">
                 <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
               </button>
             </div>
@@ -266,7 +288,7 @@ function renderLib(tab) {
         } else {
           html += `<div class="lib-list-item" onclick="(window.mrfGo||function(u){location.href=u})('${href}')">
             ${pl.cover ? `<img src="${pl.cover}" class="lib-list-cover" alt="">` : `<div class="lib-list-cover" style="display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--bg-3)">${noteSVGShared()}</div>`}
-            <div class="lib-list-info"><div class="lib-list-title">${escHtml(pl.name)}</div><div class="lib-list-sub">Плейлист · ${pl.trackCount || pl.tracks?.length || 0} треков</div></div>
+            <div class="lib-list-info"><div class="lib-list-title">${escHtml(pl.name)}</div><div class="lib-list-sub">${escHtml(listSub)}</div></div>
           </div>`;
         }
       });
@@ -334,6 +356,16 @@ function playFavs() {
 }
 
 function delPlaylist(id) {
+  const cur = Store.getPlaylist?.(id);
+  const owned = cur && typeof Store.isOwnedPlaylist === 'function' ? Store.isOwnedPlaylist(cur) : true;
+  if (!owned) {
+    Store.unsavePlaylist(id);
+    renderLib(_pageLibTab);
+    if (typeof renderSidebarPlaylists === 'function') renderSidebarPlaylists();
+    if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
+    showNotif('Убрано');
+    return;
+  }
   if (!confirm('Удалить плейлист?')) return;
   Store.deletePlaylist(id);
   renderLib(_pageLibTab);

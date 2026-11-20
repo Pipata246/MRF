@@ -90,27 +90,44 @@ function renderPlaylistsPage() {
 
   box.innerHTML = '<div class="lib-grid">' + pls.map(pl => {
     const href = typeof mrfUrl === 'function' ? mrfUrl('playlist', { id: pl.id }) : `playlist.html?id=${encodeURIComponent(pl.id)}`;
-    return `
-    <div class="lib-card" onclick="(window.mrfGo||function(u){location.href=u})('${href}')">
-      ${pl.cover ? `<img src="${pl.cover}" class="lib-card-cover" alt="">` : `<div class="lib-card-cover-placeholder">${noteSVGShared()}</div>`}
-      <div class="lib-card-body">
-        <div class="lib-card-title">${escHtml(pl.name)}</div>
-        <div class="lib-card-sub">${pl.trackCount || pl.tracks?.length || 0} треков</div>
-      </div>
-      <div class="lib-card-actions">
+    const owned = typeof Store.isOwnedPlaylist === 'function' ? Store.isOwnedPlaylist(pl) : !(pl.readOnly || pl.origin === 'saved');
+    let handle = '';
+    if (!owned && pl.author?.username) {
+      handle = window.MrfAuth?.displayUsername
+        ? MrfAuth.displayUsername(pl.author.username)
+        : ('@' + String(pl.author.username).replace(/^@+/, ''));
+    }
+    const sub = handle || `${pl.trackCount || pl.tracks?.length || 0} треков`;
+    const actions = owned
+      ? `<div class="lib-card-actions">
         <button class="lib-card-btn" onclick="event.stopPropagation();editPlaylistFromList('${pl.id}')" title="Переименовать">
           <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <button class="lib-card-btn" onclick="event.stopPropagation();deletePlaylistFromList('${pl.id}')" title="Удалить">
           <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </button>
+      </div>`
+      : `<div class="lib-card-actions">
+        <button class="lib-card-btn" onclick="event.stopPropagation();deletePlaylistFromList('${pl.id}')" title="Убрать">
+          <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>`;
+    return `
+    <div class="lib-card" onclick="(window.mrfGo||function(u){location.href=u})('${href}')">
+      ${pl.cover ? `<img src="${pl.cover}" class="lib-card-cover" alt="">` : `<div class="lib-card-cover-placeholder">${noteSVGShared()}</div>`}
+      <div class="lib-card-body">
+        <div class="lib-card-title">${escHtml(pl.name)}</div>
+        <div class="lib-card-sub">${escHtml(sub)}</div>
       </div>
+      ${actions}
     </div>`;
   }).join('') + '</div>';
 }
 window.renderPlaylistsPage = renderPlaylistsPage;
 
 function editPlaylistFromList(id) {
+  const cur = Store.getPlaylist(id);
+  if (cur && typeof Store.isOwnedPlaylist === 'function' && !Store.isOwnedPlaylist(cur)) return;
   if (typeof showRenamePlaylist === 'function') showRenamePlaylist(id);
   else {
     const pl = Store.getPlaylist(id);
@@ -125,6 +142,15 @@ function editPlaylistFromList(id) {
 }
 
 function deletePlaylistFromList(id) {
+  const cur = Store.getPlaylist(id);
+  const owned = cur && typeof Store.isOwnedPlaylist === 'function' ? Store.isOwnedPlaylist(cur) : true;
+  if (!owned) {
+    Store.unsavePlaylist(id);
+    if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();
+    else { renderPlaylistsPage(); renderSidebarPlaylists(); }
+    showNotif('Убрано');
+    return;
+  }
   if (!confirm('Удалить плейлист?')) return;
   Store.deletePlaylist(id);
   if (typeof notifyLibraryChanged === 'function') notifyLibraryChanged();

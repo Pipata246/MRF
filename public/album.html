@@ -121,14 +121,32 @@ async function loadAlbumPage(forced) {
 
   feed.innerHTML = `<div class="loading-placeholder"><span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>`;
 
-  // BACKEND TODO: Получение информации об альбоме
-  let album = {};
-  try { album = await dzObj(`/album/${id}`); } catch (_) { album = {}; }
-  if (gen !== window.__albumLoadGen || !document.getElementById('album-feed')) return;
-  if (album && album.error) album = {};
+  async function loadAlbumPayload(albumId) {
+    let alb = await dzObj(`/album/${albumId}`);
+    if (!alb || alb.error || !alb.id) alb = await dzObj(`/album/${albumId}`);
+    if (!alb || alb.error || !alb.id) return null;
+    let raw = Array.isArray(alb.tracks?.data) ? alb.tracks.data.slice() : [];
+    const need = Number(alb.nb_tracks) || 0;
+    if (!raw.length || (need && raw.length < need)) {
+      const page1 = await dzArr(`/album/${albumId}/tracks?limit=100`);
+      const page2 = page1.length >= 100
+        ? await dzArr(`/album/${albumId}/tracks?limit=100&index=100`)
+        : [];
+      const byId = new Map();
+      [...raw, ...page1, ...page2].forEach((t) => {
+        if (t && t.id != null) byId.set(String(t.id), t);
+      });
+      raw = [...byId.values()];
+    }
+    return { album: alb, raw };
+  }
 
-  if (!album || !album.id) {
-    // retry search
+  let packed = null;
+  try { packed = await loadAlbumPayload(id); } catch (_) { packed = null; }
+  if (gen !== window.__albumLoadGen || !document.getElementById('album-feed')) return;
+
+  if (!packed?.album?.id) {
+    // retry search by title+artist
     if (albumTitle || artistName) {
       try {
         const q = [albumTitle, artistName].filter(Boolean).join(' ');
@@ -140,16 +158,27 @@ async function loadAlbumPage(forced) {
         ) || found[0];
         if (exact?.id) {
           id = String(exact.id);
-          album = await dzObj(`/album/${id}`);
-          if (album && album.error) album = {};
-          try { history.replaceState({ mrfSoft: 1 }, '', mrfUrl('album', { id, title: album.title || albumTitle, artist: album.artist?.name || artistName })); } catch (_) {}
+          packed = await loadAlbumPayload(id);
+          if (packed?.album) {
+            try {
+              history.replaceState(
+                { mrfSoft: 1 },
+                '',
+                mrfUrl('album', {
+                  id,
+                  title: packed.album.title || albumTitle,
+                  artist: packed.album.artist?.name || artistName
+                })
+              );
+            } catch (_) {}
+          }
         }
       } catch (_) {}
     }
   }
   if (gen !== window.__albumLoadGen || !document.getElementById('album-feed')) return;
 
-  if (!album || !album.id) {
+  if (!packed?.album?.id) {
     feed.innerHTML = `
       <div class="search-empty" style="padding:48px 0;text-align:center">
         <p style="color:var(--text-3);margin-bottom:14px">Альбом не найден</p>
@@ -158,7 +187,8 @@ async function loadAlbumPage(forced) {
     return;
   }
 
-  const raw   = album.tracks?.data || [];
+  const album = packed.album;
+  const raw   = packed.raw || [];
   const aName = album.artist?.name || artistName;
   const aTitle= album.title || albumTitle;
   const cover = album.cover_xl || album.cover_medium || '';
@@ -168,7 +198,7 @@ async function loadAlbumPage(forced) {
     ...t,
     artist: { id: album.artist?.id, name: aName, picture_medium: album.artist?.picture_medium||'' },
     album:  { id, title: aTitle, cover_medium: album.cover_medium, cover: album.cover }
-  }));
+  })).filter(Boolean);
 
   document.title = aTitle + ' — MRF';
   const artistIdJs = album.artist?.id != null && String(album.artist.id) !== ''

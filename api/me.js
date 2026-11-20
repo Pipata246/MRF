@@ -38,7 +38,7 @@ function rowToSettings(row) {
     shuffleOnPlay: !!row.shuffle_on_play,
     rememberPosition: row.remember_position !== false,
     crossfadeSeconds: Math.max(0, Math.min(12, Number(row.crossfade_seconds) || 0)),
-    showExplicit: row.show_explicit !== false
+    showExplicit: true
   };
 }
 
@@ -66,7 +66,8 @@ function patchToRow(body) {
   if (src.crossfadeSeconds != null) {
     row.crossfade_seconds = Math.max(0, Math.min(12, Number(src.crossfadeSeconds) || 0));
   }
-  if (typeof src.showExplicit === 'boolean') row.show_explicit = src.showExplicit;
+  // Explicit always on — ignore client toggles
+  row.show_explicit = true;
   return row;
 }
 

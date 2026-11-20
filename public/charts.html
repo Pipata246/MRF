@@ -178,7 +178,7 @@ function rowHTMLChart(t, i) {
 function toggleFavChart(idx, btn) {
   if (typeof toggleFavByIdx === 'function') return toggleFavByIdx(idx, 'charts', btn);
   const t = _src['charts']?.[idx]; if (!t) return;
-  const added = Store.toggleFav({ id: t.id, title: t.title, artistName: t.artist?.name, artist: t.artist, cover: t.album?.cover_medium, album: t.album, duration: t.duration, preview: t.preview });
+  const added = Store.toggleFav({ id: t.id, deezerId: t.deezerId || (typeof deezerIdOf === 'function' ? deezerIdOf(t) : null), title: t.title, artistName: t.artist?.name, artist: t.artist, cover: t.album?.cover_medium, album: t.album, duration: t.duration, preview: t.preview });
   if (typeof applyLikeBtnState === 'function') applyLikeBtnState(btn, added);
   else { btn.classList.toggle('liked', added); btn.querySelector('path')?.setAttribute('fill', added ? 'currentColor' : 'none'); }
   updateFavBadge();
@@ -241,7 +241,7 @@ function rowHTMLChartRising(t, i) {
 function toggleFavRising(idx, btn) {
   if (typeof toggleFavByIdx === 'function') return toggleFavByIdx(idx, 'rising', btn);
   const t = _src['rising']?.[idx]; if (!t) return;
-  const added = Store.toggleFav({ id: t.id, title: t.title, artistName: t.artist?.name, artist: t.artist, cover: t.album?.cover_medium, album: t.album, duration: t.duration, preview: t.preview });
+  const added = Store.toggleFav({ id: t.id, deezerId: t.deezerId || (typeof deezerIdOf === 'function' ? deezerIdOf(t) : null), title: t.title, artistName: t.artist?.name, artist: t.artist, cover: t.album?.cover_medium, album: t.album, duration: t.duration, preview: t.preview });
   if (typeof applyLikeBtnState === 'function') applyLikeBtnState(btn, added);
   else { btn.classList.toggle('liked', added); btn.querySelector('path')?.setAttribute('fill', added ? 'currentColor' : 'none'); }
   updateFavBadge();

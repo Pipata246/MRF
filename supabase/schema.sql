@@ -76,20 +76,27 @@ create table if not exists public.saved_albums (
 create index if not exists saved_albums_user_saved_idx
   on public.saved_albums (user_id, saved_at desc);
 
--- ── Playlists (public flag for later) ──────────────────────
+-- ── Playlists (public searchable; default public) ──────────
 create table if not exists public.playlists (
   id text primary key,
   user_id uuid not null references public.profiles (id) on delete cascade,
   name text not null,
   description text not null default '',
   cover text,
-  is_public boolean not null default false,
+  is_public boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index if not exists playlists_user_updated_idx
   on public.playlists (user_id, updated_at desc);
+
+create index if not exists playlists_public_name_idx
+  on public.playlists (is_public, updated_at desc)
+  where is_public = true;
+
+create index if not exists playlists_public_name_lower_idx
+  on public.playlists (lower(name));
 
 create table if not exists public.playlist_tracks (
   id uuid primary key default gen_random_uuid(),
@@ -103,6 +110,21 @@ create table if not exists public.playlist_tracks (
 
 create index if not exists playlist_tracks_pl_pos_idx
   on public.playlist_tracks (playlist_id, position asc, added_at desc);
+
+-- Saved public playlists (reference → live updates from author)
+create table if not exists public.saved_playlists (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  playlist_id text not null references public.playlists (id) on delete cascade,
+  saved_at timestamptz not null default now(),
+  constraint saved_playlists_user_playlist unique (user_id, playlist_id)
+);
+
+create index if not exists saved_playlists_user_saved_idx
+  on public.saved_playlists (user_id, saved_at desc);
+
+create index if not exists saved_playlists_playlist_idx
+  on public.saved_playlists (playlist_id);
 
 create table if not exists public.recent_plays (
   id uuid primary key default gen_random_uuid(),
@@ -223,6 +245,19 @@ $$;
 revoke all on function public.username_available(text) from public;
 grant execute on function public.username_available(text) to anon, authenticated;
 
+-- ── Daily recommendation feed (stable until local midnight) ─
+create table if not exists public.user_recommendation_feeds (
+  user_id uuid primary key references public.profiles (id) on delete cascade,
+  local_day date not null,
+  timezone text not null default 'UTC',
+  payload jsonb not null default '{}'::jsonb,
+  generated_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists user_recommendation_feeds_day_idx
+  on public.user_recommendation_feeds (local_day);
+
 -- ── RLS ────────────────────────────────────────────────────
 alter table public.profiles enable row level security;
 alter table public.user_settings enable row level security;
@@ -231,8 +266,10 @@ alter table public.followed_artists enable row level security;
 alter table public.saved_albums enable row level security;
 alter table public.playlists enable row level security;
 alter table public.playlist_tracks enable row level security;
+alter table public.saved_playlists enable row level security;
 alter table public.recent_plays enable row level security;
 alter table public.search_history enable row level security;
+alter table public.user_recommendation_feeds enable row level security;
 
 -- Profiles: owner full access; public can read public playlist owners later
 drop policy if exists profiles_select_own on public.profiles;
@@ -263,10 +300,14 @@ drop policy if exists albums_all_own on public.saved_albums;
 create policy albums_all_own on public.saved_albums
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- Playlists (private for now; public read policy added later)
+-- Playlists: owner full access + public read
 drop policy if exists playlists_all_own on public.playlists;
 create policy playlists_all_own on public.playlists
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists playlists_select_public on public.playlists;
+create policy playlists_select_public on public.playlists
+  for select using (is_public = true);
 
 drop policy if exists playlist_tracks_all_own on public.playlist_tracks;
 create policy playlist_tracks_all_own on public.playlist_tracks
@@ -283,10 +324,36 @@ create policy playlist_tracks_all_own on public.playlist_tracks
     )
   );
 
+drop policy if exists playlist_tracks_select_public on public.playlist_tracks;
+create policy playlist_tracks_select_public on public.playlist_tracks
+  for select using (
+    exists (
+      select 1 from public.playlists p
+      where p.id = playlist_id and p.is_public = true
+    )
+  );
+
+drop policy if exists saved_playlists_all_own on public.saved_playlists;
+create policy saved_playlists_all_own on public.saved_playlists
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists profiles_select_public_authors on public.profiles;
+create policy profiles_select_public_authors on public.profiles
+  for select using (
+    exists (
+      select 1 from public.playlists p
+      where p.user_id = profiles.id and p.is_public = true
+    )
+  );
+
 drop policy if exists recent_plays_all_own on public.recent_plays;
 create policy recent_plays_all_own on public.recent_plays
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 drop policy if exists search_history_all_own on public.search_history;
 create policy search_history_all_own on public.search_history
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists rec_feeds_all_own on public.user_recommendation_feeds;
+create policy rec_feeds_all_own on public.user_recommendation_feeds
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

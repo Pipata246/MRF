@@ -87,21 +87,56 @@
       </section>
     </div>
 
-    <!-- ===== НАВИГАЦИЯ ПО МУЗЫКЕ ===== -->
+    <!-- ===== ЛИЧНОЕ / РЕКОМЕНДАЦИИ ===== -->
+    <div class="feed-zone feed-zone-personal" id="home-personal-zone">
+      <div class="feed-zone-head">
+        <h2 class="feed-zone-title">Твоя музыка</h2>
+      </div>
+
+      <div id="home-personal-guest" class="home-auth-cta hidden" role="status">
+        <p class="home-auth-cta-title">Войдите, чтобы видеть рекомендации</p>
+        <div class="home-auth-cta-actions">
+          <button type="button" class="btn-primary" onclick="goProfile()">Войти</button>
+          <button type="button" class="btn-secondary" onclick="goProfile()">Регистрация</button>
+        </div>
+      </div>
+
+      <div id="home-recs-root" class="home-recs-root" aria-live="polite"></div>
+
+      <div id="home-personal-library" class="home-personal-library hidden">
+        <section class="section">
+          <div class="section-header">
+            <h3 class="section-title">Недавно прослушанное</h3>
+            <div class="section-header-actions">
+              <a href="library.html" class="section-link">Вся библиотека →</a>
+              <div class="rail-nav" data-rail="recent-rail"></div>
+            </div>
+          </div>
+          <div class="rail-wrap">
+            <div class="recent-rail" id="recent-rail"></div>
+          </div>
+        </section>
+
+        <section class="section" id="my-playlists-section" style="display:none">
+          <div class="section-header">
+            <h3 class="section-title">Мои плейлисты</h3>
+            <div class="section-header-actions">
+              <a href="library.html" class="section-link">Все плейлисты →</a>
+              <div class="rail-nav" data-rail="my-playlists-row"></div>
+            </div>
+          </div>
+          <div class="rail-wrap">
+            <div class="horiz-scroll" id="my-playlists-row"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ===== НАСТРОЕНИЕ ===== -->
     <div class="feed-zone">
       <div class="feed-zone-head">
         <h2 class="feed-zone-title">Найди своё</h2>
       </div>
-
-      <section class="section">
-        <div class="section-header">
-          <h3 class="section-title">Жанры</h3>
-          <div class="rail-nav" data-rail="genre-catalog"></div>
-        </div>
-        <div class="rail-wrap">
-          <div class="genre-ribbon" id="genre-catalog"></div>
-        </div>
-      </section>
 
       <section class="section">
         <div class="section-header">
@@ -110,54 +145,6 @@
         <div class="mood-grid" id="mood-grid"></div>
       </section>
 
-    </div>
-
-    <!-- ===== ЛИЧНОЕ ===== -->
-    <div class="feed-zone feed-zone-personal">
-      <div class="feed-zone-head">
-        <h2 class="feed-zone-title">Твоя музыка</h2>
-      </div>
-
-      <section class="section">
-        <div class="section-header">
-          <h3 class="section-title">Для вас</h3>
-          <div class="section-header-actions">
-            <a href="search.html" class="section-link">Ещё →</a>
-            <div class="rail-nav" data-rail="for-you-row"></div>
-          </div>
-        </div>
-        <div class="rail-wrap">
-          <div class="horiz-scroll" id="for-you-row">
-            <div class="loading-placeholder" style="width:100%;min-height:150px;padding:24px 0"><span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-header">
-          <h3 class="section-title">Недавно прослушанное</h3>
-          <div class="section-header-actions">
-            <a href="library.html" class="section-link">Вся библиотека →</a>
-            <div class="rail-nav" data-rail="recent-rail"></div>
-          </div>
-        </div>
-        <div class="rail-wrap">
-          <div class="recent-rail" id="recent-rail"></div>
-        </div>
-      </section>
-
-      <section class="section" id="my-playlists-section" style="display:none">
-        <div class="section-header">
-          <h3 class="section-title">Мои плейлисты</h3>
-          <div class="section-header-actions">
-            <a href="library.html" class="section-link">Все плейлисты →</a>
-            <div class="rail-nav" data-rail="my-playlists-row"></div>
-          </div>
-        </div>
-        <div class="rail-wrap">
-          <div class="horiz-scroll" id="my-playlists-row"></div>
-        </div>
-      </section>
     </div>
 
   </div>
@@ -177,7 +164,7 @@ whenDomReady(() => {
   if (window.MrfAuth && typeof MrfAuth.onChange === 'function' && !window.__mrfHomeAuthBound) {
     window.__mrfHomeAuthBound = true;
     MrfAuth.onChange(() => {
-      if (typeof renderHomeRecent === 'function') renderHomeRecent();
+      if (typeof renderPersonalHome === 'function') renderPersonalHome();
     });
   }
   // Soft-nav calls loadHomePage itself — avoid duplicate parallel Deezer flood
@@ -191,22 +178,58 @@ function goSearch(tag) {
   else location.href = url;
 }
 
+async function applyHomeWorldCache(cache) {
+  if (!cache) return;
+  if (cache.homeTracks) {
+    _src['home'] = cache.homeTracks;
+    fillHomeFeature(cache.homeTracks[0] || null);
+    const box = document.getElementById('home-charts-list');
+    if (box) {
+      box.innerHTML = cache.homeTracks.length
+        ? `<div class="track-list">${cache.homeTracks.map((t, i) => rowHTML(t, i, 'home')).join('')}</div>`
+        : '';
+    }
+  }
+  if (cache.releases) await renderNewReleases(cache.releases);
+  if (cache.artists) await renderHomeArtists(cache.artists);
+  if (typeof syncPlayingRows === 'function') syncPlayingRows();
+}
+
 async function loadHomePage() {
+  const day = typeof mrfLocalDay === 'function' ? mrfLocalDay() : '';
   try {
     bindHomeRails();
-    renderHomeRecent();
     renderHomeMoods();
-    await Promise.all([
-      renderHomeGenres(),
-      renderHomeCharts(),
-      renderForYou(),
-      renderNewReleases(),
-      renderHomeArtists()
-    ]);
-    renderHomePlaylists();
+    purgeExploreIfNewDay();
+    const wcache = window.__mrfHomeWorldCache;
+    const worldHit = !!(wcache && wcache.localDay === day && wcache.ready);
+    // World + personal in parallel — don't stall recs behind charts/rails
+    const worldPromise = (async () => {
+      if (worldHit) {
+        await applyHomeWorldCache(wcache);
+        return;
+      }
+      await Promise.all([
+        renderHomeCharts(),
+        renderNewReleases(),
+        renderHomeArtists()
+      ]);
+      window.__mrfHomeWorldCache = {
+        localDay: day,
+        ready: true,
+        homeTracks: (_src['home'] || []).slice(),
+        releases: (window.__mrfHomeLastReleases || []).slice(),
+        artists: (window.__mrfHomeLastArtists || []).slice()
+      };
+    })();
+    await Promise.all([worldPromise, renderPersonalHome()]);
     bindHomeRails();
   } catch (err) {
     console.error('[HOME] Error loading:', err);
+  } finally {
+    if (typeof mrfFlushPendingScroll === 'function') mrfFlushPendingScroll();
+    else if (typeof mrfRestorePageScroll === 'function') mrfRestorePageScroll();
+    scheduleExplorePrefetch();
   }
 }
 window.loadHomePage = loadHomePage;
@@ -214,19 +237,16 @@ window.loadHomePage = loadHomePage;
 function renderHomeRecent() {
   const box = document.getElementById('recent-rail');
   if (!box) return;
+  // No local boot spinner — page-boot covers refresh; stay empty until auth/data ready
   if (typeof mrfAuthPending === 'function' && mrfAuthPending()) {
     _src['recent'] = [];
-    box.innerHTML = typeof mrfAuthBootHTML === 'function' ? mrfAuthBootHTML({ compact: true }) : '';
+    box.innerHTML = '';
     return;
   }
   const loggedIn = typeof mrfIsLoggedIn === 'function' ? mrfIsLoggedIn() : !!(window.MrfAuth?.session?.user);
   if (!loggedIn) {
     _src['recent'] = [];
-    box.innerHTML = `<div class="rail-guest-hint" role="status">
-      <p class="rail-guest-hint-text">Войдите в аккаунт</p>
-      <button type="button" class="btn-secondary rail-guest-hint-btn" onclick="goProfile()">Войти</button>
-    </div>`;
-    if (typeof bindHomeRails === 'function') bindHomeRails();
+    box.innerHTML = '';
     return;
   }
   const recent = Store.getRecent();
@@ -337,8 +357,8 @@ function renderHomeMoods() {
   const box = document.getElementById('mood-grid');
   if (!box) return;
   box.className = 'mood-rail';
-  box.innerHTML = MOCK.moods.map(m => `
-    <button type="button" class="mood-card" onclick="goSearch('${escHtml(m.tag)}')">
+  box.innerHTML = (MOCK.moods || []).map(m => `
+    <button type="button" class="mood-card" data-explore-kind="mood" data-explore-id="${escHtml(m.id)}" data-explore-name="${escHtml(m.name)}" data-explore-tag="${escHtml(m.tag)}" data-explore-color="${escHtml(m.color || '')}" data-explore-cover="${escHtml(m.image || '')}">
       <span class="mood-card-media" style="background-image:url('${m.image}');background-color:${m.color}"></span>
       <span class="mood-card-shade"></span>
       <span class="mood-card-copy">
@@ -346,45 +366,21 @@ function renderHomeMoods() {
         <span class="mood-card-hint">${escHtml(m.hint || '')}</span>
       </span>
     </button>`).join('');
-}
-
-async function renderHomeGenres() {
-  const box = document.getElementById('genre-catalog');
-  if (!box) return;
-
-  const wanted = [
-    { id: 132, name: 'Поп', tag: 'pop' },
-    { id: 152, name: 'Рок', tag: 'rock' },
-    { id: 116, name: 'Хип-хоп', tag: 'hip-hop' },
-    { id: 106, name: 'Электронная', tag: 'electronic' },
-    { id: 129, name: 'Джаз', tag: 'jazz' },
-    { id: 165, name: 'R&B', tag: 'rnb' },
-    { id: 85, name: 'Инди', tag: 'indie' },
-    { id: 464, name: 'Метал', tag: 'metal' },
-    { id: 98, name: 'Классика', tag: 'classical' },
-    { id: 169, name: 'Soul', tag: 'soul' },
-  ];
-
-  let byId = {};
-  try {
-    const list = await dzArr('/genre');
-    list.forEach(g => { byId[g.id] = g; });
-  } catch (_) {}
-
-  box.innerHTML = wanted.map(g => {
-    const src = byId[g.id]?.picture_medium || byId[g.id]?.picture || '';
-    return `
-    <button type="button" class="genre-poster" onclick="goSearch('${escHtml(g.tag)}')">
-      <span class="genre-poster-art">
-        ${src
-          ? `<img src="${src}" alt="" loading="lazy" decoding="async">`
-          : `<span class="genre-poster-fallback"></span>`}
-      </span>
-      <span class="genre-poster-name">${escHtml(g.name)}</span>
-    </button>`;
-  }).join('');
-
-  bindHomeRails();
+  if (box.dataset.exploreBound !== '1') {
+    box.dataset.exploreBound = '1';
+    box.addEventListener('click', (e) => {
+      const btn = e.target.closest?.('[data-explore-kind]');
+      if (!btn) return;
+      openExploreMix({
+        kind: btn.getAttribute('data-explore-kind'),
+        id: btn.getAttribute('data-explore-id'),
+        name: btn.getAttribute('data-explore-name'),
+        tag: btn.getAttribute('data-explore-tag'),
+        color: btn.getAttribute('data-explore-color'),
+        cover: btn.getAttribute('data-explore-cover')
+      });
+    });
+  }
 }
 
 function railNavHTML() {
@@ -496,36 +492,867 @@ function renderHomePlaylists() {
   section.style.display = '';
   row.innerHTML = pls.map(pl => {
     const href = typeof mrfUrl === 'function' ? mrfUrl('playlist', { id: pl.id }) : `playlist.html?id=${encodeURIComponent(pl.id)}`;
+    const owned = typeof Store.isOwnedPlaylist === 'function' ? Store.isOwnedPlaylist(pl) : !(pl.readOnly || pl.origin === 'saved');
+    let sub = `${pl.trackCount || pl.tracks?.length || 0} треков`;
+    if (!owned && pl.author?.username) {
+      sub = window.MrfAuth?.displayUsername
+        ? MrfAuth.displayUsername(pl.author.username)
+        : ('@' + String(pl.author.username).replace(/^@+/, ''));
+    }
     return `
     <button type="button" class="cover-card" onclick="(window.mrfGo||function(u){location.href=u})('${href}')">
       ${pl.cover ? `<img src="${pl.cover}" class="cover-card-art" alt="">` : `<span class="cover-card-art cover-card-fallback">${noteSVGShared()}</span>`}
       <span class="cover-card-title">${escHtml(pl.name)}</span>
-      <span class="cover-card-sub">${pl.trackCount || pl.tracks?.length || 0} треков</span>
+      <span class="cover-card-sub">${escHtml(sub)}</span>
     </button>`;
   }).join('');
   if (typeof bindHomeRails === 'function') bindHomeRails();
 }
 window.renderHomePlaylists = renderHomePlaylists;
 
-async function renderForYou() {
-  const box = document.getElementById('for-you-row');
-  if (!box) return;
-  // BACKEND TODO: Получение рекомендаций
-  const tracks = (await dzArr('/chart/0/tracks?limit=12')).map(normDZ).slice(0, 8);
-  _src['foryou'] = tracks;
-  box.innerHTML = tracks.map((t, i) => `
-    <button type="button" class="cover-card" onclick="playFromSrc('foryou',${i})">
-      ${t.album?.cover_medium ? `<img src="${t.album.cover_medium}" class="cover-card-art" alt="">` : `<span class="cover-card-art cover-card-fallback">${noteSVGShared()}</span>`}
-      <span class="cover-card-title">${escHtml(t.title)}</span>
-      <span class="cover-card-sub">${escHtml(t.artist?.name||'')}</span>
-    </button>`).join('') || '<p style="color:var(--text-3)">Нет рекомендаций</p>';
+function homeTrackCards(tracks, srcKey) {
+  _src[srcKey] = tracks || [];
+  return (tracks || []).map((t, i) => `
+    <button type="button" class="cover-card" onclick="playFromSrc('${srcKey}',${i})">
+      ${t.album?.cover_medium || t.album?.cover
+        ? `<img src="${t.album.cover_medium || t.album.cover}" class="cover-card-art" alt="" loading="lazy">`
+        : `<span class="cover-card-art cover-card-fallback">${noteSVGShared()}</span>`}
+      <span class="cover-card-title">${escHtml(t.title || '')}</span>
+      <span class="cover-card-sub">${escHtml(t.artist?.name || t.artistName || '')}</span>
+    </button>`).join('');
 }
 
-async function renderNewReleases() {
+function homeArtistCards(artists) {
+  const js = typeof jsStr === 'function' ? jsStr : (s => String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+  const seen = new Set();
+  return (artists || []).filter((a) => {
+    const k = a.id != null ? `id:${a.id}` : `n:${String(a.name || '').toLowerCase()}`;
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return !!(a.name || a.id);
+  }).map(a => {
+    const idArg = a.id != null && String(a.id) !== '' ? `'${js(a.id)}'` : 'null';
+    const nameArg = `'${js(a.name || '')}'`;
+    const pic = a.picture_medium || a.picture_xl || a.picture || '';
+    const initial = escHtml((a.name || '?').trim().charAt(0) || '?');
+    // One avatar slot only — onerror swaps img for letter fallback (no duplicate circles)
+    const ava = pic
+      ? `<img class="artist-chip-img" src="${pic}" alt="" loading="lazy" onerror="this.outerHTML='<span class=\\'artist-chip-img artist-chip-fallback\\'>${initial}</span>'">`
+      : `<span class="artist-chip-img artist-chip-fallback">${initial}</span>`;
+    return `
+    <button type="button" class="artist-chip" onclick="openArtist(${idArg},${nameArg})">
+      ${ava}
+      <span class="artist-chip-name">${escHtml(a.name || '')}</span>
+    </button>`;
+  }).join('');
+}
+
+function homeAlbumCards(albums) {
+  return (albums || []).map(a => {
+    const href = mrfUrl('album', { id: a.id, title: a.title || '', artist: a.artistName || a.artist?.name || '' });
+    const cover = a.cover_medium || a.cover || '';
+    return `
+    <button type="button" class="cover-card" onclick="(window.mrfGo||function(u){location.href=u})('${href}')">
+      ${cover ? `<img src="${cover}" class="cover-card-art" alt="" loading="lazy">` : `<span class="cover-card-art cover-card-fallback">${noteSVGShared()}</span>`}
+      <span class="cover-card-title">${escHtml(a.title || '')}</span>
+      <span class="cover-card-sub">${escHtml(a.artistName || a.artist?.name || '')}</span>
+    </button>`;
+  }).join('');
+}
+
+function homeMixCards(playlists, sectionId) {
+  window.__mrfRecMixes = window.__mrfRecMixes || {};
+  const prefix = String(sectionId || 'mix').replace(/[^\w.-]+/g, '_');
+  return (playlists || []).map((pl, i) => {
+    // Unique per section — otherwise «Плейлист дня» overwrites mfy_0 of artist mixes
+    const key = `mfy_${prefix}_${i}`;
+    _src[key] = pl.tracks || [];
+    window.__mrfRecMixes[key] = pl;
+    const cover =
+      pl.cover ||
+      pl.tracks?.[0]?.album?.cover_medium ||
+      pl.tracks?.[0]?.album?.cover ||
+      pl.tracks?.[0]?.cover ||
+      '';
+    const sub = (pl.artists && pl.artists.length)
+      ? pl.artists.slice(0, 3).join(', ')
+      : `${pl.trackCount || pl.tracks?.length || 0} треков`;
+    const isDay = pl.kind === 'day' || String(pl.id || '').includes('playlist_of_the_day');
+    const title = pl.name
+      || (isDay && typeof mrfDayPlaylistTitle === 'function' ? mrfDayPlaylistTitle(pl.localDay) : null)
+      || 'Микс';
+    // Same cover-card language as the rest of the app (not Spotify clone)
+    return `
+    <button type="button" class="cover-card${isDay ? ' is-day-pl-card' : ''}" onclick="openRecMix('${key}')">
+      ${cover
+        ? `<img src="${cover}" class="cover-card-art" alt="" loading="lazy">`
+        : `<span class="cover-card-art cover-card-fallback">${noteSVGShared()}</span>`}
+      <span class="cover-card-title">${escHtml(title)}</span>
+      <span class="cover-card-sub">${escHtml(sub)}</span>
+    </button>`;
+  }).join('');
+}
+
+function openRecMix(key) {
+  const pl = window.__mrfRecMixes && window.__mrfRecMixes[key];
+  const tracks = (_src && _src[key]) || pl?.tracks || [];
+  if (!pl || !tracks.length) return;
+  if (typeof mrfSavePageScroll === 'function') mrfSavePageScroll();
+  const id = 'rec_' + String(pl.id || key).replace(/[^\w.-]+/g, '_');
+  const isDay = pl.kind === 'day' || String(pl.id || '').includes('playlist_of_the_day');
+  const name = pl.name
+    || (isDay && typeof mrfDayPlaylistTitle === 'function' ? mrfDayPlaylistTitle(pl.localDay) : null)
+    || 'Микс';
+  const payload = {
+    id,
+    name,
+    kind: pl.kind || (isDay ? 'day' : 'artist'),
+    daySlot: pl.daySlot,
+    localDay: pl.localDay || (typeof mrfLocalDay === 'function' ? mrfLocalDay() : null),
+    cover: pl.cover || tracks[0]?.album?.cover_medium || null,
+    tracks,
+    trackCount: tracks.length,
+    readOnly: true,
+    canSave: true
+  };
+  try { sessionStorage.setItem('mrf_virtual_playlist', JSON.stringify(payload)); } catch (_) {}
+  const url = typeof mrfUrl === 'function' ? mrfUrl('playlist', { id }) : `playlist.html?id=${encodeURIComponent(id)}`;
+  if (typeof mrfGo === 'function') mrfGo(url);
+  else location.href = url;
+}
+window.openRecMix = openRecMix;
+
+/* ── Mood explore mixes via /api/recommendations?resource=mood ── */
+window.__mrfExploreMixes = window.__mrfExploreMixes || {};
+window.__mrfExploreInflight = window.__mrfExploreInflight || {};
+
+function exploreLocalDay() {
+  return typeof mrfLocalDay === 'function' ? mrfLocalDay() : '';
+}
+
+function purgeExploreIfNewDay() {
+  const day = exploreLocalDay();
+  if (window.__mrfExploreDay === day) return;
+  window.__mrfExploreDay = day;
+  window.__mrfExploreMixes = {};
+  window.__mrfExploreInflight = {};
+  window.__mrfExplorePrefetchStarted = false;
+  window.__mrfExplorePrefetchDay = null;
+}
+
+function exploreMixKey(kind, id) {
+  return `${String(kind || 'x')}_${String(id || '')}`;
+}
+
+function exploreCacheStorageKey(kind, id) {
+  // v5 — moods from /api/recommendations?resource=mood
+  return `mrf_explore_mix_v5_${exploreLocalDay()}_${exploreMixKey(kind, id)}`;
+}
+
+function readExploreMixCache(kind, id) {
+  purgeExploreIfNewDay();
+  const day = exploreLocalDay();
+  const memKey = exploreMixKey(kind, id);
+  const mem = window.__mrfExploreMixes[memKey];
+  if (mem?.tracks?.length && (!mem.localDay || mem.localDay === day)) return mem;
+  try {
+    const raw = sessionStorage.getItem(exploreCacheStorageKey(kind, id));
+    if (!raw) return null;
+    const pl = JSON.parse(raw);
+    if (!pl?.tracks?.length) return null;
+    if (pl.localDay && pl.localDay !== day) return null;
+    pl.localDay = day;
+    window.__mrfExploreMixes[memKey] = pl;
+    return pl;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeExploreMixCache(kind, id, pl) {
+  const day = exploreLocalDay();
+  const memKey = exploreMixKey(kind, id);
+  const payload = { ...pl, localDay: day };
+  window.__mrfExploreMixes[memKey] = payload;
+  try { sessionStorage.setItem(exploreCacheStorageKey(kind, id), JSON.stringify(payload)); } catch (_) {}
+}
+
+function explorePickArtists(tracks, want = 4) {
+  const artistNames = [];
+  const seenN = new Set();
+  for (const t of tracks || []) {
+    const n = t.artist?.name || t.artistName;
+    if (!n || seenN.has(n.toLowerCase())) continue;
+    seenN.add(n.toLowerCase());
+    artistNames.push(n);
+    if (artistNames.length >= want) break;
+  }
+  return artistNames;
+}
+
+async function fetchMoodMixFromApi(moodId) {
+  const id = String(moodId || '').trim();
+  if (!id) return null;
+  const q = new URLSearchParams();
+  q.set('resource', 'mood');
+  q.set('id', id);
+  try {
+    if (typeof mrfLocalDay === 'function') q.set('day', mrfLocalDay());
+    if (typeof Intl !== 'undefined') {
+      q.set('tz', Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+    }
+    q.set('offset', String(-new Date().getTimezoneOffset()));
+  } catch (_) {}
+  const res = await fetch(`/api/recommendations?${q}`, { credentials: 'same-origin' });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const pl = data?.playlist;
+  if (!pl?.tracks?.length) return null;
+  return {
+    id: pl.id || `mood_${id}`,
+    kind: 'mood',
+    name: pl.name || '',
+    tag: pl.tag || '',
+    artists: pl.artists || explorePickArtists(pl.tracks),
+    cover: pl.cover || '',
+    color: pl.color || '',
+    trackCount: pl.tracks.length,
+    tracks: (pl.tracks || []).map((t) => homeNormLocalTrack(t)).filter(Boolean),
+    localDay: pl.localDay || exploreLocalDay(),
+    readOnly: true,
+    canSave: true
+  };
+}
+
+async function ensureExploreMix(spec) {
+  const kind = String(spec?.kind || '');
+  const id = String(spec?.id || '');
+  if (kind !== 'mood' || !id) return null;
+  const cached = readExploreMixCache(kind, id);
+  if (cached?.tracks?.length >= 20) return cached;
+  const flightKey = exploreMixKey(kind, id);
+  if (window.__mrfExploreInflight[flightKey]) return window.__mrfExploreInflight[flightKey];
+  window.__mrfExploreInflight[flightKey] = (async () => {
+    const pl = await fetchMoodMixFromApi(id);
+    if (pl?.tracks?.length) writeExploreMixCache(kind, id, pl);
+    return pl;
+  })().finally(() => {
+    delete window.__mrfExploreInflight[flightKey];
+  });
+  return window.__mrfExploreInflight[flightKey];
+}
+
+function openVirtualExplorePlaylist(pl) {
+  if (!pl?.tracks?.length) return;
+  const id = 'rec_' + String(pl.id || 'explore').replace(/[^\w.-]+/g, '_');
+  const payload = {
+    id,
+    name: pl.name || 'Подборка',
+    kind: pl.kind || 'mood',
+    cover: pl.cover || pl.tracks[0]?.album?.cover_medium || null,
+    tracks: pl.tracks,
+    trackCount: pl.tracks.length,
+    localDay: pl.localDay || exploreLocalDay(),
+    readOnly: true,
+    canSave: true,
+    artists: pl.artists || []
+  };
+  try { sessionStorage.setItem('mrf_virtual_playlist', JSON.stringify(payload)); } catch (_) {}
+  const url = typeof mrfUrl === 'function' ? mrfUrl('playlist', { id }) : `playlist.html?id=${encodeURIComponent(id)}`;
+  if (typeof mrfGo === 'function') mrfGo(url);
+  else location.href = url;
+}
+
+async function openExploreMix(spec) {
+  if (!spec?.kind || !spec?.id) return;
+  const btnKey = exploreMixKey(spec.kind, spec.id);
+  if (window.__mrfExploreOpening === btnKey) return;
+  window.__mrfExploreOpening = btnKey;
+  try {
+    if (typeof mrfSavePageScroll === 'function') mrfSavePageScroll();
+    let pl = readExploreMixCache(spec.kind, spec.id);
+    if (!pl?.tracks?.length) {
+      if (typeof showNotif === 'function') showNotif('Собираем подборку…');
+      pl = await ensureExploreMix(spec);
+    }
+    if (!pl?.tracks?.length) {
+      if (typeof showNotif === 'function') showNotif('Не удалось собрать подборку');
+      return;
+    }
+    openVirtualExplorePlaylist(pl);
+  } finally {
+    if (window.__mrfExploreOpening === btnKey) window.__mrfExploreOpening = null;
+  }
+}
+window.openExploreMix = openExploreMix;
+window.ensureExploreMix = ensureExploreMix;
+
+function scheduleExplorePrefetch() {
+  purgeExploreIfNewDay();
+  const day = exploreLocalDay();
+  if (window.__mrfExplorePrefetchDay === day && window.__mrfExplorePrefetchStarted) return;
+
+  const start = () => {
+    if (window.__mrfExplorePrefetchDay === day && window.__mrfExplorePrefetchStarted) return;
+    window.__mrfExplorePrefetchStarted = true;
+    window.__mrfExplorePrefetchDay = day;
+    const jobs = [];
+    for (const m of (MOCK.moods || [])) {
+      jobs.push({
+        kind: 'mood',
+        id: String(m.id),
+        name: m.name,
+        tag: m.tag,
+        color: m.color || '',
+        cover: m.image || ''
+      });
+    }
+    let i = 0;
+    const tick = () => {
+      if (i >= jobs.length) return;
+      try {
+        if (typeof getPageId === 'function' && getPageId() !== 'index') {
+          window.__mrfExplorePrefetchStarted = false;
+          return;
+        }
+      } catch (_) {}
+      const spec = jobs[i++];
+      if (readExploreMixCache(spec.kind, spec.id)?.tracks?.length) {
+        setTimeout(tick, 80);
+        return;
+      }
+      // Slow drip — never fight home paint / scroll
+      ensureExploreMix(spec).finally(() => setTimeout(tick, 700));
+    };
+    tick();
+  };
+
+  // Wait until mood block is near viewport, then idle
+  const anchor = document.getElementById('mood-grid')
+    || document.querySelector('.feed-zone:last-of-type');
+  const arm = () => {
+    const runIdle = () => {
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(() => start(), { timeout: 2500 });
+      } else {
+        setTimeout(start, 1200);
+      }
+    };
+    if (!anchor || typeof IntersectionObserver !== 'function') {
+      setTimeout(runIdle, 2800);
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      runIdle();
+    }, { root: document.getElementById('feed'), rootMargin: '240px 0px', threshold: 0.01 });
+    io.observe(anchor);
+  };
+  setTimeout(arm, 400);
+}
+
+function saveRecMix(key) {
+  if (typeof mrfRequireLogin === 'function' && !mrfRequireLogin({ message: 'Чтобы сохранить микс, войди в аккаунт' })) return;
+  const pl = window.__mrfRecMixes && window.__mrfRecMixes[key];
+  const tracks = (_src && _src[key]) || pl?.tracks || [];
+  if (!tracks.length || typeof Store === 'undefined' || typeof Store.createPlaylist !== 'function') {
+    if (typeof showNotif === 'function') showNotif('Нечего сохранять');
+    return;
+  }
+  const name = pl?.name || 'Микс';
+  const created = Store.createPlaylist(name, '');
+  if (!created) return;
+  if (pl?.cover) Store.updatePlaylist(created.id, { cover: pl.cover });
+  tracks.forEach((t) => Store.addTrackToPlaylist(created.id, t));
+  if (typeof showNotif === 'function') showNotif('Микс в библиотеке');
+  if (typeof renderHomePlaylists === 'function') renderHomePlaylists();
+}
+window.saveRecMix = saveRecMix;
+
+function renderRecSections(sections) {
+  const root = document.getElementById('home-recs-root');
+  if (!root) return;
+  if (!sections?.length) {
+    root.innerHTML = '';
+    return false;
+  }
+  window.__mrfRecMixes = {};
+  root.innerHTML = sections.map((sec) => {
+    const railId = `rec-rail-${sec.id}`;
+    let body = '';
+    let railClass = 'horiz-scroll';
+    if (sec.type === 'tracks') body = homeTrackCards(sec.items, sec.id);
+    else if (sec.type === 'artists') {
+      railClass = 'home-artist-row';
+      body = homeArtistCards(sec.items);
+    } else if (sec.type === 'albums') body = homeAlbumCards(sec.items);
+    else if (sec.type === 'mixes' || sec.type === 'playlists') {
+      body = homeMixCards(sec.items, sec.id);
+      if (sec.id === 'playlistOfTheDay') railClass = 'horiz-scroll day-pl-rail';
+    }
+    if (!body) return '';
+    return `
+      <section class="section${sec.id === 'playlistOfTheDay' ? ' day-pl-section' : ''}">
+        <div class="section-header">
+          <h3 class="section-title">${escHtml(sec.title || '')}</h3>
+          <div class="rail-nav" data-rail="${railId}"></div>
+        </div>
+        <div class="rail-wrap">
+          <div class="${railClass}" id="${railId}">${body}</div>
+        </div>
+      </section>`;
+  }).join('');
+  return true;
+}
+
+function homeNormLocalTrack(t) {
+  if (!t) return null;
+  if (typeof isSpokenOrNonMusic === 'function' && isSpokenOrNonMusic(t)) return null;
+  const artistName = typeof t.artist === 'string' ? t.artist : (t.artist?.name || t.artistName || '');
+  const cover = t.cover || t.album?.cover_medium || t.album?.cover || '';
+  return {
+    id: t.id || (t.deezerId ? `dz_${t.deezerId}` : null),
+    deezerId: t.deezerId || (String(t.id || '').startsWith('dz_') ? String(t.id).slice(3) : null),
+    title: t.title || '',
+    artist: t.artist && typeof t.artist === 'object' ? t.artist : { name: artistName, id: t.artistId || null },
+    artistName,
+    album: t.album || { cover_medium: cover, cover },
+    preview: t.preview || null,
+    duration: t.duration || 0,
+    source: t.source || 'deezer'
+  };
+}
+
+function homeDedupeLocal(list) {
+  const seen = new Set();
+  const out = [];
+  for (const t of list || []) {
+    if (!t) continue;
+    const k = String(t.deezerId || t.id || `${t.title}|${t.artistName || t.artist?.name || ''}`).toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+  }
+  return out;
+}
+
+function homeShuffle(arr) {
+  const a = (arr || []).slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function homeDzId(t) {
+  return String(t?.deezerId || String(t?.id || '').replace(/^dz_/i, '') || '');
+}
+
+function homeLikedSet(likes) {
+  const s = new Set();
+  (likes || []).forEach((t) => {
+    const id = homeDzId(t);
+    if (id) s.add(id);
+    s.add(`${(t.title || '').toLowerCase()}|${(t.artistName || t.artist?.name || '').toLowerCase()}`);
+  });
+  return s;
+}
+
+function homeNotLiked(list, banned) {
+  return (list || []).filter((t) => {
+    const id = homeDzId(t);
+    if (id && banned.has(id)) return false;
+    const k = `${(t.title || '').toLowerCase()}|${(t.artistName || t.artist?.name || '').toLowerCase()}`;
+    return !banned.has(k);
+  });
+}
+
+async function homeSimilarAround(seeds, banned, want) {
+  const target = Math.max(Number(want) || 50, 8);
+  const picks = homeShuffle(seeds || []).slice(0, 6);
+  let out = [];
+  const names = [...new Set(picks.map((t) => t.artist?.name || t.artistName).filter(Boolean))].slice(0, 5);
+  for (const n of names) {
+    const a = await dzArr(`/search/track?q=${encodeURIComponent(n)}&limit=25`);
+    const b = await dzArr(`/search/track?q=${encodeURIComponent(n)}&limit=25&index=25`);
+    out = out.concat(a.map(normDZ).filter(Boolean), b.map(normDZ).filter(Boolean));
+  }
+  for (const seed of picks) {
+    const aid = seed.artist?.id;
+    if (aid && /^\d+$/.test(String(aid))) {
+      const top = await dzArr(`/artist/${aid}/top?limit=50`);
+      out = out.concat(top.map(normDZ).filter(Boolean));
+    }
+  }
+  let list = homeNotLiked(homeDedupeLocal(out), banned);
+  if (list.length < Math.min(12, target)) list = homeDedupeLocal(out);
+  return homeShuffle(list).slice(0, target);
+}
+
+async function homeHydrateArtist(a) {
+  if (!a) return a;
+  if (a.picture_medium || a.picture_xl) return a;
+  try {
+    if (a.id && /^\d+$/.test(String(a.id))) {
+      const full = await dzObj(`/artist/${a.id}`);
+      if (full?.id) {
+        return {
+          ...a,
+          name: a.name || full.name,
+          picture_medium: full.picture_medium || full.picture || '',
+          picture_xl: full.picture_xl || ''
+        };
+      }
+    }
+    if (a.name) {
+      const found = await dzArr(`/search/artist?q=${encodeURIComponent(a.name)}&limit=5`);
+      const hit = found.find((x) => String(x.name || '').toLowerCase() === String(a.name).toLowerCase()) || found[0];
+      if (hit) {
+        return {
+          ...a,
+          id: a.id || hit.id,
+          picture_medium: hit.picture_medium || '',
+          picture_xl: hit.picture_xl || ''
+        };
+      }
+    }
+  } catch (_) {}
+  return a;
+}
+
+const HOME_MIX_COLORS = ['#E91E8C', '#5B8DEF', '#E85D4C', '#C9A227', '#2BB673', '#9B59B6', '#E67E22', '#1ABC9C'];
+
+/** Client fallback — only artists, artist mixes, albums, playlist of the day */
+async function buildLocalRecSections() {
+  const likes = (typeof Store !== 'undefined' && Store.getFavs ? Store.getFavs() : []).map(homeNormLocalTrack).filter(Boolean);
+  const recent = (typeof Store !== 'undefined' && Store.getRecent ? Store.getRecent() : []).map(homeNormLocalTrack).filter(Boolean);
+  let playlistTracks = [];
+  try {
+    const pls = typeof Store !== 'undefined' && Store.getPlaylists ? Store.getPlaylists() : [];
+    (pls || []).forEach((p) => {
+      (p.tracks || []).forEach((t) => {
+        const n = homeNormLocalTrack(t);
+        if (n) playlistTracks.push(n);
+      });
+    });
+  } catch (_) {}
+  const savedAlbums = (typeof Store !== 'undefined' && Store.getAlbums ? Store.getAlbums() : []) || [];
+  const savedAlbKeys = new Set(savedAlbums.map((a) => String(a.id || a.title || '').toLowerCase()).filter(Boolean));
+
+  const pool = homeDedupeLocal([...likes, ...playlistTracks, ...recent]);
+  const banned = homeLikedSet(likes);
+
+  const artistCounts = new Map();
+  pool.forEach((t) => {
+    const name = t.artist?.name || t.artistName || '';
+    const id = t.artist?.id || null;
+    if (!name && !id) return;
+    const key = id ? `id:${id}` : `n:${name.toLowerCase()}`;
+    const cur = artistCounts.get(key) || { id, name, n: 0, seedTrack: t, picture_medium: t.artist?.picture_medium || '' };
+    cur.n += 1;
+    if (!cur.seedTrack) cur.seedTrack = t;
+    artistCounts.set(key, cur);
+  });
+  const ranked = [...artistCounts.values()].sort((a, b) => b.n - a.n);
+
+  const ownKeys = new Set(ranked.map((a) => (a.id ? `id:${a.id}` : `n:${(a.name || '').toLowerCase()}`)));
+  let similarArtists = [];
+  const seedAids = ranked.filter((a) => a.id && /^\d+$/.test(String(a.id))).slice(0, 3);
+  for (const a of seedAids) {
+    const rel = await dzArr(`/artist/${a.id}/related?limit=12`);
+    for (const r of rel) {
+      const key = `id:${r.id}`;
+      if (ownKeys.has(key) || similarArtists.some((x) => String(x.id) === String(r.id))) continue;
+      similarArtists.push({
+        id: r.id,
+        name: r.name,
+        picture_medium: r.picture_medium || r.picture || '',
+        picture_xl: r.picture_xl || ''
+      });
+      if (similarArtists.length >= 14) break;
+    }
+    if (similarArtists.length >= 14) break;
+  }
+  similarArtists = await Promise.all(similarArtists.slice(0, 12).map(homeHydrateArtist));
+
+  const albumItems = [];
+  const albumSeen = new Set(savedAlbKeys);
+  const artistSeen = new Set();
+  const titleSeen = new Set();
+  const albumAids = [
+    ...seedAids.map((a) => String(a.id)),
+    ...similarArtists.map((a) => String(a.id)).filter((id) => /^\d+$/.test(id))
+  ].slice(0, 12);
+  const homeAlbumish = (alb) => {
+    const rt = String(alb.record_type || alb.type || '').toLowerCase();
+    if (rt === 'single' || rt === 'ep') return false;
+    const nb = Number(alb.nb_tracks || 0);
+    if (rt === 'album') return !(nb > 0 && nb < 5);
+    if (nb > 0 && nb < 5) return false;
+    if (/\b(single|remix|- ep\b|\bep\b)/i.test(String(alb.title || '')) && (!nb || nb < 8)) return false;
+    return true;
+  };
+  const titleNorm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '').slice(0, 48);
+  const tryAlbum = (alb) => {
+    if (!homeAlbumish(alb)) return false;
+    const k = String(alb.id || '').toLowerCase() || titleNorm(alb.title);
+    const art = alb.artist?.id != null ? `id:${alb.artist.id}` : `n:${(alb.artist?.name || '').toLowerCase()}`;
+    const tn = titleNorm(alb.title);
+    if (!k || !art || albumSeen.has(k) || artistSeen.has(art) || (tn && titleSeen.has(tn))) return false;
+    albumSeen.add(k);
+    artistSeen.add(art);
+    if (tn) titleSeen.add(tn);
+    albumItems.push({
+      id: alb.id,
+      title: alb.title,
+      cover_medium: alb.cover_medium || '',
+      cover: alb.cover_xl || alb.cover_medium || '',
+      artistName: alb.artist?.name || '',
+      artist: alb.artist || {}
+    });
+    return true;
+  };
+  for (const aid of homeShuffle([...new Set(albumAids)])) {
+    if (artistSeen.has(`id:${aid}`)) continue;
+    const albs = await dzArr(`/artist/${aid}/albums?limit=20`);
+    for (const alb of homeShuffle(albs)) {
+      if (tryAlbum(alb)) break;
+    }
+    if (albumItems.length >= 12) break;
+  }
+  if (albumItems.length < 10) {
+    const chart = homeShuffle(await dzArr('/chart/0/albums?limit=50'));
+    for (const alb of chart) {
+      if (tryAlbum(alb) && albumItems.length >= 12) break;
+    }
+  }
+
+  const mixes = [];
+  const mixPool = [];
+  const mixSeen = new Set();
+  const LOCAL_MIX_WANT = 12;
+  for (const a of [...ranked.slice(0, 16), ...homeShuffle(similarArtists)]) {
+    const key = a.id ? `id:${a.id}` : `n:${(a.name || '').toLowerCase()}`;
+    if (!a.name || mixSeen.has(key)) continue;
+    mixSeen.add(key);
+    mixPool.push(a);
+    if (mixPool.length >= LOCAL_MIX_WANT + 8) break;
+  }
+  const MIX_TRACKS = 50;
+  for (let i = 0; i < mixPool.length && mixes.length < LOCAL_MIX_WANT; i++) {
+    const a = mixPool[i];
+    let similar = [];
+    let relNames = [];
+    const name = String(a.name || '').trim();
+    if (!name) continue;
+    const searchA = (await dzArr(`/search/track?q=${encodeURIComponent(name)}&limit=25`)).map(normDZ).filter(Boolean);
+    const searchB = (await dzArr(`/search/track?q=${encodeURIComponent(name)}&limit=25&index=25`)).map(normDZ).filter(Boolean);
+    similar = similar.concat(searchA, searchB);
+    if (a.id && /^\d+$/.test(String(a.id))) {
+      const top = (await dzArr(`/artist/${a.id}/top?limit=50`)).map(normDZ).filter(Boolean);
+      const related = await dzArr(`/artist/${a.id}/related?limit=6`);
+      relNames = related.slice(0, 3).map((r) => r.name).filter(Boolean);
+      similar = similar.concat(top);
+      for (const ra of related.slice(0, 3)) {
+        if (!ra.name) continue;
+        similar = similar.concat(
+          (await dzArr(`/search/track?q=${encodeURIComponent(ra.name)}&limit=25`)).map(normDZ).filter(Boolean)
+        );
+      }
+      similar = homeNotLiked(homeDedupeLocal(similar), banned);
+      if (similar.length < 12) similar = homeDedupeLocal([...top, ...searchA, ...searchB]);
+    }
+    const ownOf = pool.filter((t) => (t.artist?.name || t.artistName || '').toLowerCase() === name.toLowerCase());
+    const ratio = 0.1 + Math.random() * 0.3;
+    const ownN = Math.min(ownOf.length, Math.max(ownOf.length ? 1 : 0, Math.round(MIX_TRACKS * ratio)));
+    let tracks = homeDedupeLocal([...homeShuffle(ownOf).slice(0, ownN), ...homeShuffle(similar)]).slice(0, MIX_TRACKS);
+    if (tracks.length < 6) continue;
+    const hyd = await homeHydrateArtist(a);
+    mixes.push({
+      id: `artist_mix_${a.id || i}`,
+      kind: 'artist',
+      name: `${a.name}: микс`,
+      artists: [a.name, ...relNames].filter(Boolean).slice(0, 4),
+      cover: hyd.picture_xl || hyd.picture_medium || tracks[0]?.album?.cover_medium || '',
+      color: HOME_MIX_COLORS[i % HOME_MIX_COLORS.length],
+      trackCount: tracks.length,
+      tracks,
+      canSave: true
+    });
+  }
+
+  // Three day playlists — disjoint artist orbits from likes / similar
+  const dayLocal = typeof mrfLocalDay === 'function' ? mrfLocalDay() : null;
+  const orbitPool = homeShuffle([...ranked.slice(0, 18), ...homeShuffle(similarArtists)]).slice(0, 24);
+  const dayBases = [[], [], []];
+  orbitPool.forEach((a, i) => {
+    if (!a?.name) return;
+    dayBases[i % 3].push(a);
+  });
+  const dayPlaylists = [];
+  const dayUsedTracks = new Set();
+  for (let slot = 0; slot < 3; slot++) {
+    const orbit = dayBases[slot].slice(0, 6);
+    if (!orbit.length) continue;
+    let seeds = [];
+    for (const a of orbit) {
+      const name = String(a.name || '').trim();
+      if (!name) continue;
+      if (a.id && /^\d+$/.test(String(a.id))) {
+        seeds = seeds.concat((await dzArr(`/artist/${a.id}/top?limit=20`)).map(normDZ).filter(Boolean));
+      }
+      seeds = seeds.concat(
+        (await dzArr(`/search/track?q=${encodeURIComponent(name)}&limit=25`)).map(normDZ).filter(Boolean)
+      );
+    }
+    let dayTracks = homeDedupeLocal(seeds.filter((t) => !dayUsedTracks.has(String(t.deezerId || t.id || ''))));
+    if (dayTracks.length < MIX_TRACKS) {
+      const more = await homeSimilarAround(dayTracks.slice(0, 8).length ? dayTracks.slice(0, 8) : pool, banned, MIX_TRACKS);
+      dayTracks = homeDedupeLocal([...dayTracks, ...more]).filter(
+        (t) => !dayUsedTracks.has(String(t.deezerId || t.id || ''))
+      );
+    }
+    dayTracks = homeShuffle(dayTracks).slice(0, MIX_TRACKS);
+    if (dayTracks.length < 6) continue;
+    dayTracks.forEach((t) => {
+      const tid = String(t.deezerId || t.id || '');
+      if (tid) dayUsedTracks.add(tid);
+    });
+    const slotName = slot === 0
+      ? (typeof mrfDayPlaylistTitle === 'function' ? mrfDayPlaylistTitle(dayLocal) : 'Плейлист дня')
+      : (dayLocal
+        ? `Плейлист дня · ${slot + 1} · ${String(dayLocal).slice(8, 10)}.${String(dayLocal).slice(5, 7)}.${String(dayLocal).slice(0, 4)}`
+        : `Плейлист дня · ${slot + 1}`);
+    dayPlaylists.push({
+      id: slot === 0 ? 'playlist_of_the_day' : `playlist_of_the_day_${slot + 1}`,
+      kind: 'day',
+      daySlot: slot,
+      name: slotName,
+      localDay: dayLocal,
+      artists: [...new Set(dayTracks.map((t) => t.artist?.name || t.artistName).filter(Boolean))].slice(0, 4),
+      cover: dayTracks[0]?.album?.cover_medium || dayTracks[0]?.album?.cover || '',
+      color: HOME_MIX_COLORS[slot % HOME_MIX_COLORS.length],
+      trackCount: dayTracks.length,
+      tracks: dayTracks,
+      canSave: true
+    });
+  }
+
+  return [
+    similarArtists.length ? { id: 'similarArtists', type: 'artists', title: 'Похожие исполнители', items: similarArtists } : null,
+    mixes.length ? { id: 'artistMixes', type: 'mixes', title: 'Миксы по исполнителям', items: mixes } : null,
+    albumItems.length ? { id: 'albumPicks', type: 'albums', title: 'Альбомы для тебя', items: albumItems } : null,
+    dayPlaylists.length ? { id: 'playlistOfTheDay', type: 'mixes', title: 'Плейлисты дня', items: dayPlaylists } : null
+  ].filter(Boolean);
+}
+
+async function renderPersonalHome() {
+  // Single-flight: boot + auth onChange + soft-nav must not race-paint
+  if (window.__mrfPersonalHomeFlight) return window.__mrfPersonalHomeFlight;
+  window.__mrfPersonalHomeFlight = (async () => {
+  const guestEl = document.getElementById('home-personal-guest');
+  const libEl = document.getElementById('home-personal-library');
+  const root = document.getElementById('home-recs-root');
+  if (!root) return;
+
+  // Never show secondary boot spinners here — only the page-level boot
+  if (typeof mrfAuthPending === 'function' && mrfAuthPending()) {
+    if (guestEl) guestEl.classList.add('hidden');
+    if (libEl) libEl.classList.add('hidden');
+    return;
+  }
+
+  const loggedIn = typeof mrfIsLoggedIn === 'function' ? mrfIsLoggedIn() : !!(window.MrfAuth?.session?.user);
+  if (!loggedIn) {
+    if (guestEl) guestEl.classList.remove('hidden');
+    if (libEl) libEl.classList.add('hidden');
+    root.innerHTML = '';
+    return;
+  }
+
+  if (guestEl) guestEl.classList.add('hidden');
+  if (libEl) libEl.classList.remove('hidden');
+  // Paint library rails immediately from Store — no spinner
+  renderHomeRecent();
+  renderHomePlaylists();
+  if (typeof bindHomeRails === 'function') bindHomeRails();
+
+  // Soft-nav: paint day-cache instantly — never flash empty rails
+  const cachedHit = typeof peekRecommendationsCache === 'function' ? peekRecommendationsCache() : null;
+  if (cachedHit?.sections?.length && !cachedHit.guest) {
+    renderRecSections(cachedHit.sections);
+    if (typeof bindHomeRails === 'function') bindHomeRails();
+  }
+
+  let sections = (cachedHit && !cachedHit.guest && cachedHit.sections) || [];
+  try {
+    const data = typeof prefetchRecommendations === 'function'
+      ? await prefetchRecommendations()
+      : null;
+    if (data?.guest) {
+      // Auth blip — keep painted personal cache
+      if (sections.length) return;
+      if (guestEl) guestEl.classList.remove('hidden');
+      if (libEl) libEl.classList.add('hidden');
+      root.innerHTML = '';
+      return;
+    }
+    if (Array.isArray(data?.sections) && data.sections.length) {
+      sections = data.sections;
+    }
+  } catch (err) {
+    console.error('[HOME] recommendations', err);
+  }
+
+  // Local fallback ONLY if nothing in day-cache and API empty (never replace a painted cache)
+  if (!sections.length) {
+    try {
+      sections = await buildLocalRecSections();
+    } catch (err) {
+      console.error('[HOME] local recs', err);
+      sections = [];
+    }
+  }
+
+  if (sections.length) {
+    renderRecSections(sections);
+  } else if (!(cachedHit?.sections?.length)) {
+    root.innerHTML = '';
+  }
+  if (typeof bindHomeRails === 'function') bindHomeRails();
+  if (typeof mrfFlushPendingScroll === 'function') mrfFlushPendingScroll();
+  })().finally(() => {
+    window.__mrfPersonalHomeFlight = null;
+    if (typeof mrfFlushPendingScroll === 'function') mrfFlushPendingScroll();
+  });
+  return window.__mrfPersonalHomeFlight;
+}
+window.renderPersonalHome = renderPersonalHome;
+window.renderForYou = renderPersonalHome;
+
+// Late-arriving day cache (boot raced 15s) — re-paint home without clearing
+if (!window.__mrfRecsPaintBound) {
+  window.__mrfRecsPaintBound = true;
+  window.addEventListener('mrf:recs', () => {
+    if (typeof getPageId === 'function' && getPageId() !== 'index') return;
+    const root = document.getElementById('home-recs-root');
+    const data = typeof peekRecommendationsCache === 'function' ? peekRecommendationsCache() : null;
+    if (!root || !data?.sections?.length || data.guest) return;
+    if (typeof renderRecSections === 'function') {
+      renderRecSections(data.sections);
+      if (typeof bindHomeRails === 'function') bindHomeRails();
+    }
+    if (typeof mrfFlushPendingScroll === 'function') mrfFlushPendingScroll();
+  });
+}
+
+async function renderNewReleases(cachedAlbums) {
   const box = document.getElementById('new-releases-row');
   if (!box) return;
-  // BACKEND TODO: Получение новых релизов
-  const albums = await dzArr('/chart/0/albums?limit=10');
+  const albums = Array.isArray(cachedAlbums) ? cachedAlbums : await dzArr('/chart/0/albums?limit=10');
+  window.__mrfHomeLastReleases = albums;
   box.innerHTML = albums.map(a => `
     <button type="button" class="cover-card" onclick="location.href='${mrfUrl('album',{id:a.id,title:a.title,artist:a.artist?.name||''})}'">
       ${a.cover_medium ? `<img src="${a.cover_medium}" class="cover-card-art" alt="">` : `<span class="cover-card-art cover-card-fallback">${noteSVGShared()}</span>`}
@@ -534,20 +1361,23 @@ async function renderNewReleases() {
     </button>`).join('');
 }
 
-async function renderHomeArtists() {
+async function renderHomeArtists(cachedArtists) {
   const box = document.getElementById('home-artists-row');
   if (!box) return;
-  const artists = await dzArr('/chart/0/artists?limit=10');
+  const artists = Array.isArray(cachedArtists) ? cachedArtists : await dzArr('/chart/0/artists?limit=10');
+  window.__mrfHomeLastArtists = artists;
   const js = typeof jsStr === 'function' ? jsStr : (s => String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
   box.innerHTML = artists.map(a => {
     const idArg = a.id != null && String(a.id) !== '' ? `'${js(a.id)}'` : 'null';
     const nameArg = `'${js(a.name || '')}'`;
-    // Use openArtist — never inline location.href?id=&name= (HTML eats bare &)
+    const pic = a.picture_medium || a.picture_xl || '';
+    const initial = escHtml((a.name || '?').trim().charAt(0) || '?');
+    const ava = pic
+      ? `<img class="artist-chip-img" src="${pic}" alt="" loading="lazy" onerror="this.outerHTML='<span class=\\'artist-chip-img artist-chip-fallback\\'>${initial}</span>'">`
+      : `<span class="artist-chip-img artist-chip-fallback">${initial}</span>`;
     return `
     <button type="button" class="artist-chip" onclick="openArtist(${idArg},${nameArg})">
-      ${a.picture_medium
-        ? `<img class="artist-chip-img" src="${a.picture_medium}" alt="">`
-        : `<span class="artist-chip-img artist-chip-fallback">${escHtml((a.name||'?')[0])}</span>`}
+      ${ava}
       <span class="artist-chip-name">${escHtml(a.name)}</span>
     </button>`;
   }).join('');

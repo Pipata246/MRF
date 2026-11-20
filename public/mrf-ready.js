@@ -779,9 +779,13 @@ window.setRightPanelTab = setRightPanelTab;
 
 /* ── Context menu helpers (showTrackMenu lives in app.js) ── */
 function removeTrackFromPlaylistCtx(key, idx) {
-  const plId = key.replace('pl_', '');
+  if (typeof isOwnedPlaylistSrcKey === 'function' && !isOwnedPlaylistSrcKey(key)) return;
+  const plId = String(key || '').replace(/^pl_/, '');
+  if (!plId || plId.startsWith('rec_')) return;
   const t = _src[key]?.[idx];
   if (!t) return;
+  const pl = Store.getPlaylist?.(plId);
+  if (!pl || pl.readOnly) return;
   Store.removeTrackFromPlaylist(plId, t.id);
   showNotif('Удалено из плейлиста');
   if (typeof loadPlaylistPage === 'function') loadPlaylistPage();
@@ -978,6 +982,61 @@ function resetFsLayoutTransforms() {
 }
 window.resetFsLayoutTransforms = resetFsLayoutTransforms;
 
+/** Mobile-only: swipe mini-player left/right to change track */
+function bindMiniPlayerSwipe() {
+  if (window.__mrfMiniSwipeBound) return;
+  window.__mrfMiniSwipeBound = true;
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+  const isMobileUi = () => {
+    try {
+      if (typeof isMobilePlayerUi === 'function') return isMobilePlayerUi();
+      if (document.documentElement.getAttribute('data-ui') === 'mobile') return true;
+      return window.matchMedia('(max-width: 900px)').matches;
+    } catch (_) {
+      return false;
+    }
+  };
+  const playerFromEvent = (e) => {
+    const el = e.target && e.target.closest ? e.target.closest('#player') : null;
+    return el && el.classList.contains('player') ? el : null;
+  };
+
+  document.addEventListener('touchstart', (e) => {
+    if (!isMobileUi()) return;
+    const player = playerFromEvent(e);
+    if (!player) return;
+    if (e.target.closest('button, a, input, .progress-track, .progress-bar')) return;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    startX = t.clientX;
+    startY = t.clientY;
+    tracking = true;
+  }, { passive: true, capture: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    if (!isMobileUi()) return;
+    if (!playerFromEvent(e)) return;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    if (Math.abs(dx) < 56) return;
+    if (Math.abs(dx) < Math.abs(dy) * 1.15) return;
+    if (dx < 0) {
+      if (typeof nextTrack === 'function') nextTrack();
+    } else if (typeof prevTrack === 'function') {
+      prevTrack();
+    }
+  }, { passive: true, capture: true });
+
+  document.addEventListener('touchcancel', () => { tracking = false; }, { passive: true, capture: true });
+}
+window.bindMiniPlayerSwipe = bindMiniPlayerSwipe;
+
 /** Mobile: hoist mini-player onto <body> so #player-root never paints a grid slab */
 function ensureMobilePlayerHost() {
   const player = document.getElementById('player');
@@ -999,6 +1058,7 @@ function ensureMobilePlayerHost() {
     if (typeof ensureFsPlayerDom === 'function') ensureFsPlayerDom();
     // Keep progress line animating after remount
     if (typeof bindPlayerUIControls === 'function') bindPlayerUIControls();
+    if (typeof bindMiniPlayerSwipe === 'function') bindMiniPlayerSwipe();
     if (typeof tickProgress === 'function' && typeof audio !== 'undefined' && audio && !audio.paused) {
       try { tickProgress(); } catch (_) {}
     }
@@ -1043,12 +1103,7 @@ function syncFsPlayer(track) {
       ? formatArtistsText(t)
       : (t.artist?.name || t.artist || '')) || '—';
   }
-  const ctx = document.getElementById('fs-player-context');
-  if (ctx) {
-    const src = (typeof currentSrcKey !== 'undefined' && currentSrcKey) ? String(currentSrcKey) : '';
-    ctx.textContent = src === 'liked' ? 'Любимые треки'
-      : (src.startsWith('playlist') || src.startsWith('pl_') ? 'Плейлист' : 'Сейчас играет');
-  }
+  if (typeof syncFsPlayerContext === 'function') syncFsPlayerContext();
   if (typeof updateFavBtn === 'function') updateFavBtn();
   if (typeof isPlaying !== 'undefined' && typeof setPlayIcon === 'function') setPlayIcon(!!isPlaying);
   if (typeof syncShuffleRepeatUi === 'function') syncShuffleRepeatUi();
@@ -1373,6 +1428,36 @@ function openFsMoreSheet() {
 }
 window.openFsMoreSheet = openFsMoreSheet;
 
+function syncFsPlayerContext() {
+  const sub = document.getElementById('fs-player-context-sub');
+  if (!sub) return;
+  let label = '';
+  try {
+    label = String(
+      (typeof currentSrcLabel !== 'undefined' && currentSrcLabel) ||
+      window.currentSrcLabel ||
+      ''
+    ).trim();
+    if (!label && typeof resolvePlaybackSourceLabel === 'function') {
+      const key = (typeof currentSrcKey !== 'undefined' && currentSrcKey) || window.currentSrcKey || '';
+      label = resolvePlaybackSourceLabel(key);
+    }
+    if (!label) {
+      const st = typeof Store !== 'undefined' ? Store.getPlayerState() : null;
+      label = String(st?.srcLabel || '').trim() ||
+        (typeof resolvePlaybackSourceLabel === 'function' ? resolvePlaybackSourceLabel(st?.srcKey) : '');
+    }
+  } catch (_) {}
+  if (label) {
+    sub.textContent = label;
+    sub.hidden = false;
+  } else {
+    sub.textContent = '';
+    sub.hidden = true;
+  }
+}
+window.syncFsPlayerContext = syncFsPlayerContext;
+
 function syncFsQueueChrome() {
   if (typeof syncShuffleRepeatUi === 'function') syncShuffleRepeatUi();
   else {
@@ -1383,10 +1468,14 @@ function syncFsQueueChrome() {
   }
   const sub = document.getElementById('fs-queue-sub');
   if (sub) {
-    const src = (typeof currentSrcKey !== 'undefined' && currentSrcKey) ? String(currentSrcKey) : '';
-    sub.textContent = src === 'liked' ? 'Играет «Любимые треки»'
-      : (src.startsWith('pl_') || src.startsWith('playlist') ? 'Играет из плейлиста'
-        : (src ? 'Сейчас играет' : 'Сейчас играет'));
+    let label = '';
+    try {
+      label = String(window.currentSrcLabel || currentSrcLabel || '').trim();
+      if (!label && typeof resolvePlaybackSourceLabel === 'function') {
+        label = resolvePlaybackSourceLabel(window.currentSrcKey || currentSrcKey || '');
+      }
+    } catch (_) {}
+    sub.textContent = label ? `Играет · ${label}` : 'Сейчас играет';
   }
 }
 window.syncFsQueueChrome = syncFsQueueChrome;
@@ -1436,6 +1525,7 @@ function ensureFsPlayerDom() {
     !document.querySelector('.fs-tool-ico') ||
     !document.getElementById('fs-block-similar') ||
     !document.querySelector('.fs-cover-img') ||
+    !document.getElementById('fs-player-context-sub') ||
     document.getElementById('fs-q-repeat') ||
     existing.parentElement !== host
   );

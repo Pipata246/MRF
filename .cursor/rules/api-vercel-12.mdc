@@ -22,6 +22,7 @@ alwaysApply: true
 | 1 | `api/auth.js` | Register / login / logout / session / health |
 | 2 | `api/me.js` | Profile + settings (`?resource=profile\|settings`) |
 | 3 | `api/library.js` | Likes / follows / albums / playlists (`?resource=...`) |
-| 4–12 | **RESERVED** | Future domains only (e.g. stream/music, search proxy, recommendations) — one domain per file |
+| 4 | `api/recommendations.js` | Home feed + mood mixes (`?resource=home\|mood`) |
+| 5–12 | **RESERVED** | Future domains only (e.g. stream / official music) — one domain per file |
 
-When adding a feature: prefer extending slots 1–3. Open a new reserved slot only for a **new domain** that cannot fit cleanly.
+When adding a feature: prefer extending slots 1–4. Open a new reserved slot only for a **new domain** that cannot fit cleanly.

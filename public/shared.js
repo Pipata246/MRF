@@ -495,7 +495,24 @@ function bindHomeTopbarScroll() {
   }
   if (feed.dataset.homeScrollBound !== '1') {
     feed.dataset.homeScrollBound = '1';
-    feed.addEventListener('scroll', () => updateHomeTopbarScroll(), { passive: true });
+    let saveTimer = 0;
+    feed.addEventListener('scroll', () => {
+      updateHomeTopbarScroll();
+      // Keep home scroll fresh so back-from-playlist lands correctly
+      if (document.body.classList.contains('is-home-page')) {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          if (typeof mrfSavePageScroll === 'function') mrfSavePageScroll();
+          else {
+            window.__mrfHomeFeedScroll = {
+              feed: feed.scrollTop || 0,
+              main: 0,
+              win: window.scrollY || 0
+            };
+          }
+        }, 80);
+      }
+    }, { passive: true });
   }
   updateHomeTopbarScroll();
 }
@@ -683,7 +700,24 @@ function playFlyoutTrack(i) {
   if (typeof playFromSrc === 'function') playFromSrc('flyout_tracks', i);
 }
 
+function rememberCurrentSearchQuery(extra) {
+  const q = String(
+    extra
+    || document.getElementById('mobile-search-input')?.value
+    || document.getElementById('main-search-input')?.value
+    || document.getElementById('search-input')?.value
+    || ''
+  ).trim();
+  if (q.length < 2) return;
+  if (typeof Store?.addHistory === 'function') {
+    try { Store.addHistory(q); } catch (_) {}
+  }
+  if (typeof renderSearchHistory === 'function') renderSearchHistory();
+}
+window.rememberCurrentSearchQuery = rememberCurrentSearchQuery;
+
 function openArtistFromFlyout(id, name) {
+  rememberCurrentSearchQuery();
   closeSearchFlyout();
   if (typeof openArtist === 'function') openArtist(id, name);
   else {
@@ -842,7 +876,10 @@ function fsPlayerMarkup() {
             <button type="button" class="fs-icon-btn" id="fs-close-btn" onclick="closeFsPlayer()" aria-label="Свернуть">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-            <div class="fs-player-context" id="fs-player-context">Сейчас играет</div>
+            <div class="fs-player-context" id="fs-player-context">
+              <div class="fs-player-context-title">Сейчас играет</div>
+              <div class="fs-player-context-sub" id="fs-player-context-sub" hidden></div>
+            </div>
             <button type="button" class="fs-icon-btn" id="fs-menu-btn" onclick="openFsMoreSheet()" aria-label="Ещё">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
             </button>
@@ -1250,10 +1287,57 @@ function loaderHTMLShared(msg) {
   return `<div class="loading-placeholder">${mrfBallSpinHTML()}${label}</div>`;
 }
 
+/** Boot logo — bars assemble, then soft jump (accent from theme). */
+function mrfBootLogoHTML(size = 112) {
+  const s = Number(size) || 112;
+  return `<div class="page-boot-mark">
+    <svg class="page-boot-logo" viewBox="0 0 1254 1254" width="${s}" height="${s}" role="img" aria-label="MRF" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <circle class="page-boot-ring" cx="626" cy="615" r="603" fill="none" stroke="currentColor" stroke-width="38"/>
+      <g class="page-boot-bars" fill="currentColor">
+        <rect class="page-boot-bar" style="--i:0" x="429" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
+        <rect class="page-boot-bar" style="--i:1" x="515" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
+        <rect class="page-boot-bar" style="--i:2" x="600" y="193" width="54" height="287" rx="27" ry="27"/>
+        <rect class="page-boot-bar" style="--i:3" x="686" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
+        <rect class="page-boot-bar" style="--i:4" x="772" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
+      </g>
+      <text class="page-boot-word" x="626" y="848" text-anchor="middle" font-family="Arial Black, Helvetica Neue, Impact, sans-serif" font-size="310" font-weight="900" font-style="italic" letter-spacing="-14">MRF</text>
+    </svg>
+  </div>`;
+}
+window.mrfBootLogoHTML = mrfBootLogoHTML;
+
+function pageBootInnerHTML() {
+  const mobile = typeof isMobileLayout === 'function'
+    ? isMobileLayout()
+    : !window.matchMedia('(min-width: 901px)').matches;
+  return mobile ? mrfBootLogoHTML(112) : mrfBallSpinHTML();
+}
+
+function syncBootAccentFromSettings() {
+  try {
+    if (typeof applyThemeFromSettings === 'function') {
+      applyThemeFromSettings();
+      return;
+    }
+    if (typeof Store === 'undefined' || !Store.getSettings) return;
+    const s = Store.getSettings() || {};
+    const theme = s.theme || 'dark';
+    const color = theme === 'light'
+      ? (s.accentColorLight || s.accentColor || '#E35A90')
+      : (s.accentColorDark || s.accentColor || '#EE90B7');
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.style.setProperty('--accent', color);
+    if (document.body) document.body.classList.toggle('theme-light', theme === 'light');
+  } catch (_) {}
+}
+
 function showPageBoot() {
-  if (document.getElementById('mrf-page-boot')) {
+  syncBootAccentFromSettings();
+  const existing = document.getElementById('mrf-page-boot');
+  if (existing) {
     document.body.classList.add('is-page-booting');
-    document.getElementById('mrf-page-boot').classList.remove('is-done');
+    existing.classList.remove('is-done');
+    existing.innerHTML = pageBootInnerHTML();
     return;
   }
   if (!document.body) return;
@@ -1262,7 +1346,7 @@ function showPageBoot() {
   el.id = 'mrf-page-boot';
   el.className = 'page-boot';
   el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = mrfBallSpinHTML();
+  el.innerHTML = pageBootInnerHTML();
   document.body.appendChild(el);
 }
 window.showPageBoot = showPageBoot;
@@ -1278,14 +1362,208 @@ function hidePageBoot() {
 }
 window.hidePageBoot = hidePageBoot;
 
-/** Keep centered boot until auth session is known (kills guest flash on refresh) */
+function mrfClientTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch (_) {
+    return 'UTC';
+  }
+}
+window.mrfClientTimezone = mrfClientTimezone;
+
+/** Local calendar day YYYY-MM-DD (user's timezone). */
+function mrfLocalDay(tz) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz || mrfClientTimezone(),
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date());
+  } catch (_) {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+}
+window.mrfLocalDay = mrfLocalDay;
+
+/** «Плейлист дня · 20 ноября» from YYYY-MM-DD / now. */
+function mrfFormatLocalDayLabel(day) {
+  const raw = String(day || mrfLocalDay() || '');
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  try {
+    return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(new Date(y, mo - 1, d));
+  } catch (_) {
+    return `${String(d).padStart(2, '0')}.${String(mo).padStart(2, '0')}.${y}`;
+  }
+}
+window.mrfFormatLocalDayLabel = mrfFormatLocalDayLabel;
+
+function mrfDayPlaylistTitle(day) {
+  const label = mrfFormatLocalDayLabel(day);
+  return label ? `Плейлист дня · ${label}` : 'Плейлист дня';
+}
+window.mrfDayPlaylistTitle = mrfDayPlaylistTitle;
+
+const MRF_REC_CACHE_VER = 9;
+const MRF_REC_FEED_SS = 'mrf_rec_feed_v9';
+window.__mrfRecCache = window.__mrfRecCache || { localDay: null, data: null, tz: null, ver: 0 };
+window.__mrfRecInflight = window.__mrfRecInflight || null;
+
+function mrfRecCacheHasSections(data) {
+  return !!(data && Array.isArray(data.sections) && data.sections.length);
+}
+
+/** Day cache without artist mixes is incomplete — must refetch (server repairs mixes). */
+function mrfRecFeedMissingMixes(data) {
+  if (!data || data.guest) return false;
+  const sec = (data.sections || []).find((s) => s.id === 'artistMixes');
+  return !(sec && Array.isArray(sec.items) && sec.items.length);
+}
+
+function readRecCacheFromSession() {
+  try {
+    const raw = sessionStorage.getItem(MRF_REC_FEED_SS);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.localDay || Number(parsed.ver) !== MRF_REC_CACHE_VER) return null;
+    if (!mrfRecCacheHasSections(parsed.data)) return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeRecCache(day, data, tz) {
+  const prev = window.__mrfRecCache;
+  // Never let guest/empty stomp a good logged-in day cache
+  if (
+    prev &&
+    prev.localDay === day &&
+    Number(prev.ver) === MRF_REC_CACHE_VER &&
+    mrfRecCacheHasSections(prev.data) &&
+    !prev.data.guest
+  ) {
+    if (!data || data.guest) return;
+    if (!mrfRecCacheHasSections(data)) return;
+  }
+  window.__mrfRecCache = { localDay: day, data, tz, ver: MRF_REC_CACHE_VER };
+  try {
+    sessionStorage.setItem(
+      MRF_REC_FEED_SS,
+      JSON.stringify({ localDay: day, data, tz, ver: MRF_REC_CACHE_VER })
+    );
+  } catch (_) {
+    // Quota / private mode — memory cache still used for soft-nav
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('mrf:recs', { detail: { localDay: day } }));
+  } catch (_) {}
+}
+
+function peekRecommendationsCache() {
+  const tz = typeof mrfClientTimezone === 'function' ? mrfClientTimezone() : 'UTC';
+  const day = typeof mrfLocalDay === 'function' ? mrfLocalDay(tz) : '';
+  let cached = window.__mrfRecCache;
+  if (!cached?.data || cached.localDay !== day || Number(cached.ver) !== MRF_REC_CACHE_VER) {
+    const fromSs = readRecCacheFromSession();
+    if (fromSs && fromSs.localDay === day) {
+      window.__mrfRecCache = fromSs;
+      cached = fromSs;
+    } else {
+      cached = null;
+    }
+  }
+  if (cached && cached.localDay === day && mrfRecCacheHasSections(cached.data) && !cached.data.guest) {
+    // Incomplete day row (no mixes) → miss so API can repair
+    if (mrfRecFeedMissingMixes(cached.data)) return null;
+    return cached.data;
+  }
+  if (cached && cached.localDay === day && cached.data?.guest) {
+    return cached.data;
+  }
+  return null;
+}
+window.peekRecommendationsCache = peekRecommendationsCache;
+
+/** Prefetch / reuse daily recommendation feed — single-flight, stable until midnight. */
+async function prefetchRecommendations(opts) {
+  const force = !!(opts && opts.force);
+  const tz = mrfClientTimezone();
+  const day = mrfLocalDay(tz);
+  const loggedIn = typeof mrfIsLoggedIn === 'function' ? mrfIsLoggedIn() : false;
+
+  if (!force) {
+    const hit = peekRecommendationsCache();
+    if (hit && !!hit.guest === !loggedIn) return hit;
+  }
+
+  if (!loggedIn) {
+    // Do not clobber today's personal cache if auth is briefly unset
+    const existing = peekRecommendationsCache();
+    if (existing && !existing.guest) return existing;
+    return { ok: true, guest: true, sections: [] };
+  }
+
+  if (!force && window.__mrfRecInflight && window.__mrfRecInflight.day === day) {
+    return window.__mrfRecInflight.promise;
+  }
+
+  const promise = (async () => {
+    const q = new URLSearchParams({
+      resource: 'home',
+      tz,
+      day,
+      offset: String(-new Date().getTimezoneOffset())
+    });
+    if (force) q.set('force', '1');
+    const res = await fetch(`/api/recommendations?${q}`, { credentials: 'same-origin' });
+    const data = await res.json().catch(() => ({}));
+    if (data && data.ok !== false && mrfRecCacheHasSections(data) && !data.guest) {
+      writeRecCache(data.localDay || day, data, tz);
+    } else if (data && data.ok !== false && !data.guest) {
+      // Empty API — keep previous day cache if any
+      const prev = peekRecommendationsCache();
+      if (prev && !prev.guest) return prev;
+    }
+    return data;
+  })();
+
+  window.__mrfRecInflight = { day, promise };
+  try {
+    return await promise;
+  } finally {
+    if (window.__mrfRecInflight && window.__mrfRecInflight.promise === promise) {
+      window.__mrfRecInflight = null;
+    }
+  }
+}
+window.prefetchRecommendations = prefetchRecommendations;
+
+/** Keep centered boot until auth + library + daily recs are ready (cap ~15s). */
 function hidePageBootWhenAuthReady() {
   try { showPageBoot(); } catch (_) {}
   let done = false;
-  const finish = () => {
+  const finish = async () => {
     if (done) return;
     done = true;
     window.removeEventListener('mrf:auth', onAuth);
+    try {
+      if (typeof mrfIsLoggedIn === 'function' && mrfIsLoggedIn() && typeof prefetchRecommendations === 'function') {
+        const p = prefetchRecommendations();
+        // Hide boot by 15s, but let the same single-flight finish and fill cache
+        await Promise.race([
+          p,
+          new Promise((resolve) => setTimeout(resolve, 14000))
+        ]);
+      }
+    } catch (e) {
+      console.warn('[MRF] boot recs', e);
+    }
     if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
     hidePageBoot();
   };
@@ -1293,11 +1571,11 @@ function hidePageBootWhenAuthReady() {
     if (mrfAuthIsReady()) finish();
   };
   if (mrfAuthIsReady()) {
-    requestAnimationFrame(finish);
+    requestAnimationFrame(() => { finish(); });
     return;
   }
   window.addEventListener('mrf:auth', onAuth);
-  setTimeout(finish, 8000);
+  setTimeout(() => { finish(); }, 15000);
 }
 window.hidePageBootWhenAuthReady = hidePageBootWhenAuthReady;
 
@@ -1378,15 +1656,21 @@ window.trackCoverOf = trackCoverOf;
 
 function favToTrack(f) {
   const cover = f.cover || f.album?.cover_medium || f.album?.cover || '';
+  const deezerId = f.deezerId
+    || (String(f.id || '').startsWith('dz_') ? String(f.id).slice(3) : null)
+    || (typeof deezerIdOf === 'function' ? deezerIdOf(f) : null)
+    || null;
   return {
-    id: f.id,
+    id: f.id || (deezerId ? `dz_${deezerId}` : f.id),
+    deezerId: deezerId || null,
     title: f.title,
     artistName: f.artist || f.artistName || '',
     artist: { id: f.artistId || f.artist?.id || null, name: f.artist || f.artistName || f.artist?.name || '' },
     cover,
     album: { id: f.albumId || f.album?.id || null, title: f.albumTitle || f.album?.title || '', cover_medium: cover, cover },
     duration: f.duration || 0,
-    preview: f.preview || null
+    preview: f.preview || null,
+    source: 'deezer'
   };
 }
 
@@ -1530,6 +1814,7 @@ function confirmCreatePlaylist() {
   if (!name) { showNotif('Введи название'); return; }
 
   const pl = Store.createPlaylist(name, '');
+  if (!pl) return;
   _createPlDraftTracks.forEach(t => Store.addTrackToPlaylist(pl.id, t));
   if (window._bulkPending?.length) {
     window._bulkPending.forEach(f => Store.addTrackToPlaylist(pl.id, favToTrack(f)));
@@ -1549,6 +1834,8 @@ function confirmCreatePlaylist() {
 }
 
 function showAddTracksToPlaylist(playlistId) {
+  const cur = typeof Store.getPlaylist === 'function' ? Store.getPlaylist(playlistId) : null;
+  if (cur && typeof Store.isOwnedPlaylist === 'function' && !Store.isOwnedPlaylist(cur)) return;
   ensurePlaylistModals();
   _addTracksPlaylistId = playlistId;
   const modal = document.getElementById('modal-add-tracks');
@@ -1610,6 +1897,8 @@ function pickAddPlaylistTrack(i) {
 
 let _renamePlaylistId = null;
 function showRenamePlaylist(id) {
+  const cur = typeof Store.getPlaylist === 'function' ? Store.getPlaylist(id) : null;
+  if (cur && typeof Store.isOwnedPlaylist === 'function' && !Store.isOwnedPlaylist(cur)) return;
   ensurePlaylistModals();
   const pl = Store.getPlaylist(id);
   if (!pl) return;
@@ -1648,7 +1937,9 @@ function showAddToPlaylist(track) {
   const overlay = document.getElementById('modal-overlay');
   const list = document.getElementById('modal-playlist-list');
 
-  const pls = Store.getPlaylists();
+  const pls = typeof Store.getOwnedPlaylists === 'function'
+    ? Store.getOwnedPlaylists()
+    : (Store.getPlaylists() || []).filter((p) => p && p.origin !== 'saved' && !p.readOnly);
 
   if (!pls.length) {
     if (list) list.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px">
@@ -1679,7 +1970,7 @@ function showAddToPlaylist(track) {
 
 function toggleTrackInPlaylist(playlistId, trackId, el) {
   const pl = Store.getPlaylist(playlistId);
-  if (!pl) return;
+  if (!pl || (typeof Store.isOwnedPlaylist === 'function' && !Store.isOwnedPlaylist(pl))) return;
 
   const inPlaylist = pl.tracks?.some(t => String(t.id) === String(trackId));
 

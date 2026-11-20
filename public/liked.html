@@ -76,20 +76,28 @@ window.addEventListener('mrf:auth', () => {
 });
 
 function favToTrack(f) {
-  const primary = { id: f.artistId || null, name: f.artist || '' };
+  const primary = { id: f.artistId || null, name: f.artist || f.artistName || '' };
   const feats = typeof parseFeatNames === 'function' ? parseFeatNames(f.title || '') : [];
   const artists = typeof uniqArtists === 'function'
     ? uniqArtists([primary, ...feats.map(n => ({ name: n, id: null }))])
     : [primary, ...feats.map(n => ({ name: n, id: null }))];
+  const deezerId = f.deezerId
+    || (String(f.id || '').startsWith('dz_') ? String(f.id).slice(3) : null)
+    || (typeof deezerIdOf === 'function' ? deezerIdOf(f) : null)
+    || null;
   return {
-    id: f.id || 0,
+    id: f.id || (deezerId ? `dz_${deezerId}` : 0),
+    deezerId: deezerId || null,
     title: f.title,
     artist: primary,
+    artistName: primary.name || '',
     artists,
     artistId: f.artistId || null,
     album: { id: f.albumId || null, title: f.albumTitle || '', cover_medium: f.cover },
+    cover: f.cover || '',
     duration: f.duration || 0,
-    preview: f.preview || null
+    preview: f.preview || null,
+    source: 'deezer'
   };
 }
 

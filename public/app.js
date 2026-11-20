@@ -1,8 +1,8 @@
 /* =====================================================
    MRF — Music Streaming
-   API:   Deezer JSONP  (быстро, фото, обложки, много треков)
+   API:   Deezer JSONP  (каталог / превью) + /api (auth / library / recs)
    Audio: HTML5 Audio   (30-сек превью Deezer)
-   DB:    Supabase      (избранное, история)
+   DB:    Supabase via /api
    ===================================================== */
 
 const DZ = 'https://api.deezer.com';
@@ -35,6 +35,11 @@ let recentTracks = Store.getRecent();
 
 /** Intent to keep playing across full page navigations (pause-on-unload must not clear this) */
 let _wantPlaying = false;
+/** Playback source key/label for FS «Сейчас играет» subtitle */
+let currentSrcKey = '';
+let currentSrcLabel = '';
+window.currentSrcKey = '';
+window.currentSrcLabel = '';
 let _persistPosTimer = null;
 let _audioBound = false;
 let _navHandlersBound = false;
@@ -311,6 +316,8 @@ async function enrichTrackArtists(t) {
         if (Array.isArray(full.contributors) && full.contributors.length) fromApi = full.contributors;
         else if (full.artist) fromApi = [full.artist];
         if (full.title && !t.title) t.title = full.title;
+        // Keep preview fresh — saved library/recent URLs often expire
+        if (full.preview) t.preview = full.preview;
       }
     } catch (_) {}
   }
@@ -347,7 +354,29 @@ async function enrichTrackArtists(t) {
 }
 window.enrichTrackArtists = enrichTrackArtists;
 
+/** Drop audiobooks / podcasts / spoken chapters from music feeds. */
+function isSpokenOrNonMusic(t) {
+  if (!t) return true;
+  const title = String(t.title || t.name || '').trim();
+  const artist = String(t.artist?.name || t.artistName || (typeof t.artist === 'string' ? t.artist : '') || '').trim();
+  const album = String(t.album?.title || '').trim();
+  const blob = `${title} ${artist} ${album}`.toLowerCase();
+  if (!title) return true;
+  // «Часть 102 — …», «Глава 3», «Part 12», «Episode 5»
+  if (/^(часть|глава|chapter|part|episode|эпизод|выпуск)\s*[\d№#]/i.test(title)) return true;
+  if (/\b(часть|глава|chapter|part|episode|эпизод)\s*[\d№#]+\b/i.test(title) && title.length > 28) return true;
+  if (/\b(аудиокниг|audiobook|podcast|подкаст|spoken[\s-]?word|лекци[яи]|рассказ\b|отрывок|ветеринарн)\b/i.test(blob)) return true;
+  if (/\b(meditation guidance|guided meditation|sleep story|bedtime story)\b/i.test(blob)) return true;
+  // Very long lecture-style titles with «Про …»
+  if (/^про\s+/i.test(title) && title.length > 48) return true;
+  if (title.length > 90 && /\b(врач|здоровье|книг|рассказ|истори[яи])\b/i.test(title)) return true;
+  return false;
+}
+window.isSpokenOrNonMusic = isSpokenOrNonMusic;
+
 function normDZ(t) {
+  if (!t || t.id == null) return null;
+  if (isSpokenOrNonMusic(t)) return null;
   const artists = collectArtistsFromDZ(t);
   const primary = artists[0] || {
     id: t.artist?.id,
@@ -381,6 +410,198 @@ function normDZ(t) {
     source:    'deezer'
   };
 }
+
+function samePlayableTrack(a, b) {
+  if (!a || !b) return false;
+  if (a.id != null && b.id != null && String(a.id) === String(b.id)) return true;
+  const ad = a.deezerId || String(a.id || '').replace(/^dz_/i, '');
+  const bd = b.deezerId || String(b.id || '').replace(/^dz_/i, '');
+  if (ad && bd && String(ad) === String(bd)) return true;
+  const at = String(a.title || '').trim().toLowerCase();
+  const bt = String(b.title || '').trim().toLowerCase();
+  if (!at || at !== bt) return false;
+  const aa = String(a.artistName || a.artist?.name || a.artist || '').trim().toLowerCase();
+  const ba = String(b.artistName || b.artist?.name || b.artist || '').trim().toLowerCase();
+  return !!aa && aa === ba;
+}
+
+function deezerIdOf(t) {
+  if (!t) return '';
+  if (t.deezerId != null && String(t.deezerId)) return String(t.deezerId).replace(/^dz_/i, '');
+  const id = String(t.id || '');
+  if (/^dz_\d+$/i.test(id)) return id.replace(/^dz_/i, '');
+  if (/^\d+$/.test(id)) return id;
+  return '';
+}
+
+/** Persist a freshly resolved preview into recent / likes / playlists so next play works. */
+function patchStoredPreview(t) {
+  if (!t?.preview || typeof Store === 'undefined') return;
+  const dzId = deezerIdOf(t) || t.deezerId || null;
+  const patchOne = (x) => {
+    if (!samePlayableTrack(x, t)) return { item: x, changed: false };
+    if (x.preview === t.preview && String(x.deezerId || '') === String(dzId || '')) {
+      return { item: x, changed: false };
+    }
+    return {
+      item: { ...x, preview: t.preview, deezerId: dzId || x.deezerId || null },
+      changed: true
+    };
+  };
+  try {
+    if (typeof Store.getRecent === 'function' && typeof Store.setRecent === 'function') {
+      let changed = false;
+      const next = Store.getRecent().map((x) => {
+        const r = patchOne(x);
+        if (r.changed) changed = true;
+        return r.item;
+      });
+      if (changed) Store.setRecent(next);
+    }
+    if (typeof Store.getFavs === 'function' && typeof Store.setFavs === 'function') {
+      let changed = false;
+      const next = Store.getFavs().map((x) => {
+        const r = patchOne(x);
+        if (r.changed) changed = true;
+        return r.item;
+      });
+      if (changed) Store.setFavs(next);
+    }
+    if (typeof Store.getPlaylists === 'function' && typeof Store.setPlaylists === 'function') {
+      const pls = Store.getPlaylists();
+      let changed = false;
+      const next = pls.map((pl) => {
+        if (!Array.isArray(pl.tracks) || !pl.tracks.length) return pl;
+        let plChanged = false;
+        const tracks = pl.tracks.map((x) => {
+          const r = patchOne(x);
+          if (r.changed) plChanged = true;
+          return r.item;
+        });
+        if (!plChanged) return pl;
+        changed = true;
+        return { ...pl, tracks };
+      });
+      if (changed) Store.setPlaylists(next);
+    }
+  } catch (_) {}
+}
+
+function _applyDzTrackFields(t, raw) {
+  if (!t || !raw) return t;
+  if (raw.preview) t.preview = raw.preview;
+  if (raw.id != null) {
+    t.deezerId = raw.id;
+    if (!t.id || String(t.id) === String(raw.id) || /^\d+$/.test(String(t.id))) {
+      t.id = `dz_${raw.id}`;
+    }
+  }
+  if (raw.title) t.title = t.title || raw.title;
+  if (raw.album) {
+    t.album = t.album && typeof t.album === 'object'
+      ? {
+          ...t.album,
+          id: raw.album.id || t.album.id,
+          title: raw.album.title || t.album.title,
+          cover_small: raw.album.cover_small || t.album.cover_small,
+          cover_medium: raw.album.cover_medium || t.album.cover_medium,
+          cover_big: raw.album.cover_big || t.album.cover_big,
+          cover_xl: raw.album.cover_xl || t.album.cover_xl,
+          cover: raw.album.cover_xl || raw.album.cover_big || raw.album.cover_medium || t.album.cover
+        }
+      : raw.album;
+    t.cover = t.cover || raw.album.cover_medium || raw.album.cover || '';
+  }
+  if (raw.artist) {
+    t.artist = t.artist && typeof t.artist === 'object'
+      ? { ...t.artist, id: raw.artist.id || t.artist.id, name: raw.artist.name || t.artist.name }
+      : { id: raw.artist.id, name: raw.artist.name || '' };
+    t.artistName = t.artistName || raw.artist.name || '';
+  }
+  if (raw.duration) t.duration = t.duration || raw.duration;
+  return t;
+}
+
+/**
+ * Resolve a working Deezer preview for library/recent/queue tracks.
+ * Search results are fresh; saved copies often lose preview — refetch by id or title.
+ * force: bypass client/server cache and prefer a different CDN url when possible.
+ */
+async function ensureTrackPreview(t, opts) {
+  if (!t) return null;
+  const force = !!(opts && opts.force);
+  const oldPreview = t.preview || '';
+  // Saved library/recent previews expire — never trust them blindly when force=true
+  if (t.preview && !force) return t;
+
+  // Reuse a fresh preview from another in-memory rail (skip when forcing refresh)
+  if (!force) {
+    try {
+      if (typeof _src === 'object' && _src) {
+        for (const key of Object.keys(_src)) {
+          const hit = (_src[key] || []).find((x) => samePlayableTrack(x, t) && x.preview);
+          if (hit?.preview) {
+            t.preview = hit.preview;
+            if (hit.deezerId) t.deezerId = hit.deezerId;
+            return t;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  const dzId = deezerIdOf(t);
+  if (dzId && /^\d+$/.test(dzId)) {
+    try {
+      const raw = await dzObj(`/track/${dzId}`);
+      // Apply preview directly — do not run spoken filter (normDZ) on library resolves
+      if (raw && !raw.error && raw.preview) {
+        _applyDzTrackFields(t, raw);
+        // Same CDN url as the dead one → keep looking via search
+        if (!force || !oldPreview || t.preview !== oldPreview) return t;
+      }
+    } catch (_) {}
+  }
+
+  const artist = t.artistName || t.artist?.name || (typeof t.artist === 'string' ? t.artist : '') || '';
+  const q = `${t.title || ''} ${artist}`.trim();
+  if (!q) return t.preview ? t : null;
+  try {
+    const found = (await dzArr(`/search/track?q=${encodeURIComponent(q)}&limit=10`))
+      .map(normDZ)
+      .filter(Boolean);
+    const preferAlt = force && !!oldPreview;
+    const hit = (preferAlt
+        ? found.find((x) => x.preview && x.preview !== oldPreview && samePlayableTrack(x, t))
+        : null)
+      || found.find((x) => samePlayableTrack(x, t) && x.preview)
+      || (preferAlt ? found.find((x) => x.preview && x.preview !== oldPreview) : null)
+      || found.find((x) => {
+        const xt = String(x.title || '').trim().toLowerCase();
+        const tt = String(t.title || '').trim().toLowerCase();
+        return xt && tt && xt === tt && x.preview;
+      })
+      || found.find((x) => x.preview)
+      || found[0];
+    if (hit?.preview) {
+      t.preview = hit.preview;
+      t.deezerId = hit.deezerId || t.deezerId || null;
+      if (!t.id || String(t.id).startsWith('local') || /^\d+$/.test(String(t.id))) t.id = hit.id;
+      if (hit.album) t.album = hit.album;
+      if (hit.cover || hit.album?.cover_medium) {
+        t.cover = hit.cover || hit.album?.cover_medium || t.cover;
+      }
+      if (hit.artist) {
+        t.artist = hit.artist;
+        t.artistName = hit.artist.name || t.artistName;
+      }
+      return t;
+    }
+  } catch (_) {}
+
+  return t.preview ? t : null;
+}
+window.ensureTrackPreview = ensureTrackPreview;
 
 /* ══════════════════════════════════
    AUDIO
@@ -434,10 +655,9 @@ function bindAudio() {
   audio.addEventListener('error', () => {
     if (!_wantPlaying && !_switchingTrack) return;
     const token = _playToken;
-    showNotification('Трек недоступен');
     setTimeout(() => {
       if (token !== _playToken) return;
-      advancePastUnavailable();
+      void retryPreviewOrSkip(token);
     }, 0);
   });
   audio.addEventListener('timeupdate', () => {
@@ -947,11 +1167,75 @@ async function searchByTag(tag) {
 /* ══════════════════════════════════
    PLAYBACK
 ══════════════════════════════════ */
+function resolvePlaybackSourceLabel(key) {
+  const k = String(key || '');
+  if (!k) return '';
+  if (k === 'liked' || k === 'favs') return 'Любимые треки';
+  if (k === 'charts' || k === 'rising') return 'Чарты';
+  if (k === 'home') return 'Главная';
+  if (k === 'recent') return 'Недавние';
+  if (k === 's-tracks' || k === 'mobile_flyout_tracks' || k === 'flyout_tracks' || k === 'search_trend') {
+    let q = '';
+    try {
+      q = String(window.__mrfLastSearchQ || new URLSearchParams(location.search).get('q') || '').trim();
+    } catch (_) {}
+    return q ? `Поиск: «${q}»` : 'Поиск';
+  }
+  if (k.startsWith('pl_') || k.startsWith('playlist')) {
+    const rawId = k.replace(/^playlist_?/, '').replace(/^pl_/, '');
+    try {
+      if (typeof Store !== 'undefined' && Store.getPlaylist) {
+        const pl = Store.getPlaylist(rawId) || Store.getPlaylist(String(rawId).replace(/^rec_/, ''));
+        if (pl?.name) return pl.name;
+      }
+      if (String(rawId).startsWith('rec_')) {
+        const v = JSON.parse(sessionStorage.getItem('mrf_virtual_playlist') || 'null');
+        if (v && String(v.id) === String(rawId) && v.name) return v.name;
+        if (v?.kind === 'mood') return v.name || 'Настроение';
+      }
+    } catch (_) {}
+    if (String(rawId).includes('playlist_of_the_day')) {
+      return typeof mrfDayPlaylistTitle === 'function' ? mrfDayPlaylistTitle() : 'Плейлист дня';
+    }
+    if (String(rawId).includes('mood_')) return 'Настроение';
+    if (String(rawId).includes('artist_mix') || String(rawId).startsWith('rec_')) return 'Микс';
+    return 'Плейлист';
+  }
+  if (k.startsWith('mfy_')) {
+    try {
+      const pl = window.__mrfRecMixes && window.__mrfRecMixes[k];
+      if (pl?.name) return pl.name;
+      if (pl?.kind === 'day') {
+        return typeof mrfDayPlaylistTitle === 'function' ? mrfDayPlaylistTitle(pl.localDay) : 'Плейлист дня';
+      }
+    } catch (_) {}
+    return 'Микс';
+  }
+  if (k.startsWith('album') || k.includes('album')) return 'Альбом';
+  if (k.includes('artist') || k.startsWith('rp_artist')) return 'Исполнитель';
+  if (k === 'track_page' || k === 'mock_single') return 'Трек';
+  return 'Очередь';
+}
+window.resolvePlaybackSourceLabel = resolvePlaybackSourceLabel;
+
+function setPlaybackSource(key) {
+  currentSrcKey = String(key || '');
+  currentSrcLabel = resolvePlaybackSourceLabel(currentSrcKey);
+  window.currentSrcKey = currentSrcKey;
+  window.currentSrcLabel = currentSrcLabel;
+  try {
+    Store.setPlayerState({ srcKey: currentSrcKey, srcLabel: currentSrcLabel });
+  } catch (_) {}
+  if (typeof syncFsPlayerContext === 'function') syncFsPlayerContext();
+}
+window.setPlaybackSource = setPlaybackSource;
+
 function playFromSrc(key, index) {
   const list = _src[key];
   if (!list?.length) return;
   _trackFlowDir = 1;
   window._trackFlowDir = 1;
+  setPlaybackSource(key);
   // «Перемешивание при запуске» — включать shuffle при старте нового списка
   try {
     if (typeof Store !== 'undefined' && Store.getSettings().shuffleOnPlay && !isShuffle) {
@@ -1007,7 +1291,7 @@ function stopAtEndOfQueue() {
 
 /**
  * After an unavailable track: notify already shown by caller.
- * Skip forward until a playable preview is found (respects repeat wrap).
+ * Skip forward and let playNow resolve previews (library/recent often need refetch).
  */
 function advancePastUnavailable() {
   const n = queue.length;
@@ -1038,45 +1322,24 @@ function advancePastUnavailable() {
       stopPlaybackUi();
       return;
     }
-    const cand = queue[i];
-    if (cand?.preview) {
-      queueIndex = i;
-      _trackFlowDir = 1;
-      window._trackFlowDir = 1;
-      playNow();
-      return;
-    }
-    showNotification('Трек недоступен');
+    queueIndex = i;
+    _trackFlowDir = 1;
+    window._trackFlowDir = 1;
+    playNow();
+    return;
   }
   stopPlaybackUi();
 }
 
-function playNow() {
-  if (queueIndex < 0 || queueIndex >= queue.length) return;
-  const token = ++_playToken;
+function startAudioForCurrent(token) {
   const t = queue[queueIndex];
-  updatePlayerUI(t);
-  addToRecent(t);
-  renderQueuePanel();
-  updateFavBtn();
-  syncPlayingRows();
-  _wantPlaying = true;
-  persistPlayer();
-  // Load full contributor list (Deezer search often returns only 1 artist)
-  const playId = t.id;
-  enrichTrackArtists(t).then(enriched => {
-    if (token !== _playToken) return;
-    if (queue[queueIndex]?.id !== playId) return;
-    Object.assign(queue[queueIndex], enriched);
-    updatePlayerUI(queue[queueIndex]);
-    if (typeof syncRightPanel === 'function') syncRightPanel();
-  }).catch(() => {});
-  if (!t.preview) {
+  if (!t?.preview) {
     showNotification('Трек недоступен');
     advancePastUnavailable();
     return;
   }
   _switchingTrack = true;
+  _wantPlaying = true;
   try { audio.pause(); } catch (_) {}
   audio.src = t.preview;
   audio.volume = isMuted ? 0 : volume;
@@ -1094,9 +1357,105 @@ function playNow() {
     .catch(() => {
       if (token !== _playToken) return;
       _switchingTrack = false;
+      void retryPreviewOrSkip(token);
+    });
+}
+
+async function retryPreviewOrSkip(token) {
+  if (token !== _playToken) return;
+  const cur = queue[queueIndex];
+  if (cur && !cur._previewRetried) {
+    cur._previewRetried = true;
+    const oldPreview = cur.preview || '';
+    try {
+      // Prefer a different search hit — /track/:id sometimes returns a dead CDN url
+      const artist = cur.artistName || cur.artist?.name || (typeof cur.artist === 'string' ? cur.artist : '') || '';
+      const q = `${cur.title || ''} ${artist}`.trim();
+      if (q) {
+        const found = (await dzArr(`/search/track?q=${encodeURIComponent(q)}&limit=10`))
+          .map(normDZ)
+          .filter(Boolean);
+        const hit = found.find((x) => x.preview && x.preview !== oldPreview && samePlayableTrack(x, cur))
+          || found.find((x) => x.preview && x.preview !== oldPreview)
+          || found.find((x) => x.preview && samePlayableTrack(x, cur));
+        if (hit?.preview) {
+          if (token !== _playToken) return;
+          Object.assign(cur, {
+            preview: hit.preview,
+            deezerId: hit.deezerId || cur.deezerId,
+            id: hit.id || cur.id,
+            album: hit.album || cur.album,
+            cover: hit.cover || hit.album?.cover_medium || cur.cover,
+            artist: hit.artist || cur.artist,
+            artistName: hit.artist?.name || cur.artistName
+          });
+          patchStoredPreview(cur);
+          updatePlayerUI(cur);
+          startAudioForCurrent(token);
+          return;
+        }
+      }
+      const again = await ensureTrackPreview(cur, { force: true });
+      if (token !== _playToken) return;
+      if (again?.preview && again.preview !== oldPreview) {
+        Object.assign(cur, again);
+        patchStoredPreview(cur);
+        updatePlayerUI(cur);
+        startAudioForCurrent(token);
+        return;
+      }
+    } catch (_) {}
+  }
+  showNotification('Трек недоступен');
+  advancePastUnavailable();
+}
+
+function playNow() {
+  if (queueIndex < 0 || queueIndex >= queue.length) return;
+  const token = ++_playToken;
+  const t = queue[queueIndex];
+  if (t) t._previewRetried = false;
+  updatePlayerUI(t);
+  addToRecent(t);
+  renderQueuePanel();
+  updateFavBtn();
+  syncPlayingRows();
+  _wantPlaying = true;
+  persistPlayer();
+  // Load full contributor list (Deezer search often returns only 1 artist)
+  const playId = t.id;
+  enrichTrackArtists(t).then(enriched => {
+    if (token !== _playToken) return;
+    if (queue[queueIndex]?.id !== playId && deezerIdOf(queue[queueIndex]) !== deezerIdOf({ id: playId })) return;
+    Object.assign(queue[queueIndex], enriched);
+    updatePlayerUI(queue[queueIndex]);
+    if (typeof syncRightPanel === 'function') syncRightPanel();
+  }).catch(() => {});
+
+  void (async () => {
+    try {
+      // Always refresh preview from Deezer — library/recent URLs go stale while search is fresh
+      const ensured = await ensureTrackPreview(queue[queueIndex], { force: true });
+      if (token !== _playToken) return;
+      const cur = queue[queueIndex];
+      if (!cur) return;
+      if (ensured?.preview) {
+        Object.assign(cur, ensured);
+        patchStoredPreview(cur);
+        updatePlayerUI(cur);
+      }
+      if (!cur.preview) {
+        showNotification('Трек недоступен');
+        advancePastUnavailable();
+        return;
+      }
+      startAudioForCurrent(token);
+    } catch (_) {
+      if (token !== _playToken) return;
       showNotification('Трек недоступен');
       advancePastUnavailable();
-    });
+    }
+  })();
 }
 
 function persistPlayer(forcePos) {
@@ -1112,7 +1471,9 @@ function persistPlayer(forcePos) {
       shuffle: !!isShuffle,
       repeat: isRepeat || 'off',
       position: remember ? livePos : 0,
-      playing: !!_wantPlaying && !audio.ended
+      playing: !!_wantPlaying && !audio.ended,
+      srcKey: currentSrcKey || Store.getPlayerState()?.srcKey || '',
+      srcLabel: currentSrcLabel || Store.getPlayerState()?.srcLabel || ''
     });
   } catch {}
 }
@@ -1340,7 +1701,7 @@ function updatePlayerUI(t) {
   if (c) {
     c.style.backgroundImage = cover ? `url("${cover}")` : '';
     c.style.backgroundSize = 'cover';
-    c.style.backgroundPosition = 'center';
+  c.style.backgroundPosition = 'center';
     c.style.backgroundColor = cover ? 'transparent' : 'var(--bg-3)';
     c.classList.toggle('is-empty', !cover);
   }
@@ -1441,6 +1802,7 @@ function toggleFavByIdx(idx, key, btn) {
   const t = _src[key]?.[idx]; if (!t) return;
   const added = Store.toggleFav({
     id: t.id,
+    deezerId: deezerIdOf(t) || t.deezerId || null,
     title: t.title,
     artistName: t.artist?.name || '',
     artist: t.artist,
@@ -1467,6 +1829,7 @@ function toggleFavPlayer() {
   const btn=el('player-like-btn');
   const added = Store.toggleFav({
     id: t.id,
+    deezerId: deezerIdOf(t) || t.deezerId || null,
     title: t.title,
     artistName: t.artist?.name || t.artist || '',
     artist: t.artist,
@@ -1523,12 +1886,12 @@ function restorePlayerState() {
     ? Store.getSettings().defaultVolume
     : 70;
   volume = (pState.volume ?? defVol) / 100;
-  isMuted = pState.muted || false;
+    isMuted = pState.muted || false;
   isShuffle = !!pState.shuffle;
   isRepeat = pState.repeat || 'off';
-  audio.volume = isMuted ? 0 : volume;
-  const vfill = el('volume-fill');
-  if (vfill) vfill.style.width = (volume * 100) + '%';
+    audio.volume = isMuted ? 0 : volume;
+    const vfill = el('volume-fill');
+    if (vfill) vfill.style.width = (volume * 100) + '%';
   if (typeof syncShuffleRepeatUi === 'function') syncShuffleRepeatUi();
   else {
     el('btn-shuffle')?.classList.toggle('active-btn', isShuffle);
@@ -1536,11 +1899,23 @@ function restorePlayerState() {
   }
   updateVolumeIcon();
 
-  const t = queue[queueIndex];
-  const shouldResume = !!pState.playing && !!t?.preview;
-  if (!t?.preview) return;
+  // Restore source label for FS header
+  currentSrcKey = String(pState.srcKey || '');
+  currentSrcLabel = String(pState.srcLabel || '') || resolvePlaybackSourceLabel(currentSrcKey);
+  window.currentSrcKey = currentSrcKey;
+  window.currentSrcLabel = currentSrcLabel;
+  if (typeof syncFsPlayerContext === 'function') syncFsPlayerContext();
 
-  _wantPlaying = shouldResume;
+  const t = queue[queueIndex];
+  // Hard refresh: always start paused (soft-nav keeps the live audio element)
+  _wantPlaying = false;
+  try { Store.setPlayerState({ playing: false }); } catch (_) {}
+  if (!t?.preview) {
+    setPlayIcon(false);
+    syncPlayingRows();
+    return;
+  }
+
   audio.src = t.preview;
   audio.volume = isMuted ? 0 : volume;
 
@@ -1552,34 +1927,15 @@ function restorePlayerState() {
     }
   };
 
-  const tryResume = () => {
+  const finishPaused = () => {
     applySeek();
-    if (!shouldResume) {
-      setPlayIcon(false);
-      syncPlayingRows();
-      return;
-    }
-    audio.play().then(() => {
-      setPlayIcon(true);
-      startProgress();
-      syncPlayingRows();
-    }).catch(() => {
-      // Autoplay policy: resume on first user gesture
-      setPlayIcon(false);
-      syncPlayingRows();
-      const unlock = () => {
-        if (!_wantPlaying) return;
-        audio.play().then(() => { setPlayIcon(true); startProgress(); syncPlayingRows(); }).catch(() => {});
-        document.removeEventListener('pointerdown', unlock, true);
-        document.removeEventListener('keydown', unlock, true);
-      };
-      document.addEventListener('pointerdown', unlock, true);
-      document.addEventListener('keydown', unlock, true);
-    });
+    try { audio.pause(); } catch (_) {}
+    setPlayIcon(false);
+    syncPlayingRows();
   };
 
-  if (audio.readyState >= 1) tryResume();
-  else audio.addEventListener('loadedmetadata', tryResume, { once: true });
+  if (audio.readyState >= 1) finishPaused();
+  else audio.addEventListener('loadedmetadata', finishPaused, { once: true });
   audio.load();
 }
 function syncFavIcons() {
@@ -2010,7 +2366,7 @@ function renderMoodGrid() {
   const box = el('mood-grid'); if (!box) return;
   box.className = 'mood-rail';
   box.innerHTML = MOCK.moods.map(m => `
-    <button type="button" class="mood-card" onclick="searchByTag('${esc(m.tag)}')">
+    <button type="button" class="mood-card" data-explore-kind="mood" data-explore-id="${esc(m.id)}" data-explore-name="${esc(m.name)}" data-explore-tag="${esc(m.tag)}" data-explore-color="${esc(m.color || '')}" data-explore-cover="${esc(m.image || '')}">
       <span class="mood-card-media" style="background-image:url('${m.image || ''}');background-color:${m.color || '#222'}"></span>
       <span class="mood-card-shade"></span>
       <span class="mood-card-copy">
@@ -2018,6 +2374,23 @@ function renderMoodGrid() {
         <span class="mood-card-hint">${esc(m.hint || '')}</span>
       </span>
     </button>`).join('');
+  if (box.dataset.exploreBound !== '1') {
+    box.dataset.exploreBound = '1';
+    box.addEventListener('click', (e) => {
+      const btn = e.target.closest?.('[data-explore-kind]');
+      if (!btn) return;
+      const spec = {
+        kind: btn.getAttribute('data-explore-kind'),
+        id: btn.getAttribute('data-explore-id'),
+        name: btn.getAttribute('data-explore-name'),
+        tag: btn.getAttribute('data-explore-tag'),
+        color: btn.getAttribute('data-explore-color'),
+        cover: btn.getAttribute('data-explore-cover')
+      };
+      if (typeof openExploreMix === 'function') openExploreMix(spec);
+      else if (typeof searchByTag === 'function') searchByTag(spec.tag || '');
+    });
+  }
 }
 
 function renderRecommendations() {
@@ -2240,6 +2613,18 @@ function confirmDeletePlaylist(id) {
 ══════════════════════════════════ */
 let _ctxMenu = null;
 
+/** «Удалить из плейлиста» — только свои плейлисты (не микс / не день / не readOnly) */
+function isOwnedPlaylistSrcKey(key) {
+  const k = String(key || '');
+  if (!k.startsWith('pl_')) return false;
+  const id = k.slice(3);
+  if (!id || id.startsWith('rec_')) return false;
+  const pl = (typeof Store !== 'undefined' && Store.getPlaylist) ? Store.getPlaylist(id) : null;
+  if (!pl || pl.readOnly) return false;
+  return true;
+}
+window.isOwnedPlaylistSrcKey = isOwnedPlaylistSrcKey;
+
 function showTrackMenu(e, idx, key) {
   e.preventDefault();
   e.stopPropagation();
@@ -2266,6 +2651,7 @@ function showTrackMenu(e, idx, key) {
   const albumId = t.album?.id || null;
   const albumTitle = t.album?.title || '';
   const trackId = t.deezerId || String(t.id || '').replace(/^dz_/i, '') || t.id;
+  const canRemoveFromPl = isOwnedPlaylistSrcKey(key);
 
   const item = (action, icon, label, danger) =>
     `<button type="button" class="ctx-item${danger ? ' ctx-item-danger' : ''}" data-ctx="${action}">${icon}${label}</button>`;
@@ -2283,7 +2669,7 @@ function showTrackMenu(e, idx, key) {
     <div class="ctx-divider"></div>
     ${item('fav', icoHeart, fav ? 'Удалить из избранного' : 'Добавить в избранное')}
     ${item('playlist', icoPlus, 'Добавить в плейлист')}
-    ${String(key).startsWith('pl_') ? item('rm-pl', '', 'Удалить из плейлиста', true) : ''}
+    ${canRemoveFromPl ? item('rm-pl', '', 'Удалить из плейлиста', true) : ''}
     <div class="ctx-divider"></div>
     ${albumId ? item('album', '', 'К альбому') : ''}
     ${artistName || artistId ? item('artist', '', 'К исполнителю') : ''}
@@ -2374,6 +2760,7 @@ function toggleFavFromMenu(idx, key) {
   const t = _src[key]?.[idx]; if (!t) return;
   const added = Store.toggleFav({
     id: t.id,
+    deezerId: deezerIdOf(t) || t.deezerId || null,
     title: t.title,
     artistName: t.artist?.name || '',
     artist: t.artist,

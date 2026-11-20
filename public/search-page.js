@@ -1,6 +1,42 @@
 /* MRF — search-page.js (external to avoid let collisions with app.js) */
 var _searchPageTimer = null;
-var _searchPageResults = { tracks: [], artists: [], albums: [] };
+var _searchPageResults = { tracks: [], artists: [], albums: [], playlists: [] };
+
+function searchPlaylistAuthorLabel(pl) {
+  const raw = pl?.author?.username || '';
+  if (!raw) return '';
+  if (window.MrfAuth?.displayUsername) return MrfAuth.displayUsername(raw);
+  const s = String(raw).trim().replace(/^@+/, '');
+  return s ? '@' + s : '';
+}
+
+function searchPlaylistCardHTML(pl) {
+  const href = typeof mrfUrl === 'function'
+    ? mrfUrl('playlist', { id: pl.id })
+    : `playlist.html?id=${encodeURIComponent(pl.id)}`;
+  const handle = searchPlaylistAuthorLabel(pl);
+  const sub = handle
+    ? handle
+    : `${pl.trackCount || pl.tracks?.length || 0} треков`;
+  return `
+    <div class="lib-card" onclick="(window.mrfGo||function(u){location.href=u})('${href}')">
+      ${pl.cover ? `<img src="${escHtml(pl.cover)}" class="lib-card-cover" alt="">` : `<div class="lib-card-cover-placeholder">${noteSVGShared()}</div>`}
+      <div class="lib-card-body">
+        <div class="lib-card-title">${escHtml(pl.name || 'Плейлист')}</div>
+        <div class="lib-card-sub">${escHtml(sub)}</div>
+      </div>
+    </div>`;
+}
+
+async function searchPublicPlaylists(q) {
+  if (!q || typeof mrfApi !== 'function') return [];
+  try {
+    const data = await mrfApi('/api/library?resource=playlistSearch&q=' + encodeURIComponent(q) + '&limit=20');
+    return Array.isArray(data?.items) ? data.items : [];
+  } catch (_) {
+    return [];
+  }
+}
 
 function syncMobileSearchInput(query) {
   const mob = document.getElementById('mobile-search-input');
@@ -25,6 +61,7 @@ async function renderMobileSearchFlyout(q) {
   const fly = document.getElementById('mobile-search-flyout');
   if (!fly) return;
   const query = (q || '').trim();
+  if (query) window.__mrfLastSearchQ = query;
   const gen = ++_mobileFlyoutGen;
 
   if (!query) {
@@ -52,7 +89,7 @@ async function renderMobileSearchFlyout(q) {
     let html = `<div class="search-flyout-hint"><span>Быстрый поиск</span><kbd>Enter</kbd><span>— все результаты</span></div>`;
     if (aList.length) {
       html += `<div class="search-flyout-label">Артисты</div>` + aList.map(a => `
-        <button type="button" class="search-flyout-row" onclick="closeMobileSearchFlyout();openArtist(${a.id != null && String(a.id) !== '' ? `'${jsStr(a.id)}'` : 'null'},'${jsStr(a.name)}')">
+        <button type="button" class="search-flyout-row" onclick="rememberCurrentSearchQuery('${jsStr(query)}');closeMobileSearchFlyout();openArtist(${a.id != null && String(a.id) !== '' ? `'${jsStr(a.id)}'` : 'null'},'${jsStr(a.name)}')">
           ${a.picture_medium ? `<img class="search-flyout-avatar" src="${a.picture_medium}" alt="">` : `<span class="search-flyout-avatar ph">${escHtml((a.name || '?')[0])}</span>`}
           <span class="search-flyout-meta"><span class="search-flyout-title">${escHtml(a.name || '')}</span><span class="search-flyout-sub">Исполнитель</span></span>
         </button>`).join('');
@@ -385,21 +422,23 @@ function doSearch(q, opts) {
 
 async function pageRunSearch(q) {
   if (!q || q.trim().length < 1) return;
+  window.__mrfLastSearchQ = String(q).trim();
   // Live typing must NOT write history — only Enter / click commits via doSearch({save:true})
   showSearchResults();
   const box = document.getElementById('search-results');
   if (box) box.innerHTML = loaderHTMLShared('Ищем…');
 
-  // BACKEND TODO: Получение поисковой выдачи
   try {
-    const [rawTracks, rawArtists, rawAlbums] = await Promise.all([
+    const [rawTracks, rawArtists, rawAlbums, publicPlaylists] = await Promise.all([
       dzArr(`/search/track?q=${encodeURIComponent(q)}&limit=50`),
       dzArr(`/search/artist?q=${encodeURIComponent(q)}&limit=20`),
-      dzArr(`/search/album?q=${encodeURIComponent(q)}&limit=20`)
+      dzArr(`/search/album?q=${encodeURIComponent(q)}&limit=20`),
+      searchPublicPlaylists(q)
     ]);
     _searchPageResults.tracks  = (rawTracks || []).map(normDZ);
     _searchPageResults.artists = (rawArtists || []).slice().sort((a, b) => (+b.nb_fan || 0) - (+a.nb_fan || 0));
     _searchPageResults.albums  = rawAlbums || [];
+    _searchPageResults.playlists = publicPlaylists || [];
 
     // reset tabs to "all"
     document.querySelectorAll('#search-tabs .tab-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
@@ -423,14 +462,9 @@ function switchSearchTab(tab, btn) {
 function renderSearchPlaylists() {
   const box = document.getElementById('search-results');
   if (!box) return;
-  const q = (document.getElementById('main-search-input')?.value || document.getElementById('search-input')?.value || '').trim().toLowerCase();
-  const pls = Store.getPlaylists().filter(p => !q || (p.name || '').toLowerCase().includes(q));
+  const pls = _searchPageResults.playlists || [];
   box.innerHTML = pls.length
-    ? `<div class="lib-grid">${pls.map(pl => `
-        <div class="lib-card" onclick="location.href='playlist.html?id=${pl.id}'">
-          ${pl.cover ? `<img src="${pl.cover}" class="lib-card-cover" alt="">` : `<div class="lib-card-cover-placeholder">${noteSVGShared()}</div>`}
-          <div class="lib-card-body"><div class="lib-card-title">${escHtml(pl.name)}</div><div class="lib-card-sub">${pl.trackCount} треков</div></div>
-        </div>`).join('')}</div>`
+    ? `<div class="lib-grid">${pls.map(searchPlaylistCardHTML).join('')}</div>`
     : `<div class="search-empty"><p>Плейлисты не найдены</p></div>`;
 }
 
@@ -441,6 +475,7 @@ function renderSearchAll() {
   const tracks = _searchPageResults.tracks;
   const artists = _searchPageResults.artists;
   const albums = _searchPageResults.albums;
+  const playlists = _searchPageResults.playlists || [];
 
   if (tracks.length) {
     const best = tracks[0];
@@ -460,7 +495,7 @@ function renderSearchAll() {
   if (artists.length) {
     html += `<div class="section"><div class="section-header"><h3 class="section-title" style="font-size:16px">Артисты</h3></div>
       <div class="artists-grid">${artists.slice(0, 6).map(a => `
-        <div class="artist-card" onclick="openArtist(${a.id != null && String(a.id) !== '' ? `'${jsStr(a.id)}'` : 'null'},'${jsStr(a.name)}')">
+        <div class="artist-card" onclick="rememberCurrentSearchQuery();openArtist(${a.id != null && String(a.id) !== '' ? `'${jsStr(a.id)}'` : 'null'},'${jsStr(a.name)}')">
           ${a.picture_medium ? `<img class="artist-img" src="${a.picture_medium}" alt="" loading="lazy">` : `<div class="artist-img-placeholder">${(a.name || '?')[0]}</div>`}
           <div class="artist-name">${escHtml(a.name)}</div>
           <div class="artist-listeners">${a.nb_fan ? (+a.nb_fan).toLocaleString('ru') + ' фанатов' : ''}</div>
@@ -473,6 +508,10 @@ function renderSearchAll() {
           ${a.cover_medium ? `<img class="album-cover" src="${a.cover_medium}" alt="" loading="lazy">` : `<div class="album-cover-placeholder">${noteSVGShared()}</div>`}
           <div class="album-body"><div class="album-title">${escHtml(a.title)}</div><div class="album-artist">${escHtml(a.artist?.name || '')}</div></div>
         </div>`).join('')}</div></div>`;
+  }
+  if (playlists.length) {
+    html += `<div class="section"><div class="section-header"><h3 class="section-title" style="font-size:16px">Плейлисты</h3></div>
+      <div class="lib-grid">${playlists.slice(0, 6).map(searchPlaylistCardHTML).join('')}</div></div>`;
   }
   if (!html) {
     html = `<div class="search-empty" style="padding:60px 0">
@@ -496,7 +535,7 @@ function renderSearchArtists() {
   if (!box) return;
   box.innerHTML = _searchPageResults.artists.length
     ? `<div class="artists-grid">${_searchPageResults.artists.map(a => `
-        <div class="artist-card" onclick="openArtist(${a.id != null && String(a.id) !== '' ? `'${jsStr(a.id)}'` : 'null'},'${jsStr(a.name)}')">
+        <div class="artist-card" onclick="rememberCurrentSearchQuery();openArtist(${a.id != null && String(a.id) !== '' ? `'${jsStr(a.id)}'` : 'null'},'${jsStr(a.name)}')">
           ${a.picture_medium ? `<img class="artist-img" src="${a.picture_medium}" alt="" loading="lazy">` : `<div class="artist-img-placeholder">${(a.name || '?')[0]}</div>`}
           <div class="artist-name">${escHtml(a.name)}</div>
           <div class="artist-listeners">${a.nb_fan ? (+a.nb_fan).toLocaleString('ru') + ' фанатов' : ''}</div>

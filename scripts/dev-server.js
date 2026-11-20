@@ -34,7 +34,8 @@ loadEnvFile();
 const API = {
   '/api/auth': require('../api/auth'),
   '/api/me': require('../api/me'),
-  '/api/library': require('../api/library')
+  '/api/library': require('../api/library'),
+  '/api/recommendations': require('../api/recommendations')
 };
 
 const MIME = {

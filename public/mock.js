@@ -94,7 +94,7 @@ const MOCK = {
   /* ── Настроения / Жанровые подборки ───────────── */
   moods: [
     {
-      id: 'mood1', name: 'В работу', tag: 'focus work', color: '#3d4a5c',
+      id: 'mood1', name: 'В работу', tag: 'focus instrumental', color: '#3d4a5c',
       hint: 'Спокойный фокус без отвлечений',
       image: 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?auto=format&fit=crop&w=640&q=80'
     },
@@ -204,8 +204,14 @@ const Store = {
         return true;
       });
     } else {
+      const deezerId = track.deezerId
+        || (String(track.id || '').startsWith('dz_') ? String(track.id).slice(3) : null)
+        || (typeof deezerIdOf === 'function' ? deezerIdOf(track) : null)
+        || null;
       const entry = {
-        id: track.id, title: track.title,
+        id: track.id,
+        deezerId: deezerId || null,
+        title: track.title,
         artist: key.artist,
         artistId: track.artist?.id || track.artistId || null,
         cover: track.cover || track.album?.cover_medium || '',
@@ -225,12 +231,58 @@ const Store = {
   /* Плейлисты */
   getPlaylists()  { return this._get(this.keys.playlists, []); },
   setPlaylists(v) { this._set(this.keys.playlists, v); MOCK.playlists = v; },
+  isOwnedPlaylist(pl) {
+    if (!pl) return false;
+    if (pl.origin === 'saved' || pl.origin === 'public') return false;
+    if (pl.readOnly) return false;
+    return true;
+  },
+  getOwnedPlaylists() {
+    return this.getPlaylists().filter((p) => this.isOwnedPlaylist(p));
+  },
+  isPlaylistSaved(id) {
+    const pl = this.getPlaylist(id);
+    return !!(pl && (pl.origin === 'saved' || pl.savedAt));
+  },
+  savePlaylist(playlist) {
+    if (!playlist || playlist.id == null) return false;
+    const sid = String(playlist.id);
+    const next = {
+      ...playlist,
+      id: sid,
+      origin: 'saved',
+      readOnly: true,
+      isPublic: true,
+      savedAt: playlist.savedAt || Date.now(),
+      trackCount: playlist.trackCount != null
+        ? playlist.trackCount
+        : (playlist.tracks || []).length
+    };
+    const pls = this.getPlaylists().filter((p) => String(p.id) !== sid);
+    pls.unshift(next);
+    this.setPlaylists(pls);
+    return true;
+  },
+  unsavePlaylist(id) {
+    const sid = String(id);
+    const before = this.getPlaylists();
+    const next = before.filter((p) => !(String(p.id) === sid && (p.origin === 'saved' || p.readOnly)));
+    if (next.length === before.length) return false;
+    this.setPlaylists(next);
+    return true;
+  },
   createPlaylist(name, desc = '') {
     const pl = {
       id: 'pl_' + Date.now(),
-      name, description: desc,
-      cover: null, trackCount: 0,
-      createdAt: Date.now(), tracks: []
+      name,
+      description: desc,
+      cover: null,
+      trackCount: 0,
+      createdAt: Date.now(),
+      tracks: [],
+      isPublic: true,
+      origin: 'owned',
+      readOnly: false
     };
     const pls = this.getPlaylists();
     pls.unshift(pl);
@@ -239,22 +291,34 @@ const Store = {
   },
   updatePlaylist(id, data) {
     const sid = String(id);
+    const cur = this.getPlaylist(sid);
+    if (!this.isOwnedPlaylist(cur)) return;
     const pls = this.getPlaylists().map(p => String(p.id) === sid ? { ...p, ...data } : p);
     this.setPlaylists(pls);
   },
   deletePlaylist(id) {
     const sid = String(id);
+    const cur = this.getPlaylist(sid);
+    if (cur && !this.isOwnedPlaylist(cur)) {
+      return this.unsavePlaylist(sid);
+    }
     this.setPlaylists(this.getPlaylists().filter(p => String(p.id) !== sid));
+    return true;
   },
   addTrackToPlaylist(playlistId, track) {
     if (!track) return;
     const sid = String(playlistId);
     const pls = this.getPlaylists();
     const pl = pls.find(p => String(p.id) === sid);
-    if (!pl) return;
+    if (!pl || !this.isOwnedPlaylist(pl)) return;
     const tid = track.id != null ? String(track.id) : '';
+    const deezerId = track.deezerId
+      || (String(track.id || '').startsWith('dz_') ? String(track.id).slice(3) : null)
+      || (typeof deezerIdOf === 'function' ? deezerIdOf(track) : null)
+      || null;
     const norm = {
       id: track.id,
+      deezerId: deezerId || null,
       title: track.title || '',
       artistName: track.artistName || track.artist?.name || track.artist || '',
       artist: track.artist?.name || track.artistName || track.artist || '',
@@ -285,7 +349,7 @@ const Store = {
     const tid = String(trackId);
     const pls = this.getPlaylists();
     const pl = pls.find(p => String(p.id) === sid);
-    if (!pl) return;
+    if (!pl || !this.isOwnedPlaylist(pl)) return;
     pl.tracks = (pl.tracks || []).filter(t => String(t.id) !== tid);
     pl.trackCount = pl.tracks.length;
     this.setPlaylists(pls);

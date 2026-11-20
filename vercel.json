@@ -4,12 +4,14 @@
     { "src": "api/auth.js", "use": "@vercel/node" },
     { "src": "api/me.js", "use": "@vercel/node" },
     { "src": "api/library.js", "use": "@vercel/node" },
+    { "src": "api/recommendations.js", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/auth", "dest": "/api/auth.js" },
     { "src": "/api/me", "dest": "/api/me.js" },
     { "src": "/api/library", "dest": "/api/library.js" },
+    { "src": "/api/recommendations", "dest": "/api/recommendations.js" },
     { "src": "/(.*)", "dest": "/public/$1" }
   ]
 }

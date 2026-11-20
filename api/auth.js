@@ -29,7 +29,7 @@ module.exports = withHandler(async function auth(req, res) {
       ok: true,
       service: 'mrf-api',
       supabaseConfigured: !!(getUrl() && getAnon()),
-      apiSlotsUsed: 3,
+      apiSlotsUsed: 4,
       apiSlotsMax: 12
     });
   }
