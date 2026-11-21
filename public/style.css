@@ -6430,9 +6430,13 @@ body.theme-light .color-swatch-custom.is-open {
     align-items: center;
   }
 
-  /* TMA fullscreen: empty glass strip under TG Close/More — search starts below */
+  /*
+   * TMA fullscreen (mobile only):
+   * 1) Apple-style frosted glass strip under native TG Close/More (empty)
+   * 2) Push ALL app chrome + content below that strip — no search stacked in it
+   */
   html[data-ui="mobile"][data-tg="1"] {
-    --mrf-tg-glass-top: 56px;
+    --mrf-tg-glass-top: 100px;
   }
   html[data-ui="mobile"][data-tg="1"] body::before {
     content: '';
@@ -6440,40 +6444,75 @@ body.theme-light .color-swatch-custom.is-open {
     top: 0;
     left: 0;
     right: 0;
-    height: var(--mrf-tg-glass-top, 56px);
-    z-index: 450;
+    height: var(--mrf-tg-glass-top, 100px);
+    z-index: 500;
     pointer-events: none;
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 42%, transparent 100%),
-      rgba(10, 10, 12, 0.52);
-    backdrop-filter: blur(22px) saturate(1.55);
-    -webkit-backdrop-filter: blur(22px) saturate(1.55);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.22) 0%,
+        rgba(255, 255, 255, 0.08) 45%,
+        rgba(255, 255, 255, 0.03) 100%
+      );
+    backdrop-filter: blur(48px) saturate(1.85);
+    -webkit-backdrop-filter: blur(48px) saturate(1.85);
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.22);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
   }
+  html[data-theme="light"][data-ui="mobile"][data-tg="1"] body::before,
+  html[data-ui="mobile"][data-tg="1"] body.theme-light::before {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.72) 0%,
+        rgba(255, 255, 255, 0.38) 55%,
+        rgba(255, 255, 255, 0.16) 100%
+      );
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+  /* Shift entire app below TG chrome (non-home) */
+  html[data-ui="mobile"][data-tg="1"] main.main-content {
+    padding-top: var(--mrf-tg-glass-top, 100px) !important;
+    box-sizing: border-box;
+  }
+  /* Home: hero bleeds under Apple glass; only chrome/content start below TG */
+  html[data-ui="mobile"][data-tg="1"] body.is-home-page main.main-content {
+    padding-top: 0 !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-home-page .home-feature {
+    padding-top: calc(var(--mrf-tg-glass-top, 100px) + 56px);
+  }
+  /* Topbar: never pad into the glass strip — search stays below TG */
   html[data-ui="mobile"][data-tg="1"] #topbar-root {
-    padding-top: var(--mrf-tg-glass-top, 56px);
-    background: color-mix(in srgb, var(--bg-main) 78%, transparent);
-    backdrop-filter: blur(18px) saturate(1.35);
-    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+    padding-top: 0;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom: none;
   }
   html[data-ui="mobile"][data-tg="1"] .topbar {
-    /* safe-area already inside --mrf-tg-glass-top */
-    padding-top: 12px;
-    padding-bottom: 12px;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
   html[data-ui="mobile"][data-tg="1"] body.is-home-page #topbar-root {
-    background: color-mix(in srgb, var(--bg-main) 55%, transparent);
-    backdrop-filter: blur(20px) saturate(1.45);
-    -webkit-backdrop-filter: blur(20px) saturate(1.45);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    top: var(--mrf-tg-glass-top, 100px);
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom: none;
   }
-  html[data-ui="mobile"][data-tg="1"] body.is-search-page:not(.is-search-results) .feed,
-  html[data-ui="mobile"][data-tg="1"] body.is-library-page .feed,
-  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .feed {
-    padding-top: var(--mrf-tg-glass-top, 56px);
+  html[data-ui="mobile"][data-tg="1"] body.is-home-page.is-home-scrolled #topbar-root {
+    background: color-mix(in srgb, var(--bg-main) 55%, transparent);
+    backdrop-filter: blur(28px) saturate(1.6);
+    -webkit-backdrop-filter: blur(28px) saturate(1.6);
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.18);
+  }
+  html[data-ui="mobile"][data-tg="1"] body:not(.is-home-page) #topbar-root {
+    top: var(--mrf-tg-glass-top, 100px);
   }
   html[data-ui="mobile"][data-tg="1"] .mobile-back-fab {
-    top: calc(var(--mrf-tg-glass-top, 56px) + 10px);
+    top: calc(var(--mrf-tg-glass-top, 100px) + 10px);
   }
   /* Back lives under the header on deep pages — keep search full-width */
   .topbar-nav { display: none !important; }

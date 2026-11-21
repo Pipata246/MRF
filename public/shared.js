@@ -121,15 +121,23 @@ window.addEventListener('orientationchange', () => {
 
     const sa = tg.safeAreaInset || {};
     const csa = tg.contentSafeAreaInset || {};
-    let top = (Number(sa.top) || 0) + (Number(csa.top) || 0);
+    let saTop = Number(sa.top) || 0;
+    let csaTop = Number(csa.top) || 0;
 
-    // Fullscreen close bar often lands before insets publish
-    const fs = !!(tg.isFullscreen || (typeof tg.isExpanded === 'boolean' && tg.isExpanded));
-    if (top < 40) {
-      const sys = Number(sa.top) || 0;
-      top = Math.max(top, sys + (fs ? 56 : 48));
-    }
-    if (top < 48) top = 56;
+    // Prefer CSS vars Telegram injects when available
+    try {
+      const cs = getComputedStyle(root);
+      const vSafe = parseFloat(cs.getPropertyValue('--tg-safe-area-inset-top')) || 0;
+      const vContent = parseFloat(cs.getPropertyValue('--tg-content-safe-area-inset-top')) || 0;
+      if (vSafe > saTop) saTop = vSafe;
+      if (vContent > csaTop) csaTop = vContent;
+    } catch (_) {}
+
+    let top = saTop + csaTop;
+    // Close/More row ≈ 52–58px under status; never leave search under TG chrome
+    if (csaTop < 8) top = saTop + 56;
+    if (top < 96) top = 100;
+    if (top > 160) top = 160;
 
     setGlassTop(top);
   }
@@ -161,12 +169,12 @@ window.addEventListener('orientationchange', () => {
       if (window.Telegram && window.Telegram.WebApp) boot(window.Telegram.WebApp);
       else {
         markTg();
-        setGlassTop(56);
+        setGlassTop(100);
       }
     };
     s.onerror = () => {
       markTg();
-      setGlassTop(56);
+      setGlassTop(100);
     };
     document.head.appendChild(s);
   }
@@ -183,7 +191,7 @@ window.addEventListener('orientationchange', () => {
   if (!likely) return;
 
   markTg();
-  setGlassTop(56);
+  setGlassTop(100);
   loadTgScript();
 })();
 
