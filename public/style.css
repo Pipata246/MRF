@@ -6523,28 +6523,53 @@ body.theme-light .color-swatch-custom.is-open {
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.18) !important;
   }
 
-  /* ——— FROM HOME: deep pages (artist / mix / playlist / album / …) ——— */
-  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page) main.main-content,
+  /*
+   * ——— FROM HOME: album / artist / mix / playlist / … ———
+   * Do NOT touch home. Fixed header under glass (same Y as home search),
+   * back strictly under that header.
+   * Order: glass → header → back → content
+   */
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page):not(.is-search-page):not(.is-library-page):not(.is-liked-page) main.main-content,
   html[data-ui="mobile"][data-tg="1"] body.is-playlist-page main.main-content {
-    padding-top: var(--mrf-tg-pad, 64px) !important;
+    /* glass + header + back row */
+    padding-top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 44px) !important;
   }
-  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page) #topbar-root,
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page):not(.is-search-page):not(.is-library-page):not(.is-liked-page) #topbar-root,
   html[data-ui="mobile"][data-tg="1"] body.is-playlist-page #topbar-root {
+    position: fixed !important;
     top: var(--mrf-tg-pad, 64px) !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 60 !important;
+    margin: 0 !important;
     padding-top: 0 !important;
+    background: color-mix(in srgb, var(--bg-main) 92%, transparent) !important;
+    backdrop-filter: blur(20px) saturate(1.4) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent) !important;
   }
-  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page) .topbar,
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page):not(.is-search-page):not(.is-library-page):not(.is-liked-page) .topbar,
   html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .topbar {
+    height: auto !important;
     min-height: var(--mrf-tg-bar-h, 48px) !important;
     padding: 6px 14px !important;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+    box-sizing: border-box !important;
   }
-  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page) .feed,
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page):not(.is-search-page):not(.is-library-page):not(.is-liked-page) .topbar-search,
+  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .topbar-search {
+    height: 40px !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page):not(.is-search-page):not(.is-library-page):not(.is-liked-page) .feed,
   html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .feed {
-    padding-top: 48px !important; /* slot for back under header */
+    padding-top: 0 !important;
   }
-  html[data-ui="mobile"][data-tg="1"] body.is-deep-page .mobile-back-fab.is-on,
-  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .mobile-back-fab.is-on {
-    top: var(--mrf-tg-back-top) !important;
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page):not(.is-search-page):not(.is-library-page):not(.is-liked-page) .mobile-back-fab.is-on,
+  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .mobile-back-fab.is-on,
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page) .mobile-back-fab.is-on {
+    top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 8px) !important;
+    z-index: 70 !important;
   }
 
   /* ——— DEFAULT (all non-home): main clears glass; header sits first ——— */
@@ -6616,23 +6641,12 @@ body.theme-light .color-swatch-custom.is-open {
     padding-top: 52px !important; /* room for back under header */
   }
 
-  /* ——— PLAYLIST / DEEP (artist, album, …): glass → topbar → back ——— */
-  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .feed,
-  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-liked-page):not(.is-search-page):not(.is-library-page):not(.is-home-page) .feed {
-    padding-top: 52px !important; /* room for back under header */
-  }
-
-  /* ——— BACK: always under header, never in glass ——— */
-  html[data-ui="mobile"][data-tg="1"] .mobile-back-fab,
-  html[data-ui="mobile"][data-tg="1"] .mobile-back-fab.is-on,
-  html[data-ui="mobile"][data-tg="1"] body .mobile-back-fab.is-on,
+  /* ——— BACK (liked / search-results / generic) — under header ——— */
   html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results.has-mobile-back .mobile-back-fab.is-on,
-  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .mobile-back-fab.is-on,
-  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .mobile-back-fab.is-on,
-  html[data-ui="mobile"][data-tg="1"] body.is-deep-page .mobile-back-fab.is-on,
-  html[data-ui="mobile"][data-tg="1"] body:not(.is-search-page):not(.is-library-page):not(.is-liked-page):not(.is-home-page) .mobile-back-fab.is-on {
+  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .mobile-back-fab.is-on {
     top: var(--mrf-tg-back-top) !important;
     left: max(14px, env(safe-area-inset-left, 0px)) !important;
+    z-index: 70 !important;
   }
 
   /* ——— BIG PLAYER: glass → player header (↓ / …) ——— */
@@ -8219,8 +8233,10 @@ body.theme-light .color-swatch-custom.is-open {
   }
   html[data-ui="mobile"][data-tg="1"] body.is-liked-page .mobile-back-fab.is-on,
   html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results.has-mobile-back .mobile-back-fab.is-on,
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page) .mobile-back-fab.is-on,
+  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .mobile-back-fab.is-on,
   html[data-ui="mobile"][data-tg="1"] body:not(.is-search-page):not(.is-library-page):not(.is-liked-page):not(.is-home-page) .mobile-back-fab.is-on {
-    top: var(--mrf-tg-back-top) !important;
+    top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 8px) !important;
   }
   .home-feature {
     min-height: calc(252px + env(safe-area-inset-top, 0px));
