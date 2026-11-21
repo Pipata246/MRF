@@ -45,6 +45,29 @@ create index if not exists profiles_telegram_trial_used_idx
   on public.profiles (telegram_trial_used)
   where telegram_trial_used = true;
 
+-- ── Billing (YooKassa) ─────────────────────────────────────
+create table if not exists public.billing_payments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  yookassa_payment_id text not null,
+  plan text not null,
+  amount_rub numeric(10, 2) not null,
+  currency text not null default 'RUB',
+  status text not null default 'pending',
+  raw jsonb not null default '{}'::jsonb,
+  paid_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint billing_payments_plan_check check (plan in ('month', 'year')),
+  constraint billing_payments_status_check check (status in ('pending', 'succeeded', 'canceled'))
+);
+
+create unique index if not exists billing_payments_yookassa_uidx
+  on public.billing_payments (yookassa_payment_id);
+create index if not exists billing_payments_user_id_idx
+  on public.billing_payments (user_id);
+create index if not exists billing_payments_status_idx
+  on public.billing_payments (status);
+
 -- ── Settings (per user) ────────────────────────────────────
 create table if not exists public.user_settings (
   user_id uuid primary key references public.profiles (id) on delete cascade,
@@ -335,6 +358,14 @@ alter table public.saved_playlists enable row level security;
 alter table public.recent_plays enable row level security;
 alter table public.search_history enable row level security;
 alter table public.user_recommendation_feeds enable row level security;
+alter table public.billing_payments enable row level security;
+
+drop policy if exists billing_payments_no_client on public.billing_payments;
+create policy billing_payments_no_client
+  on public.billing_payments
+  for all
+  using (false)
+  with check (false);
 
 -- Profiles: owner full access; public can read public playlist owners later
 drop policy if exists profiles_select_own on public.profiles;

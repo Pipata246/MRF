@@ -9625,11 +9625,19 @@ body.theme-light .mobile-nav-item.active {
 }
 .prem-hero-cta { position: relative; }
 .prem-cta {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0;
   min-width: 180px;
-  padding: 12px 22px;
+  min-height: 46px;
+  padding: 0 22px;
   font-size: 14px;
   font-weight: 700;
+  line-height: 1;
   border-radius: 999px;
+  text-align: center;
+  box-sizing: border-box;
 }
 .prem-cta:disabled {
   opacity: 1;
@@ -9641,6 +9649,122 @@ body.theme-light .mobile-nav-item.active {
   background: color-mix(in srgb, var(--accent) 22%, var(--bg-3));
   color: var(--accent);
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+a.prem-cta {
+  text-decoration: none;
+}
+
+.prem-plans-modal {
+  width: min(400px, 92vw);
+  padding: 22px 18px 18px;
+  gap: 0;
+}
+.prem-plans-x {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 16px;
+  cursor: pointer;
+}
+.prem-plans-title {
+  margin: 0 28px 16px 0;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.prem-plans-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.prem-plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+  padding: 18px 16px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  box-sizing: border-box;
+}
+.prem-plan-card.is-best {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    var(--bg-3);
+}
+.prem-plan-card-badge {
+  align-self: flex-start;
+  margin-bottom: 2px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #111;
+  background: var(--accent);
+  line-height: 1.2;
+}
+.prem-plan-card-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.prem-plan-card-prices {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.prem-plan-card-was {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-decoration: line-through;
+  line-height: 1.2;
+}
+.prem-plan-card-price {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.15;
+}
+.prem-plan-card-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+.prem-plan-card-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  box-sizing: border-box;
+}
+.prem-plan-card-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .prem-compare {
@@ -9847,6 +9971,7 @@ body.theme-light .mobile-nav-item.active {
   padding: 8px 0 24px;
 }
 .prem-foot-cta { margin-bottom: 10px; }
+.prem-foot-note[hidden] { display: none !important; }
 .prem-foot-note {
   margin: 0 auto;
   max-width: 36ch;
@@ -9893,6 +10018,25 @@ body.theme-light .prem-visual {
   .prem-hero-mark { width: 72px; height: 72px; }
   .prem-hero-mark .logo-img { width: 72px; height: 72px; }
   .prem-hero-title { max-width: none; }
+  .prem-plans-modal {
+    width: min(360px, 92vw);
+    padding: 20px 16px 16px;
+  }
+  .prem-plan-card {
+    padding: 18px 16px 14px;
+    border-radius: 16px;
+    min-height: 168px;
+  }
+  .prem-plan-card-price {
+    font-size: 30px;
+  }
+  .prem-plan-card-btn {
+    min-height: 46px;
+  }
+  .prem-cta {
+    min-height: 48px;
+    padding: 0 24px;
+  }
   .prem-compare {
     grid-template-columns: 1fr;
   }

@@ -19,6 +19,7 @@ const {
   getTelegramBotId,
   TRIAL_DAYS
 } = require('../lib/telegram-auth');
+const { isBillingReady, listPublicPlans } = require('../lib/billing');
 
 async function loadProfile(sb, userId) {
   const { data } = await sb.from('profiles').select('*').eq('id', userId).maybeSingle();
@@ -48,12 +49,14 @@ module.exports = withHandler(async function auth(req, res) {
       ok: true,
       service: 'mrf-api',
       supabaseConfigured: !!(getUrl() && getAnon()),
-      apiSlotsUsed: 4,
+      apiSlotsUsed: 5,
       apiSlotsMax: 12,
       telegramBotUsername: tg.botUsername,
       telegramBotId: tg.botId,
       telegramBotReady: tg.botReady,
-      telegramTrialDays: tg.trialDays
+      telegramTrialDays: tg.trialDays,
+      billingReady: isBillingReady(),
+      billingPlans: listPublicPlans()
     });
   }
 

@@ -132,6 +132,31 @@
 
   </div>
 </main>
+
+<div class="modal-overlay hidden" id="overlay-prem-plans" onclick="closePremiumPlansModal()"></div>
+<div class="modal prem-plans-modal hidden" id="modal-prem-plans" role="dialog" aria-modal="true" aria-labelledby="prem-plans-title">
+  <button type="button" class="prem-plans-x" onclick="closePremiumPlansModal()" aria-label="Закрыть">✕</button>
+  <h3 class="prem-plans-title" id="prem-plans-title">Тариф</h3>
+  <div class="prem-plans-list">
+    <div class="prem-plan-card">
+      <div class="prem-plan-card-label">1 месяц</div>
+      <div class="prem-plan-card-price">300 ₽</div>
+      <div class="prem-plan-card-sub">в месяц</div>
+      <button type="button" class="btn-primary prem-plan-card-btn" data-checkout="month">Оформить</button>
+    </div>
+    <div class="prem-plan-card is-best">
+      <div class="prem-plan-card-badge">Выгоднее</div>
+      <div class="prem-plan-card-label">1 год</div>
+      <div class="prem-plan-card-prices">
+        <span class="prem-plan-card-was">3600 ₽</span>
+        <span class="prem-plan-card-price">2990 ₽</span>
+      </div>
+      <div class="prem-plan-card-sub">≈ 249 ₽/мес</div>
+      <button type="button" class="btn-primary prem-plan-card-btn" data-checkout="year">Оформить</button>
+    </div>
+  </div>
+</div>
+
 <div id="player-root"></div>
 <script src="mock.js"></script>
 <script src="backend.js"></script>
@@ -140,6 +165,97 @@
 <script src="mrf-ready.js"></script>
 <script src="soft-nav.js"></script>
 <script>
+function openPremiumPlansModal() {
+  if (!(window.MrfAuth && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn())) {
+    if (typeof showNotif === 'function') showNotif('Войди в аккаунт');
+    location.href = typeof mrfUrl === 'function' ? mrfUrl('profile') : 'profile.html';
+    return;
+  }
+  const overlay = document.getElementById('overlay-prem-plans');
+  const modal = document.getElementById('modal-prem-plans');
+  if (overlay) overlay.classList.remove('hidden');
+  if (modal) modal.classList.remove('hidden');
+}
+window.openPremiumPlansModal = openPremiumPlansModal;
+
+function closePremiumPlansModal() {
+  const overlay = document.getElementById('overlay-prem-plans');
+  const modal = document.getElementById('modal-prem-plans');
+  if (overlay) overlay.classList.add('hidden');
+  if (modal) modal.classList.add('hidden');
+}
+window.closePremiumPlansModal = closePremiumPlansModal;
+
+async function startPremiumCheckout(plan) {
+  if (!(window.MrfAuth && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn())) {
+    if (typeof showNotif === 'function') showNotif('Войди в аккаунт');
+    location.href = typeof mrfUrl === 'function' ? mrfUrl('profile') : 'profile.html';
+    return;
+  }
+  if (!MrfAuth.api) {
+    if (typeof showNotif === 'function') showNotif('Оплата недоступна');
+    return;
+  }
+  const btns = document.querySelectorAll('#modal-prem-plans [data-checkout]');
+  btns.forEach((b) => { b.disabled = true; });
+  try {
+    const res = await MrfAuth.api('/api/billing?action=create', {
+      method: 'POST',
+      body: { plan }
+    });
+    if (!res?.confirmationUrl) {
+      if (typeof showNotif === 'function') showNotif('Не удалось начать оплату');
+      return;
+    }
+    location.assign(res.confirmationUrl);
+  } catch (e) {
+    if (typeof showNotif === 'function') showNotif(e?.message || 'Не удалось начать оплату');
+  } finally {
+    btns.forEach((b) => { b.disabled = false; });
+  }
+}
+window.startPremiumCheckout = startPremiumCheckout;
+
+function bindPremiumCheckoutButtons() {
+  document.querySelectorAll('#modal-prem-plans [data-checkout]').forEach((btn) => {
+    if (btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      const plan = btn.getAttribute('data-checkout');
+      void startPremiumCheckout(plan);
+    });
+  });
+  document.querySelectorAll('[data-open-plans]').forEach((btn) => {
+    if (btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => openPremiumPlansModal());
+  });
+}
+
+async function consumePremiumPaidReturn() {
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get('paid') !== '1') return;
+    if (typeof showNotif === 'function') showNotif('Проверяем оплату…');
+    if (window.MrfAuth?.api && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn()) {
+      try {
+        const sess = await MrfAuth.api('/api/auth?action=session');
+        if (sess?.profile && typeof MrfAuth.applyProfileLocal === 'function') {
+          MrfAuth.profile = sess.profile;
+          MrfAuth.applyProfileLocal(sess.profile);
+        }
+      } catch (_) {}
+    }
+    const u = new URL(location.href);
+    u.searchParams.delete('paid');
+    history.replaceState(history.state || {}, '', u.pathname + u.search + u.hash);
+    if (typeof showNotif === 'function') {
+      const on = typeof mrfUserHasPremium === 'function' && mrfUserHasPremium();
+      showNotif(on ? 'Premium активен' : 'Если оплата прошла — обнови через минуту');
+    }
+  } catch (_) {}
+}
+
 function renderPremiumPage() {
   const logo = document.getElementById('prem-hero-logo');
   if (logo && typeof mrfLogoSVG === 'function') {
@@ -148,18 +264,18 @@ function renderPremiumPage() {
   const on = typeof mrfUserHasPremium === 'function' && mrfUserHasPremium();
   const ctaHtml = on
     ? `<button type="button" class="btn-primary prem-cta is-owned" disabled>У вас Premium</button>`
-    : `<button type="button" class="btn-primary prem-cta" disabled>Скоро в продаже</button>`;
+    : `<button type="button" class="btn-primary prem-cta" data-open-plans="1">Оформить</button>`;
   const hero = document.getElementById('prem-hero-cta');
   const foot = document.getElementById('prem-foot-cta');
   if (hero) hero.innerHTML = ctaHtml;
   if (foot) foot.innerHTML = ctaHtml;
   const note = document.getElementById('prem-foot-note');
   if (note) {
-    note.textContent = on
-      ? 'Все возможности уже открыты в этом аккаунте.'
-      : 'Оплата появится на этой странице.';
+    note.hidden = !on;
+    note.textContent = on ? 'Все возможности уже открыты в этом аккаунте.' : '';
   }
   document.body.classList.toggle('is-premium-owned', on);
+  bindPremiumCheckoutButtons();
   if (typeof syncPrisonPlayerUi === 'function') syncPrisonPlayerUi();
   if (typeof syncMrfPremFab === 'function') syncMrfPremFab();
 }
@@ -168,6 +284,7 @@ window.renderPremiumPage = renderPremiumPage;
 function bootPremiumPage() {
   initShared();
   renderPremiumPage();
+  void consumePremiumPaidReturn().then(() => renderPremiumPage());
 }
 window.bootPremiumPage = bootPremiumPage;
 
