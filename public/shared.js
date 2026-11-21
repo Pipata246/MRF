@@ -89,6 +89,105 @@ window.addEventListener('orientationchange', () => {
 });
 
 /* ══════════════════════════════════
+   TELEGRAM MINI APP — glass top inset (mobile only)
+   Empty frosted strip under TG Close/More so search isn’t covered.
+══════════════════════════════════ */
+(function initMrfTelegramChrome() {
+  const FLAG = 'mrf_in_tma';
+  const root = document.documentElement;
+
+  function markTg() {
+    root.setAttribute('data-tg', '1');
+  }
+
+  function setGlassTop(px) {
+    const n = Math.max(0, Math.round(Number(px) || 0));
+    root.style.setProperty('--mrf-tg-glass-top', n + 'px');
+  }
+
+  function applyInsets(tg) {
+    if (!tg) return;
+    try {
+      if (tg.initData) sessionStorage.setItem(FLAG, '1');
+    } catch (_) {}
+    markTg();
+
+    try {
+      const meta = document.querySelector('meta[name="viewport"]');
+      if (meta && meta.content && !/viewport-fit/i.test(meta.content)) {
+        meta.content = meta.content.replace(/\s+$/, '') + ', viewport-fit=cover';
+      }
+    } catch (_) {}
+
+    const sa = tg.safeAreaInset || {};
+    const csa = tg.contentSafeAreaInset || {};
+    let top = (Number(sa.top) || 0) + (Number(csa.top) || 0);
+
+    // Fullscreen close bar often lands before insets publish
+    const fs = !!(tg.isFullscreen || (typeof tg.isExpanded === 'boolean' && tg.isExpanded));
+    if (top < 40) {
+      const sys = Number(sa.top) || 0;
+      top = Math.max(top, sys + (fs ? 56 : 48));
+    }
+    if (top < 48) top = 56;
+
+    setGlassTop(top);
+  }
+
+  function boot(tg) {
+    try { tg.ready(); } catch (_) {}
+    try { tg.expand(); } catch (_) {}
+    try {
+      if (typeof tg.requestFullscreen === 'function') tg.requestFullscreen();
+    } catch (_) {}
+    applyInsets(tg);
+    try {
+      tg.onEvent('safeAreaChanged', () => applyInsets(tg));
+      tg.onEvent('contentSafeAreaChanged', () => applyInsets(tg));
+      tg.onEvent('fullscreenChanged', () => applyInsets(tg));
+      tg.onEvent('viewportChanged', () => applyInsets(tg));
+    } catch (_) {}
+  }
+
+  function loadTgScript() {
+    if (window.Telegram && window.Telegram.WebApp) {
+      boot(window.Telegram.WebApp);
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://telegram.org/js/telegram-web-app.js';
+    s.async = true;
+    s.onload = () => {
+      if (window.Telegram && window.Telegram.WebApp) boot(window.Telegram.WebApp);
+      else {
+        markTg();
+        setGlassTop(56);
+      }
+    };
+    s.onerror = () => {
+      markTg();
+      setGlassTop(56);
+    };
+    document.head.appendChild(s);
+  }
+
+  let likely = false;
+  try {
+    likely = sessionStorage.getItem(FLAG) === '1'
+      || /Telegram/i.test(navigator.userAgent || '')
+      || !!(window.TelegramWebviewProxy);
+  } catch (_) {
+    likely = /Telegram/i.test(navigator.userAgent || '');
+  }
+
+  if (!likely) return;
+
+  markTg();
+  setGlassTop(56);
+  loadTgScript();
+})();
+
+/* ══════════════════════════════════
    ОПРЕДЕЛЕНИЕ ТЕКУЩЕЙ СТРАНИЦЫ
 ══════════════════════════════════ */
 function getPageId(href) {

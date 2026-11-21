@@ -6429,6 +6429,52 @@ body.theme-light .color-swatch-custom.is-open {
     gap: 10px;
     align-items: center;
   }
+
+  /* TMA fullscreen: empty glass strip under TG Close/More — search starts below */
+  html[data-ui="mobile"][data-tg="1"] {
+    --mrf-tg-glass-top: 56px;
+  }
+  html[data-ui="mobile"][data-tg="1"] body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--mrf-tg-glass-top, 56px);
+    z-index: 450;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 42%, transparent 100%),
+      rgba(10, 10, 12, 0.52);
+    backdrop-filter: blur(22px) saturate(1.55);
+    -webkit-backdrop-filter: blur(22px) saturate(1.55);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  html[data-ui="mobile"][data-tg="1"] #topbar-root {
+    padding-top: var(--mrf-tg-glass-top, 56px);
+    background: color-mix(in srgb, var(--bg-main) 78%, transparent);
+    backdrop-filter: blur(18px) saturate(1.35);
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  }
+  html[data-ui="mobile"][data-tg="1"] .topbar {
+    /* safe-area already inside --mrf-tg-glass-top */
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-home-page #topbar-root {
+    background: color-mix(in srgb, var(--bg-main) 55%, transparent);
+    backdrop-filter: blur(20px) saturate(1.45);
+    -webkit-backdrop-filter: blur(20px) saturate(1.45);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page:not(.is-search-results) .feed,
+  html[data-ui="mobile"][data-tg="1"] body.is-library-page .feed,
+  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .feed {
+    padding-top: var(--mrf-tg-glass-top, 56px);
+  }
+  html[data-ui="mobile"][data-tg="1"] .mobile-back-fab {
+    top: calc(var(--mrf-tg-glass-top, 56px) + 10px);
+  }
   /* Back lives under the header on deep pages — keep search full-width */
   .topbar-nav { display: none !important; }
   .topbar-search {

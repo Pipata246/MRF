@@ -207,6 +207,8 @@
       mark.hidden = true;
       btn.hidden = true;
 
+      try { sessionStorage.setItem('mrf_in_tma', '1'); } catch (_) {}
+
       // Prefer home; billing return goes through confirm on premium/home
       const paid = new URLSearchParams(location.search).get('paid') === '1';
       const next = paid ? '/premium.html' + location.search : '/index.html';
