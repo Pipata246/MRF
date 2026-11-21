@@ -1530,8 +1530,213 @@ if (!window.__mrfPremFabAuthBound) {
     try {
       if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
     } catch (_) {}
+    try {
+      const params = new URLSearchParams(location.search);
+      const hasReturn = params.get('paid') === '1' || !!mrfReadPayWait();
+      if (hasReturn) void mrfConfirmBillingPayment({ silent: false });
+      else void mrfConfirmBillingPayment({ silent: true, pendingOnly: true });
+    } catch (_) {}
   });
 }
+
+/* ── Billing: auto-confirm after YooKassa return (no modal required) ── */
+const MRF_PAY_WAIT_KEY = 'mrf_pay_wait_v1';
+let __mrfBillingConfirmBusy = false;
+
+function mrfReadPayWait() {
+  const read = (store) => {
+    try {
+      const raw = store.getItem(MRF_PAY_WAIT_KEY);
+      if (!raw) return null;
+      const p = JSON.parse(raw);
+      if (!p || (!p.localId && !p.paymentId)) return null;
+      return p;
+    } catch (_) {
+      return null;
+    }
+  };
+  try {
+    return read(localStorage) || read(sessionStorage);
+  } catch (_) {
+    return null;
+  }
+}
+
+function mrfSavePayWait(payload) {
+  const raw = JSON.stringify(payload || {});
+  try { localStorage.setItem(MRF_PAY_WAIT_KEY, raw); } catch (_) {}
+  try { sessionStorage.setItem(MRF_PAY_WAIT_KEY, raw); } catch (_) {}
+}
+window.mrfSavePayWait = mrfSavePayWait;
+
+function mrfClearPayWait() {
+  try { localStorage.removeItem(MRF_PAY_WAIT_KEY); } catch (_) {}
+  try { sessionStorage.removeItem(MRF_PAY_WAIT_KEY); } catch (_) {}
+}
+
+function mrfStripPaidQuery() {
+  try {
+    const u = new URL(location.href);
+    if (!u.searchParams.has('paid') && !u.searchParams.has('pid')) return;
+    u.searchParams.delete('paid');
+    u.searchParams.delete('pid');
+    history.replaceState(history.state || {}, '', u.pathname + u.search + u.hash);
+  } catch (_) {}
+}
+
+function mrfApplyBillingProfile(profile) {
+  if (!profile || !window.MrfAuth) return;
+  MrfAuth.profile = profile;
+  if (typeof MrfAuth.applyProfileLocal === 'function') MrfAuth.applyProfileLocal(profile);
+  try { if (typeof syncPrisonPlayerUi === 'function') syncPrisonPlayerUi(); } catch (_) {}
+  try { if (typeof syncMrfPremFab === 'function') syncMrfPremFab(); } catch (_) {}
+  try {
+    if (typeof getPageId === 'function' && getPageId() === 'premium' && typeof renderPremiumPage === 'function') {
+      renderPremiumPage();
+    }
+  } catch (_) {}
+  try {
+    if (typeof getPageId === 'function' && getPageId() === 'profile' && typeof loadProfilePage === 'function') {
+      loadProfilePage();
+    }
+  } catch (_) {}
+}
+
+function mrfWaitAuthReady(timeoutMs) {
+  const limit = typeof timeoutMs === 'number' ? timeoutMs : 20000;
+  if (window.MrfAuth?.ready) return Promise.resolve();
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearInterval(tick);
+      clearTimeout(kill);
+      window.removeEventListener('mrf:auth', onAuth);
+      resolve();
+    };
+    const onAuth = () => {
+      if (window.MrfAuth?.ready) finish();
+    };
+    const tick = setInterval(() => {
+      if (window.MrfAuth?.ready) finish();
+    }, 120);
+    const kill = setTimeout(finish, limit);
+    window.addEventListener('mrf:auth', onAuth);
+  });
+}
+
+/**
+ * After YooKassa return / page load: ask server to sync this payment with YooKassa
+ * and apply Premium once. Works without modal; safe if user closed the tab and came back.
+ */
+async function mrfConfirmBillingPayment(opts) {
+  const o = opts || {};
+  if (__mrfBillingConfirmBusy) return null;
+  __mrfBillingConfirmBusy = true;
+  try {
+    // Capture return params into durable storage before anything strips them
+    try {
+      const params = new URLSearchParams(location.search);
+      const pid = params.get('pid') || '';
+      if (params.get('paid') === '1' && pid) {
+        mrfSavePayWait({
+          localId: pid,
+          fromReturn: true,
+          t: Date.now()
+        });
+      }
+    } catch (_) {}
+
+    await mrfWaitAuthReady();
+    if (!(window.MrfAuth?.api && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn())) {
+      return null;
+    }
+
+    const stored = mrfReadPayWait();
+    const params = new URLSearchParams(location.search);
+    const localId = params.get('pid') || stored?.localId || null;
+    const paymentId = stored?.paymentId || null;
+    const fromReturn = params.get('paid') === '1' || !!stored?.fromReturn;
+
+    // Prefer explicit id; else ask server for active pending and sync it
+    let targetLocal = localId;
+    let targetYoo = paymentId;
+
+    if (!targetLocal && !targetYoo) {
+      // Background: only look for an open pending checkout (auto-fix stuck pays)
+      try {
+        const pending = await MrfAuth.api('/api/billing?action=pending');
+        if (pending?.payment?.status === 'pending') {
+          targetLocal = pending.payment.id;
+          targetYoo = pending.payment.paymentId;
+        } else if (pending?.payment && fromReturn) {
+          mrfStripPaidQuery();
+          mrfClearPayWait();
+          if (pending.profile) mrfApplyBillingProfile(pending.profile);
+          if (!o.silent && typeof showNotif === 'function') {
+            const st = pending.payment.status;
+            if (st === 'succeeded') showNotif('Premium активен', 2200);
+            else if (st === 'canceled') showNotif('Оплата отменена', 2200);
+            else if (st === 'expired') showNotif('Время оплаты истекло', 2200);
+          }
+          return pending;
+        } else if (o.pendingOnly || (!fromReturn && !stored)) {
+          return null;
+        }
+      } catch (_) {
+        if (o.pendingOnly) return null;
+      }
+    }
+
+    if (!targetLocal && !targetYoo) {
+      mrfStripPaidQuery();
+      return null;
+    }
+
+    const started = Date.now();
+    const maxMs = 3 * 60 * 1000;
+    let last = null;
+
+    while (Date.now() - started < maxMs) {
+      try {
+        const q = targetLocal
+          ? `local_id=${encodeURIComponent(targetLocal)}`
+          : `payment_id=${encodeURIComponent(targetYoo)}`;
+        last = await MrfAuth.api(`/api/billing?action=status&${q}`);
+        const st = last?.payment?.status || last?.status || '';
+        if (st === 'succeeded' || st === 'canceled' || st === 'expired') {
+          mrfStripPaidQuery();
+          mrfClearPayWait();
+          if (last.profile) mrfApplyBillingProfile(last.profile);
+          if (!o.silent && typeof showNotif === 'function') {
+            if (st === 'succeeded') showNotif('Premium активен', 2200);
+            else if (st === 'canceled') showNotif('Оплата отменена', 2200);
+            else showNotif('Время оплаты истекло', 2200);
+          }
+          return last;
+        }
+      } catch (_) {}
+      await new Promise((r) => setTimeout(r, 1800));
+    }
+
+    // Timed out waiting — leave storage so next page load retries
+    mrfStripPaidQuery();
+    if (!o.silent && typeof showNotif === 'function') showNotif('Проверяем оплату…', 1800);
+    return last;
+  } finally {
+    __mrfBillingConfirmBusy = false;
+  }
+}
+window.mrfConfirmBillingPayment = mrfConfirmBillingPayment;
+
+function mrfHardGo(url) {
+  if (typeof window.mrfHardNavigate === 'function') window.mrfHardNavigate(url);
+  else {
+    try { window.location.href = url; } catch (_) { location.assign(url); }
+  }
+}
+window.mrfHardGo = mrfHardGo;
 
 function loaderHTMLShared(msg) {
   const label = msg ? `<span>${msg}</span>` : '';

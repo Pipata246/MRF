@@ -459,6 +459,11 @@
     } else if (pname === 'premium') {
       if (typeof window.renderPremiumPage === 'function') window.renderPremiumPage();
       else if (typeof window.bootPremiumPage === 'function') window.bootPremiumPage();
+      if (typeof window.mrfConfirmBillingPayment === 'function') {
+        void window.mrfConfirmBillingPayment({ silent: false }).then(() => {
+          if (typeof window.renderPremiumPage === 'function') window.renderPremiumPage();
+        });
+      }
     }
   }
 
@@ -628,6 +633,20 @@
 
   window.mrfGo = softNavigate;
   window.softNavigate = softNavigate;
+
+  /** Full browser navigation (YooKassa, external, paid return) — bypass soft-nav patch. */
+  window.mrfHardNavigate = function (url) {
+    const href = String(url || '');
+    if (!href) return;
+    allowHardNav = true;
+    try {
+      if (rawAssign) rawAssign.call(location, href);
+      else location.assign(href);
+    } finally {
+      // Keep hard-nav open briefly in case assign is async / redirected
+      setTimeout(() => { allowHardNav = false; }, 0);
+    }
+  };
 
   /** Topbar back/forward — browser history triggers popstate; fallback if no-op */
   window.mrfHistoryBack = function () {
