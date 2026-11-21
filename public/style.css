@@ -6616,9 +6616,12 @@ body.theme-light .color-swatch-custom.is-open {
     padding-top: 0 !important;
   }
 
-  /* ——— SEARCH RESULTS: glass → fixed topbar → back under topbar ——— */
+  /* ——— SEARCH RESULTS: compact header under glass (same as home bar size) ——— */
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results {
+    --mrf-tg-search-bar-h: 44px;
+  }
   html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results main.main-content {
-    padding-top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 52px) !important;
+    padding-top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-search-bar-h, 44px) + 52px) !important;
   }
   html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results #topbar-root {
     position: fixed !important;
@@ -6627,11 +6630,29 @@ body.theme-light .color-swatch-custom.is-open {
     right: 0;
     z-index: 60;
     margin: 0;
+    padding: 0 !important;
     border-bottom: none !important;
+    background: color-mix(in srgb, var(--bg-main) 88%, transparent) !important;
+    backdrop-filter: blur(18px) saturate(1.3) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.3) !important;
   }
-  /* Back a bit lower — same breathing room as album/artist deep pages */
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results .topbar {
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 4px 14px !important;
+    gap: 10px !important;
+    box-sizing: border-box !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results .topbar-search {
+    height: 36px !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results .topbar-avatar {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  /* Back under compact header — keep spacing like other screens */
   html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results.has-mobile-back .mobile-back-fab.is-on {
-    top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 16px) !important;
+    top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-search-bar-h, 44px) + 12px) !important;
     z-index: 70 !important;
   }
 
@@ -8258,7 +8279,7 @@ body.theme-light .color-swatch-custom.is-open {
     top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 8px) !important;
   }
   html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results.has-mobile-back .mobile-back-fab.is-on {
-    top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 16px) !important;
+    top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-search-bar-h, 44px) + 12px) !important;
   }
   .home-feature {
     min-height: calc(252px + env(safe-area-inset-top, 0px));
