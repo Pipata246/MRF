@@ -9,6 +9,7 @@ create table if not exists public.billing_payments (
   status text not null default 'pending',
   raw jsonb not null default '{}'::jsonb,
   paid_at timestamptz,
+  premium_applied_at timestamptz,
   created_at timestamptz not null default now(),
   constraint billing_payments_plan_check check (plan in ('month', 'year')),
   constraint billing_payments_status_check check (status in ('pending', 'succeeded', 'canceled', 'expired'))

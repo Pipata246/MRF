@@ -56,6 +56,8 @@ create table if not exists public.billing_payments (
   status text not null default 'pending',
   raw jsonb not null default '{}'::jsonb,
   paid_at timestamptz,
+  -- Set exactly once when Premium is granted for this payment; never re-grant after
+  premium_applied_at timestamptz,
   created_at timestamptz not null default now(),
   constraint billing_payments_plan_check check (plan in ('month', 'year')),
   constraint billing_payments_status_check check (status in ('pending', 'succeeded', 'canceled', 'expired'))
@@ -67,6 +69,9 @@ create index if not exists billing_payments_user_id_idx
   on public.billing_payments (user_id);
 create index if not exists billing_payments_status_idx
   on public.billing_payments (status);
+create index if not exists billing_payments_premium_applied_idx
+  on public.billing_payments (premium_applied_at)
+  where premium_applied_at is not null;
 
 -- ── Settings (per user) ────────────────────────────────────
 create table if not exists public.user_settings (

@@ -11,7 +11,7 @@
 const crypto = require('crypto');
 const { readBody, send, setSessionCookies, withHandler } = require('../lib/http');
 const { requireUser, adminClient } = require('../lib/supabase');
-const { publicProfile, isPremiumActive } = require('../lib/auth-utils');
+const { publicProfile } = require('../lib/auth-utils');
 const {
   isBillingReady,
   listPublicPlans,
@@ -51,9 +51,17 @@ function publicPaymentView(row) {
   };
 }
 
+/**
+ * One-shot: pending → succeeded grants Premium exactly once per payment row.
+ * Never re-applies an already-stored payment (even if profile premium was cleared).
+ */
 async function markPaymentPaid(admin, row, yooPayment) {
-  if (row.status === 'succeeded') return { already: true, row };
-  if (row.status === 'canceled' || row.status === 'expired') return { already: true, row };
+  if (row.status === 'succeeded' || row.status === 'canceled' || row.status === 'expired') {
+    return { already: true, row };
+  }
+  if (row.premium_applied_at) {
+    return { already: true, row };
+  }
 
   const plan = getPlan(row.plan);
   if (!plan) {
@@ -63,15 +71,20 @@ async function markPaymentPaid(admin, row, yooPayment) {
   }
 
   const paidAt = yooPayment.captured_at || yooPayment.created_at || new Date().toISOString();
+  const appliedAt = new Date().toISOString();
+
+  // Atomic claim: only the first writer may apply premium for this payment.
   const { data: locked, error: lockErr } = await admin
     .from('billing_payments')
     .update({
       status: 'succeeded',
       paid_at: paidAt,
+      premium_applied_at: appliedAt,
       raw: yooPayment
     })
     .eq('id', row.id)
     .eq('status', 'pending')
+    .is('premium_applied_at', null)
     .select('*')
     .maybeSingle();
   if (lockErr) throw lockErr;
@@ -117,28 +130,16 @@ async function markPaymentTerminal(admin, row, status, yooPayment) {
   return updated || row;
 }
 
-/** If payment succeeded but profile grant failed earlier — repair. */
-async function ensurePremiumForPaidRow(admin, row) {
-  if (!row || row.status !== 'succeeded') return;
-  const plan = getPlan(row.plan);
-  if (!plan) return;
-  const { data: mine } = await admin
-    .from('profiles')
-    .select('*')
-    .eq('id', row.user_id)
-    .maybeSingle();
-  if (isPremiumActive(mine)) return;
-  await grantPremiumFromPlan(admin, row.user_id, plan);
-}
-
-/** Re-check YooKassa + apply grant / cancel / expire. */
+/** Re-check YooKassa + apply grant / cancel / expire. Grant only on first pending→succeeded. */
 async function syncPaymentRow(admin, row) {
   if (!row) return row;
-  if (row.status === 'succeeded') {
-    try { await ensurePremiumForPaidRow(admin, row); } catch (_) {}
-    return row;
-  }
-  if (row.status === 'canceled' || row.status === 'expired') {
+  // Already finished — history only, never re-grant
+  if (
+    row.status === 'succeeded'
+    || row.status === 'canceled'
+    || row.status === 'expired'
+    || row.premium_applied_at
+  ) {
     return row;
   }
 
@@ -267,13 +268,18 @@ module.exports = withHandler(async function billing(req, res) {
       return send(res, 503, { ok: false, error: 'Сервер не настроен' });
     }
 
+    // Close timed-out checkouts only. Never sync Yoo→grant here —
+    // that would re-apply an old paid payment when user clicks «Оформить».
     const { data: stale } = await admin
       .from('billing_payments')
       .select('*')
       .eq('user_id', uid)
       .eq('status', 'pending');
     for (const s of stale || []) {
-      try { await syncPaymentRow(admin, s); } catch (_) {}
+      if (!isPaymentTimedOut(s)) continue;
+      try {
+        await markPaymentTerminal(admin, s, 'expired', s.raw || {});
+      } catch (_) {}
     }
 
     const origin = requestOrigin(req);
