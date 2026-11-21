@@ -135,11 +135,11 @@ window.addEventListener('orientationchange', () => {
       if (vContent > csaTop) csaTop = vContent;
     } catch (_) {}
 
+    // Real TG chrome only — do NOT inflate (was forcing 100px → huge empty header)
     let top = saTop + csaTop;
-    // Close/More row ≈ 52–58px under status; never leave search under TG chrome
-    if (csaTop < 8) top = saTop + 56;
-    if (top < 96) top = 100;
-    if (top > 160) top = 160;
+    if (csaTop < 8) top = saTop + 48;
+    if (top < 52) top = 56;
+    if (top > 120) top = 120;
 
     setGlassTop(top);
   }
@@ -171,12 +171,12 @@ window.addEventListener('orientationchange', () => {
       if (window.Telegram && window.Telegram.WebApp) boot(window.Telegram.WebApp);
       else {
         markTg();
-        setGlassTop(100);
+        setGlassTop(64);
       }
     };
     s.onerror = () => {
       markTg();
-      setGlassTop(100);
+      setGlassTop(64);
     };
     document.head.appendChild(s);
   }
@@ -193,7 +193,7 @@ window.addEventListener('orientationchange', () => {
   if (!likely) return;
 
   markTg();
-  setGlassTop(100);
+  setGlassTop(64);
   loadTgScript();
 })();
 
