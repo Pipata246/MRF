@@ -6439,8 +6439,8 @@ body.theme-light .color-swatch-custom.is-open {
     --mrf-tg-glass-top: 100px;
     /* Other tabs: tuck chrome up to the glass edge */
     --mrf-tg-flush-top: calc(var(--mrf-tg-glass-top, 100px) - 14px);
-    /* Search + Library shared title row offset */
-    --mrf-tg-tab-chrome: 14px;
+    /* Search home / Library / deep tabs — shared title row */
+    --mrf-tg-tab-chrome: 16px;
   }
   html[data-ui="mobile"][data-tg="1"] body::before {
     content: '';
@@ -6540,21 +6540,6 @@ body.theme-light .color-swatch-custom.is-open {
   }
   html[data-ui="mobile"][data-tg="1"] .mobile-back-fab {
     top: calc(var(--mrf-tg-glass-top, 100px) + 10px);
-  }
-  /* Search + Library: same chrome level (Search a touch lower; Library matches) */
-  html[data-ui="mobile"][data-tg="1"] body.is-search-page:not(.is-search-results) .search-home-head {
-    padding-top: var(--mrf-tg-tab-chrome, 14px) !important;
-    margin-bottom: 10px;
-  }
-  html[data-ui="mobile"][data-tg="1"] body.is-library-page .feed,
-  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .feed {
-    padding-top: var(--mrf-tg-tab-chrome, 14px) !important;
-  }
-  html[data-ui="mobile"][data-tg="1"] body.is-library-page .library-header,
-  html[data-ui="mobile"][data-tg="1"] body.is-library-page .search-home-head,
-  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .library-header {
-    padding-top: 0 !important;
-    margin-top: 0 !important;
   }
   html[data-ui="mobile"][data-tg="1"] body:not(.is-home-page) .topbar {
     padding-top: 6px;
@@ -6895,6 +6880,55 @@ body.theme-light .color-swatch-custom.is-open {
   body.is-search-page.is-search-results .feed {
     padding-top: 0;
   }
+
+  /*
+   * TMA: lock Search home / Library / Liked / Playlist / deep pages
+   * to ONE chrome level (placed after base safe-area rules so it wins).
+   */
+  html[data-ui="mobile"][data-tg="1"] {
+    --mrf-tg-tab-chrome: 16px;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page:not(.is-search-results) .search-home-head {
+    padding-top: var(--mrf-tg-tab-chrome, 16px) !important;
+    margin-bottom: 10px !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page:not(.is-search-results) .feed {
+    padding-top: 0 !important;
+  }
+  /* Library: pad the header like Search head — not the feed (was sitting higher) */
+  html[data-ui="mobile"][data-tg="1"] body.is-library-page .feed {
+    padding-top: 0 !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-library-page .library-header {
+    padding-top: var(--mrf-tg-tab-chrome, 16px) !important;
+    margin-top: 0 !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .feed {
+    padding-top: var(--mrf-tg-tab-chrome, 16px) !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .liked-hero {
+    margin-top: 0 !important;
+    padding-top: 12px !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .feed,
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page):not(.is-search-page):not(.is-library-page) .feed {
+    padding-top: var(--mrf-tg-tab-chrome, 16px) !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page .mobile-back-fab,
+  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .mobile-back-fab,
+  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .mobile-back-fab,
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page.has-mobile-back .mobile-back-fab {
+    top: calc(max(0px, var(--mrf-tg-flush-top, 86px)) + 8px) !important;
+  }
+  /* Big player: drop ↓ / … below TG Close */
+  html[data-ui="mobile"][data-tg="1"] .fs-stage {
+    padding-top: calc(max(0px, var(--mrf-tg-flush-top, 86px)) + 10px) !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] .fs-player-top {
+    padding-top: 2px;
+    padding-bottom: 8px;
+  }
+
   /* Match sticky topbar avatar ring exactly */
   .mobile-page-avatar {
     width: 40px;
