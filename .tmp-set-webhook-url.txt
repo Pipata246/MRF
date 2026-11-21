@@ -1,0 +1,1 @@
+https://api.telegram.org/bot9002576967:AAGLrfhZVUVUtZL8SwqY6XVNehIZoe3sJqY/setWebhook?url=https%3A%2F%2Fmrf-murex.vercel.app%2Fapi%2Ftelegram%3Faction%3Dwebhook&secret_token=e1bf89ccd6554b34349c33cbd41f85cd&allowed_updates=%5B%22message%22%2C%22callback_query%22%5D
