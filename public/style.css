@@ -6431,16 +6431,13 @@ body.theme-light .color-swatch-custom.is-open {
   }
 
   /*
-   * TMA fullscreen (mobile only):
-   * 1) Apple-style frosted glass strip under native TG Close/More (empty)
-   * 2) Push ALL app chrome + content below that strip — no search stacked in it
+   * TMA — ONE pad everywhere (--mrf-tg-pad from JS).
+   * Glass strip = pad. All chrome / back / content start at pad. No per-page hacks.
    */
   html[data-ui="mobile"][data-tg="1"] {
-    --mrf-tg-glass-top: 100px;
-    /* Other tabs: tuck chrome up to the glass edge */
-    --mrf-tg-flush-top: calc(var(--mrf-tg-glass-top, 100px) - 14px);
-    /* Search home / Library / deep tabs — shared title row */
-    --mrf-tg-tab-chrome: 16px;
+    --mrf-tg-pad: 100px;
+    --mrf-tg-glass-top: var(--mrf-tg-pad);
+    --mrf-tg-bar-h: 52px;
   }
   html[data-ui="mobile"][data-tg="1"] body::before {
     content: '';
@@ -6448,7 +6445,7 @@ body.theme-light .color-swatch-custom.is-open {
     top: 0;
     left: 0;
     right: 0;
-    height: var(--mrf-tg-glass-top, 100px);
+    height: var(--mrf-tg-pad, 100px);
     z-index: 500;
     pointer-events: none;
     background:
@@ -6475,35 +6472,17 @@ body.theme-light .color-swatch-custom.is-open {
     border-bottom-color: rgba(0, 0, 0, 0.08);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
-  /*
-   * Home: keep as-is (hero under glass, chrome below TG).
-   * Other tabs: ONE offset only — search flush to glass (no sticky top:glass
-   * double-shift that stacked search over tabs).
-   */
-  html[data-ui="mobile"][data-tg="1"] main.main-content {
-    padding-top: max(0px, var(--mrf-tg-flush-top, 86px)) !important;
-    box-sizing: border-box;
-  }
+
+  /* HOME — unchanged special case */
   html[data-ui="mobile"][data-tg="1"] body.is-home-page main.main-content {
     padding-top: 0 !important;
   }
   html[data-ui="mobile"][data-tg="1"] body.is-home-page .home-feature {
-    padding-top: calc(var(--mrf-tg-glass-top, 100px) + 56px);
+    padding-top: calc(var(--mrf-tg-pad, 100px) + 56px);
   }
-  html[data-ui="mobile"][data-tg="1"] #topbar-root {
-    padding-top: 0;
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border-bottom: none;
-  }
-  html[data-ui="mobile"][data-tg="1"] .topbar {
-    padding-top: 10px;
-    padding-bottom: 10px;
-  }
-  /* Home only — absolute chrome under glass */
   html[data-ui="mobile"][data-tg="1"] body.is-home-page #topbar-root {
-    top: var(--mrf-tg-glass-top, 100px);
+    top: var(--mrf-tg-pad, 100px);
+    padding-top: 0;
     background: transparent;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -6515,40 +6494,41 @@ body.theme-light .color-swatch-custom.is-open {
     -webkit-backdrop-filter: blur(28px) saturate(1.6);
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.18);
   }
-  /* Other tabs: only main padding lifts content — no second sticky offset */
+
+  /* ALL other pages: identical top clearance */
+  html[data-ui="mobile"][data-tg="1"] body:not(.is-home-page) main.main-content {
+    padding-top: var(--mrf-tg-pad, 100px) !important;
+    box-sizing: border-box;
+  }
   html[data-ui="mobile"][data-tg="1"] body:not(.is-home-page) #topbar-root {
-    top: 0;
-    background: color-mix(in srgb, var(--bg-main) 82%, transparent);
-    backdrop-filter: blur(18px) saturate(1.35);
-    -webkit-backdrop-filter: blur(18px) saturate(1.35);
-  }
-  /* Search results: search sits on the glass edge; tabs/content start below */
-  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results main.main-content {
-    padding-top: calc(max(0px, var(--mrf-tg-flush-top, 86px)) + 52px) !important;
-  }
-  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results #topbar-root {
-    position: fixed;
-    top: max(0px, var(--mrf-tg-flush-top, 86px));
-    left: 0;
-    right: 0;
-    z-index: 60;
-    margin: 0;
+    top: var(--mrf-tg-pad, 100px);
     padding-top: 0;
     background: color-mix(in srgb, var(--bg-main) 88%, transparent);
     backdrop-filter: blur(20px) saturate(1.4);
     -webkit-backdrop-filter: blur(20px) saturate(1.4);
   }
-  html[data-ui="mobile"][data-tg="1"] .mobile-back-fab {
-    top: calc(var(--mrf-tg-glass-top, 100px) + 10px);
-  }
   html[data-ui="mobile"][data-tg="1"] body:not(.is-home-page) .topbar {
-    padding-top: 6px;
-    padding-bottom: 8px;
-  }
-  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results .topbar {
-    padding-top: 6px;
+    padding-top: 8px;
     padding-bottom: 8px;
     min-height: 0;
+  }
+  /* Search results: fixed bar under glass */
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results main.main-content {
+    padding-top: calc(var(--mrf-tg-pad, 100px) + var(--mrf-tg-bar-h, 52px)) !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results #topbar-root {
+    position: fixed;
+    top: var(--mrf-tg-pad, 100px);
+    left: 0;
+    right: 0;
+    z-index: 60;
+    margin: 0;
+  }
+  /* Liked sticky search — same top line as back + every other chrome */
+  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .liked-sticky-bar {
+    top: var(--mrf-tg-pad, 100px) !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
   }
   /* Back lives under the header on deep pages — keep search full-width */
   .topbar-nav { display: none !important; }
@@ -6882,47 +6862,47 @@ body.theme-light .color-swatch-custom.is-open {
   }
 
   /*
-   * TMA: lock Search home / Library / Liked / Playlist / deep pages
-   * to ONE chrome level (placed after base safe-area rules so it wins).
+   * TMA: kill every leftover safe-area / per-page pad so chrome matches.
+   * Main already cleared --mrf-tg-pad; heads only get a tiny uniform gap.
    */
-  html[data-ui="mobile"][data-tg="1"] {
-    --mrf-tg-tab-chrome: 16px;
-  }
-  html[data-ui="mobile"][data-tg="1"] body.is-search-page:not(.is-search-results) .search-home-head {
-    padding-top: var(--mrf-tg-tab-chrome, 16px) !important;
-    margin-bottom: 10px !important;
-  }
-  html[data-ui="mobile"][data-tg="1"] body.is-search-page:not(.is-search-results) .feed {
-    padding-top: 0 !important;
-  }
-  /* Library: pad the header like Search head — not the feed (was sitting higher) */
-  html[data-ui="mobile"][data-tg="1"] body.is-library-page .feed {
-    padding-top: 0 !important;
-  }
-  html[data-ui="mobile"][data-tg="1"] body.is-library-page .library-header {
-    padding-top: var(--mrf-tg-tab-chrome, 16px) !important;
+  html[data-ui="mobile"][data-tg="1"] body:not(.is-home-page) .search-home-head,
+  html[data-ui="mobile"][data-tg="1"] body:not(.is-home-page) .library-header {
+    padding-top: 10px !important;
     margin-top: 0 !important;
   }
-  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .feed {
-    padding-top: var(--mrf-tg-tab-chrome, 16px) !important;
+  html[data-ui="mobile"][data-tg="1"] body:not(.is-home-page) .feed,
+  html[data-ui="mobile"][data-tg="1"] body.is-library-page .feed,
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page .feed,
+  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .feed,
+  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .feed,
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page .feed {
+    padding-top: 0 !important;
   }
   html[data-ui="mobile"][data-tg="1"] body.is-liked-page .liked-hero {
-    margin-top: 0 !important;
-    padding-top: 12px !important;
+    margin-top: 8px !important;
+    padding-top: 14px !important;
   }
-  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .feed,
-  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page):not(.is-search-page):not(.is-library-page) .feed {
-    padding-top: var(--mrf-tg-tab-chrome, 16px) !important;
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-liked-page):not(.is-search-page) .feed {
+    padding-top: 10px !important;
   }
-  html[data-ui="mobile"][data-tg="1"] body.is-deep-page .mobile-back-fab,
-  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .mobile-back-fab,
-  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .mobile-back-fab,
-  html[data-ui="mobile"][data-tg="1"] body.is-search-page.has-mobile-back .mobile-back-fab {
-    top: calc(max(0px, var(--mrf-tg-flush-top, 86px)) + 8px) !important;
+  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .feed {
+    padding-top: 10px !important;
   }
-  /* Big player: drop ↓ / … below TG Close */
+  /* Back arrow — ONE position under TG glass, every screen */
+  html[data-ui="mobile"][data-tg="1"] .mobile-back-fab,
+  html[data-ui="mobile"][data-tg="1"] .mobile-back-fab.is-on,
+  html[data-ui="mobile"][data-tg="1"] body .mobile-back-fab.is-on,
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results.has-mobile-back .mobile-back-fab.is-on,
+  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .mobile-back-fab.is-on,
+  html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .mobile-back-fab.is-on,
+  html[data-ui="mobile"][data-tg="1"] body.is-deep-page .mobile-back-fab.is-on,
+  html[data-ui="mobile"][data-tg="1"] body:not(.is-search-page):not(.is-library-page):not(.is-liked-page):not(.is-home-page) .mobile-back-fab.is-on {
+    top: calc(var(--mrf-tg-pad, 100px) + 10px) !important;
+    left: max(14px, env(safe-area-inset-left, 0px)) !important;
+  }
+  /* Big player controls under TG */
   html[data-ui="mobile"][data-tg="1"] .fs-stage {
-    padding-top: calc(max(0px, var(--mrf-tg-flush-top, 86px)) + 10px) !important;
+    padding-top: calc(var(--mrf-tg-pad, 100px) + 10px) !important;
   }
   html[data-ui="mobile"][data-tg="1"] .fs-player-top {
     padding-top: 2px;
@@ -8169,6 +8149,9 @@ body.theme-light .color-swatch-custom.is-open {
   .library-title { font-size: 26px !important; }
   body.is-liked-page .mobile-back-fab.is-on {
     top: calc(58px + 14px + env(safe-area-inset-top, 0px));
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .mobile-back-fab.is-on {
+    top: calc(var(--mrf-tg-pad, 100px) + 10px) !important;
   }
   .home-feature {
     min-height: calc(252px + env(safe-area-inset-top, 0px));

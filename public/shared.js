@@ -102,6 +102,8 @@ window.addEventListener('orientationchange', () => {
 
   function setGlassTop(px) {
     const n = Math.max(0, Math.round(Number(px) || 0));
+    // One pad for glass + every page chrome / back button
+    root.style.setProperty('--mrf-tg-pad', n + 'px');
     root.style.setProperty('--mrf-tg-glass-top', n + 'px');
   }
 
