@@ -17,10 +17,166 @@ const {
   getTelegramBotUsername,
   getTelegramBotToken,
   getTelegramBotId,
+  getTelegramWebhookSecret,
   verifyTelegramAuth,
+  createTelegramLinkToken,
+  parseTelegramLinkToken,
+  buildTelegramDeepLink,
+  sendTelegramMessage,
+  ensureTelegramWebhook,
+  requestPublicOrigin,
   trialEndsAt,
   TRIAL_DAYS
 } = require('../lib/telegram-auth');
+
+async function applyTelegramLink(admin, uid, tg) {
+  const { data: mine, error: mineErr } = await admin
+    .from('profiles')
+    .select('*')
+    .eq('id', uid)
+    .maybeSingle();
+  if (mineErr) return { ok: false, status: 400, error: mineErr.message };
+  if (!mine) return { ok: false, status: 404, error: 'Профиль не найден' };
+
+  if (mine.telegram_id != null) {
+    if (Number(mine.telegram_id) === tg.id) {
+      return { ok: true, alreadyLinked: true, trialGranted: false, profile: publicProfile(mine) };
+    }
+    return { ok: false, status: 409, error: 'Telegram уже привязан к этому аккаунту' };
+  }
+
+  if (mine.telegram_trial_used) {
+    return { ok: false, status: 409, error: 'Привязка недоступна для этого аккаунта' };
+  }
+
+  const { data: taken } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('telegram_id', tg.id)
+    .maybeSingle();
+  if (taken && taken.id !== uid) {
+    return { ok: false, status: 409, error: 'Этот Telegram уже привязан к другому аккаунту' };
+  }
+
+  const now = new Date();
+  const patch = {
+    telegram_id: tg.id,
+    telegram_username: tg.username,
+    telegram_linked_at: now.toISOString(),
+    telegram_trial_used: true,
+    updated_at: now.toISOString()
+  };
+
+  let trialGranted = false;
+  const active = isPremiumActive(mine);
+  const trialEnd = trialEndsAt(now);
+  if (!active) {
+    patch.is_premium = true;
+    patch.premium_started_at = mine.premium_started_at || now.toISOString();
+    patch.premium_ends_at = trialEnd.toISOString();
+    trialGranted = true;
+  } else if (mine.premium_ends_at) {
+    const curEnd = Date.parse(mine.premium_ends_at);
+    if (!Number.isFinite(curEnd) || trialEnd.getTime() > curEnd) {
+      patch.premium_ends_at = trialEnd.toISOString();
+      trialGranted = true;
+    }
+  }
+
+  const { data: updated, error: upErr } = await admin
+    .from('profiles')
+    .update(patch)
+    .eq('id', uid)
+    .is('telegram_id', null)
+    .eq('telegram_trial_used', false)
+    .select('*')
+    .maybeSingle();
+
+  if (upErr) {
+    if (/profiles_telegram_id_uidx|duplicate|unique/i.test(upErr.message || '')) {
+      return { ok: false, status: 409, error: 'Этот Telegram уже привязан к другому аккаунту' };
+    }
+    return { ok: false, status: 400, error: upErr.message };
+  }
+  if (!updated) {
+    return { ok: false, status: 409, error: 'Не удалось привязать — обнови страницу' };
+  }
+
+  return {
+    ok: true,
+    alreadyLinked: false,
+    trialGranted,
+    trialDays: trialGranted ? TRIAL_DAYS : 0,
+    profile: publicProfile(updated)
+  };
+}
+
+async function handleTelegramWebhook(req, res) {
+  if (req.method !== 'POST') {
+    return send(res, 405, { error: 'Method not allowed' }, { Allow: 'POST' });
+  }
+  const expected = getTelegramWebhookSecret();
+  const got = String(req.headers['x-telegram-bot-api-secret-token'] || '');
+  if (!expected || got !== expected) {
+    return send(res, 401, { ok: false, error: 'Unauthorized' });
+  }
+
+  const body = await readBody(req);
+  const msg = body.message || body.edited_message;
+  if (!msg || !msg.from || msg.from.is_bot) {
+    return send(res, 200, { ok: true });
+  }
+
+  const text = String(msg.text || '').trim();
+  const startMatch = text.match(/^\/start(?:@[A-Za-z0-9_]+)?(?:\s+(.+))?$/i);
+  if (!startMatch) {
+    return send(res, 200, { ok: true });
+  }
+
+  const payload = String(startMatch[1] || '').trim();
+  const chatId = msg.chat?.id || msg.from.id;
+  const parsed = parseTelegramLinkToken(payload);
+  if (!parsed) {
+    try {
+      await sendTelegramMessage(chatId, 'Открой MRF → Профиль → Привязать Telegram.');
+    } catch (_) {}
+    return send(res, 200, { ok: true });
+  }
+
+  let admin;
+  try {
+    admin = adminClient();
+  } catch (_) {
+    return send(res, 200, { ok: true });
+  }
+
+  const tg = {
+    id: Number(msg.from.id),
+    username: msg.from.username
+      ? String(msg.from.username).replace(/^@+/, '').slice(0, 64)
+      : null,
+    firstName: msg.from.first_name ? String(msg.from.first_name).slice(0, 128) : null
+  };
+  if (!Number.isFinite(tg.id) || tg.id <= 0) {
+    return send(res, 200, { ok: true });
+  }
+
+  const result = await applyTelegramLink(admin, parsed.userId, tg);
+  try {
+    if (result.ok) {
+      await sendTelegramMessage(
+        chatId,
+        result.trialGranted
+          ? 'Готово. Telegram привязан — Premium на 14 дней.'
+          : 'Готово. Telegram привязан.'
+      );
+    } else {
+      await sendTelegramMessage(chatId, result.error || 'Не удалось привязать.');
+    }
+  } catch (_) {}
+
+  return send(res, 200, { ok: true });
+}
 
 const SETTINGS_COLS =
   'theme, accent_dark, accent_light, autoplay, shuffle_on_play, remember_position, crossfade_seconds, show_explicit, settings';
@@ -208,6 +364,11 @@ module.exports = withHandler(async function me(req, res) {
   const url = new URL(req.url || '/', 'http://local');
   const resource = (url.searchParams.get('resource') || 'profile').toLowerCase();
 
+  // Telegram bot webhook — no user session (verified via secret_token header)
+  if (resource === 'tg_hook') {
+    return handleTelegramWebhook(req, res);
+  }
+
   const publicGet =
     req.method === 'GET' && (resource === 'account' || resource === 'accounts');
 
@@ -369,10 +530,33 @@ module.exports = withHandler(async function me(req, res) {
         return send(res, 503, { ok: false, error: 'Привязка Telegram временно недоступна' });
       }
       const body = await readBody(req);
+      const action = String(body.action || '').toLowerCase();
+
+      // Deep-link bind: open bot in Telegram app → /start TOKEN (no Login Widget / SMS code)
+      if (action === 'start_link') {
+        const token = createTelegramLinkToken(uid);
+        if (!token) return send(res, 400, { ok: false, error: 'Не удалось создать ссылку' });
+        const deepLink = buildTelegramDeepLink(botUsername, token);
+        if (!deepLink) return send(res, 503, { ok: false, error: 'Бот не настроен' });
+        const origin = requestPublicOrigin(req);
+        try {
+          await ensureTelegramWebhook(origin);
+        } catch (_) {
+          // Link still works once webhook is set; client can retry
+        }
+        return send(res, 200, {
+          ok: true,
+          mode: 'bot_start',
+          deepLink,
+          botUsername,
+          expiresIn: 15 * 60
+        });
+      }
+
+      // Legacy Login Widget / OIDC payload (optional fallback)
       const verified = await verifyTelegramAuth(body);
       if (!verified.ok) return send(res, 400, { ok: false, error: verified.error });
 
-      const tg = verified.telegram;
       let admin;
       try {
         admin = adminClient();
@@ -380,90 +564,14 @@ module.exports = withHandler(async function me(req, res) {
         return send(res, 503, { ok: false, error: 'Сервер не настроен' });
       }
 
-      const { data: mine, error: mineErr } = await admin
-        .from('profiles')
-        .select('*')
-        .eq('id', uid)
-        .maybeSingle();
-      if (mineErr) return send(res, 400, { ok: false, error: mineErr.message });
-      if (!mine) return send(res, 404, { ok: false, error: 'Профиль не найден' });
-
-      // Permanent bind — no re-link, no trial farming
-      if (mine.telegram_id != null) {
-        if (Number(mine.telegram_id) === tg.id) {
-          return send(res, 200, {
-            ok: true,
-            alreadyLinked: true,
-            trialGranted: false,
-            profile: publicProfile(mine)
-          });
-        }
-        return send(res, 409, { ok: false, error: 'Telegram уже привязан к этому аккаунту' });
-      }
-
-      if (mine.telegram_trial_used) {
-        return send(res, 409, { ok: false, error: 'Привязка недоступна для этого аккаунта' });
-      }
-
-      const { data: taken } = await admin
-        .from('profiles')
-        .select('id')
-        .eq('telegram_id', tg.id)
-        .maybeSingle();
-      if (taken && taken.id !== uid) {
-        return send(res, 409, { ok: false, error: 'Этот Telegram уже привязан к другому аккаунту' });
-      }
-
-      const now = new Date();
-      const patch = {
-        telegram_id: tg.id,
-        telegram_username: tg.username,
-        telegram_linked_at: now.toISOString(),
-        telegram_trial_used: true,
-        updated_at: now.toISOString()
-      };
-
-      let trialGranted = false;
-      const active = isPremiumActive(mine);
-      const trialEnd = trialEndsAt(now);
-      if (!active) {
-        patch.is_premium = true;
-        patch.premium_started_at = mine.premium_started_at || now.toISOString();
-        patch.premium_ends_at = trialEnd.toISOString();
-        trialGranted = true;
-      } else if (mine.premium_ends_at) {
-        const curEnd = Date.parse(mine.premium_ends_at);
-        if (!Number.isFinite(curEnd) || trialEnd.getTime() > curEnd) {
-          patch.premium_ends_at = trialEnd.toISOString();
-          trialGranted = true;
-        }
-      }
-      // Lifetime premium (no ends_at): link only, mark trial used, no extra days
-
-      const { data: updated, error: upErr } = await admin
-        .from('profiles')
-        .update(patch)
-        .eq('id', uid)
-        .is('telegram_id', null)
-        .eq('telegram_trial_used', false)
-        .select('*')
-        .maybeSingle();
-
-      if (upErr) {
-        if (/profiles_telegram_id_uidx|duplicate|unique/i.test(upErr.message || '')) {
-          return send(res, 409, { ok: false, error: 'Этот Telegram уже привязан к другому аккаунту' });
-        }
-        return send(res, 400, { ok: false, error: upErr.message });
-      }
-      if (!updated) {
-        return send(res, 409, { ok: false, error: 'Не удалось привязать — обнови страницу' });
-      }
-
+      const result = await applyTelegramLink(admin, uid, verified.telegram);
+      if (!result.ok) return send(res, result.status || 400, { ok: false, error: result.error });
       return send(res, 200, {
         ok: true,
-        trialGranted,
-        trialDays: trialGranted ? TRIAL_DAYS : 0,
-        profile: publicProfile(updated)
+        alreadyLinked: !!result.alreadyLinked,
+        trialGranted: !!result.trialGranted,
+        trialDays: result.trialDays || 0,
+        profile: result.profile
       });
     }
 

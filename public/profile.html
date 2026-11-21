@@ -135,7 +135,7 @@
               <span class="pf-tg-offer-once">1 раз</span>
             </div>
             <div class="pf-tg-offer-title" id="pf-tg-trial-title">14 дней бесплатно</div>
-            <div class="pf-tg-offer-text">Полный доступ сразу после привязки Telegram</div>
+            <div class="pf-tg-offer-text">Откроется Telegram → нажми Start</div>
             <ul class="pf-tg-offer-perks">
               <li>Любой трек</li>
               <li>Shuffle и скип</li>
@@ -728,14 +728,12 @@ function paintTelegramBlock({ linked, telegramUsername, trialAvailable, botUsern
   if (trialTitle) trialTitle.textContent = `${days} дней бесплатно`;
   if (trial) trial.hidden = !trialAvailable;
   if (bindBtn) {
-    bindBtn.hidden = !(botReady && botUsername && botId);
+    bindBtn.hidden = !(botReady && botUsername);
     bindBtn.disabled = false;
     const label = bindBtn.querySelector('.pf-tg-bind-label');
     if (label) label.textContent = 'Привязать Telegram';
   }
-  widget.hidden = true;
-  if (botReady && botUsername) ensureTelegramLoginWidget(widget, botUsername);
-  else hideWidget();
+  hideWidget();
 }
 
 function syncTelegramBlock() {
@@ -790,136 +788,79 @@ function syncTelegramBlock() {
 }
 window.syncTelegramBlock = syncTelegramBlock;
 
-function buildTelegramReturnUrl() {
-  const returnTo = new URL(location.origin + '/profile.html');
-  returnTo.searchParams.set('edit', '1');
-  return returnTo;
-}
-
-function ensureTelegramLoginWidget(host, botUsername) {
-  if (!host || !botUsername) return;
-  if (host.dataset.bot === botUsername && host.querySelector('iframe, script[data-telegram-login]')) {
-    return;
+function stopTelegramLinkPoll() {
+  if (window.__mrfTgLinkPoll) {
+    clearInterval(window.__mrfTgLinkPoll);
+    window.__mrfTgLinkPoll = null;
   }
-  host.dataset.bot = botUsername;
-  host.hidden = true;
-  host.setAttribute('aria-hidden', 'true');
-  host.innerHTML = '';
-  const script = document.createElement('script');
-  script.async = true;
-  script.src = 'https://telegram.org/js/telegram-widget.js?22';
-  script.setAttribute('data-telegram-login', botUsername);
-  script.setAttribute('data-size', 'large');
-  script.setAttribute('data-radius', '12');
-  script.setAttribute('data-userpic', 'false');
-  script.setAttribute('data-auth-url', buildTelegramReturnUrl().toString());
-  host.appendChild(script);
 }
 
-function buildTelegramOauthUrl(botId) {
-  const returnTo = buildTelegramReturnUrl();
-  return `https://oauth.telegram.org/auth?bot_id=${encodeURIComponent(botId)}`
-    + `&origin=${encodeURIComponent(location.origin)}`
-    + `&lang=ru`
-    + `&return_to=${encodeURIComponent(returnTo.toString())}`;
-}
-
-function loadTelegramOidcScript() {
-  if (window.Telegram && Telegram.Login && typeof Telegram.Login.auth === 'function') {
-    return Promise.resolve(true);
-  }
-  if (window.__mrfTgOidcPromise) return window.__mrfTgOidcPromise;
-  window.__mrfTgOidcPromise = new Promise((resolve) => {
-    const existing = document.querySelector('script[data-mrf-tg-oidc]');
-    if (existing) {
-      existing.addEventListener('load', () => resolve(!!(window.Telegram && Telegram.Login)));
-      existing.addEventListener('error', () => resolve(false));
+function startTelegramLinkPoll() {
+  stopTelegramLinkPoll();
+  let ticks = 0;
+  window.__mrfTgLinkPoll = setInterval(() => {
+    ticks += 1;
+    if (ticks > 45) {
+      stopTelegramLinkPoll();
       return;
     }
-    const s = document.createElement('script');
-    s.src = 'https://oauth.telegram.org/js/telegram-login.js';
-    s.async = true;
-    s.dataset.mrfTgOidc = '1';
-    s.onload = () => resolve(!!(window.Telegram && Telegram.Login && Telegram.Login.auth));
-    s.onerror = () => resolve(false);
-    document.head.appendChild(s);
-  });
-  return window.__mrfTgOidcPromise;
-}
-
-function startTelegramBindRedirect(botId) {
-  showNotif('Подтверди вход в Telegram');
-  location.assign(buildTelegramOauthUrl(botId));
+    if (!window.MrfAuth?.api) return;
+    void MrfAuth.api('/api/me?resource=telegram').then((data) => {
+      if (!data?.linked) return;
+      stopTelegramLinkPoll();
+      if (data.profile) {
+        MrfAuth.profile = { ...(MrfAuth.profile || {}), ...data.profile };
+        if (typeof MrfAuth.applyProfileLocal === 'function') MrfAuth.applyProfileLocal(MrfAuth.profile);
+      }
+      showNotif('Telegram привязан');
+      loadProfilePage();
+      if (typeof syncPrisonPlayerUi === 'function') syncPrisonPlayerUi();
+      if (typeof syncMrfPremFab === 'function') syncMrfPremFab();
+    }).catch(() => {});
+  }, 2000);
 }
 
 async function startTelegramBind() {
   const cfg = window.__mrfTgBind || {};
-  const botId = cfg.botId;
-  const botUsername = cfg.botUsername;
-  if (!botId || !botUsername) {
+  if (!cfg.botUsername) {
     showNotif('Telegram не настроен');
     return;
   }
-
-  const isMobile = document.documentElement.getAttribute('data-ui') === 'mobile'
-    || window.matchMedia('(max-width: 900px)').matches;
-
-  // Mobile: same-window oauth (popups are unreliable)
-  if (isMobile) {
-    startTelegramBindRedirect(botId);
+  if (!window.MrfAuth?.api) {
+    showNotif('Войди в аккаунт');
     return;
   }
 
-  const ready = await loadTelegramOidcScript();
-  if (!ready || !window.Telegram?.Login?.auth) {
-    startTelegramBindRedirect(botId);
-    return;
-  }
-
-  showNotif('Подтверди вход в Telegram');
-
-  let opened = null;
-  const realOpen = window.open.bind(window);
-  window.open = function patchedOpen() {
-    opened = realOpen.apply(window, arguments);
-    return opened;
-  };
-
-  let settled = false;
-  const finish = (data) => {
-    if (settled) return;
-    settled = true;
-    if (!data || data.error) {
-      if (data && data.error === 'popup_closed') return;
-      showNotif('Не удалось войти');
+  const bindBtn = document.getElementById('pf-tg-bind');
+  if (bindBtn) bindBtn.disabled = true;
+  try {
+    const res = await MrfAuth.api('/api/me?resource=telegram', {
+      method: 'POST',
+      body: { action: 'start_link' }
+    });
+    if (!res?.deepLink) {
+      showNotif('Не удалось открыть Telegram');
       return;
     }
-    if (data.id_token) void onTelegramAuth({ id_token: data.id_token });
-    else showNotif('Не удалось войти');
-  };
-
-  try {
-    Telegram.Login.auth({ client_id: Number(botId), scope: ['profile'], lang: 'ru' }, finish);
-  } catch (_) {
-    window.open = realOpen;
-    startTelegramBindRedirect(botId);
-    return;
+    showNotif('В Telegram нажми Start');
+    startTelegramLinkPoll();
+    // Prefer new tab/app so this page keeps polling; fallback to same-tab
+    let opened = null;
+    try { opened = window.open(res.deepLink, '_blank'); } catch (_) { opened = null; }
+    if (!opened) location.assign(res.deepLink);
+  } catch (e) {
+    showNotif(e?.message || 'Не удалось открыть Telegram');
+  } finally {
+    if (bindBtn) bindBtn.disabled = false;
   }
-  window.open = realOpen;
-
-  if (!opened) {
-    startTelegramBindRedirect(botId);
-    return;
-  }
-  setTimeout(() => {
-    try {
-      if (!settled && (!opened || opened.closed)) startTelegramBindRedirect(botId);
-    } catch (_) {
-      if (!settled) startTelegramBindRedirect(botId);
-    }
-  }, 500);
 }
 window.startTelegramBind = startTelegramBind;
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && window.__mrfTgLinkPoll) {
+    void syncTelegramBlock();
+  }
+});
 
 async function onTelegramAuth(user) {
   if (!user || !window.MrfAuth?.api) return;
