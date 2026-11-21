@@ -460,20 +460,87 @@
     return !!(MrfAuth.session && MrfAuth.session.user);
   }
 
+  const TG_CACHE_KEY = 'mrf_tg_cfg_v1';
+
+  function readTelegramCache() {
+    try {
+      const raw = sessionStorage.getItem(TG_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeTelegramCache(cfg) {
+    if (!cfg || typeof cfg !== 'object') return;
+    MrfAuth.telegram = {
+      botUsername: cfg.botUsername || '',
+      botReady: !!cfg.botReady,
+      trialDays: Number(cfg.trialDays) || 14
+    };
+    try {
+      sessionStorage.setItem(TG_CACHE_KEY, JSON.stringify(MrfAuth.telegram));
+    } catch (_) {}
+    try {
+      if (MrfAuth.telegram.botReady && MrfAuth.telegram.botUsername) {
+        const id = 'mrf-tg-widget-preload';
+        if (!document.getElementById(id)) {
+          const s = document.createElement('script');
+          s.id = id;
+          s.async = true;
+          s.src = 'https://telegram.org/js/telegram-widget.js?22';
+          document.head.appendChild(s);
+        }
+      }
+    } catch (_) {}
+  }
+
+  function applyTelegramFromHealth(h) {
+    if (!h || typeof h !== 'object') return;
+    writeTelegramCache({
+      botUsername: h.telegramBotUsername || '',
+      botReady: !!h.telegramBotReady,
+      trialDays: h.telegramTrialDays || 14
+    });
+  }
+
+  function getTelegramConfig() {
+    if (MrfAuth.telegram && (MrfAuth.telegram.botUsername || MrfAuth.telegram.botReady === false)) {
+      return MrfAuth.telegram;
+    }
+    const cached = readTelegramCache();
+    if (cached) {
+      MrfAuth.telegram = cached;
+      return cached;
+    }
+    return { botUsername: '', botReady: false, trialDays: 14 };
+  }
+
   async function initBackend() {
     wrapStore();
     MrfAuth.ready = false;
+    // Hydrate TG config from cache before network — profile UI can paint instantly
+    const cachedTg = readTelegramCache();
+    if (cachedTg) MrfAuth.telegram = cachedTg;
+
+    const healthP = api('/api/auth?action=health')
+      .then((h) => {
+        MrfAuth._health = h && typeof h === 'object'
+          ? h
+          : { ok: false, supabaseConfigured: false };
+        applyTelegramFromHealth(MrfAuth._health);
+      })
+      .catch(() => {
+        // On Vercel this usually means env missing on this deployment (need Redeploy)
+        // or /api route not reachable.
+        MrfAuth._health = { ok: false, supabaseConfigured: false };
+      });
+
     await refreshSession();
-    try {
-      const h = await api('/api/auth?action=health');
-      MrfAuth._health = h && typeof h === 'object'
-        ? h
-        : { ok: false, supabaseConfigured: false };
-    } catch (_) {
-      // On Vercel this usually means env missing on this deployment (need Redeploy)
-      // or /api route not reachable.
-      MrfAuth._health = { ok: false, supabaseConfigured: false };
-    }
+    await healthP;
     MrfAuth.ready = true;
     notify();
   }
@@ -481,6 +548,8 @@
   MrfAuth.hasAuthHint = hasAuthHint;
   MrfAuth.api = api;
   MrfAuth.applyProfileLocal = applyProfileLocal;
+  MrfAuth.getTelegramConfig = getTelegramConfig;
+  MrfAuth.writeTelegramCache = writeTelegramCache;
 
   MrfAuth.normalizeUsername = normalizeUsername;
   MrfAuth.displayUsername = displayUsername;

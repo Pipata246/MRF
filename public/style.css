@@ -9813,6 +9813,12 @@ body.theme-light .prem-visual {
   font-size: 13px;
   color: var(--text-2);
 }
+.pf-tg-trial {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
 .pf-tg-widget {
   min-height: 40px;
 }

@@ -134,6 +134,7 @@
             <div class="pf-tg-meta">
               <div class="pf-tg-title">Привязка</div>
               <div class="pf-tg-status" id="pf-tg-status">Не привязан</div>
+              <div class="pf-tg-trial" id="pf-tg-trial" hidden>За привязку — 14 дней Premium</div>
             </div>
           </div>
           <div class="pf-tg-widget" id="pf-tg-widget" hidden></div>
@@ -665,8 +666,9 @@ function syncPremiumBlock(premium, planLabel) {
 }
 window.syncPremiumBlock = syncPremiumBlock;
 
-async function syncTelegramBlock() {
+function paintTelegramBlock({ linked, telegramUsername, trialAvailable, botUsername, botReady, trialDays }) {
   const status = document.getElementById('pf-tg-status');
+  const trial = document.getElementById('pf-tg-trial');
   const widget = document.getElementById('pf-tg-widget');
   const section = document.getElementById('telegram-link');
   if (!status || !widget) return;
@@ -675,36 +677,94 @@ async function syncTelegramBlock() {
   if (section) section.hidden = !logged || !isProfileEditMode();
   if (!logged) {
     status.textContent = 'Не привязан';
+    if (trial) trial.hidden = true;
     widget.hidden = true;
     widget.innerHTML = '';
     return;
   }
 
-  try {
-    const data = await MrfAuth.api('/api/me?resource=telegram');
-    if (data?.linked) {
-      status.textContent = data.telegramUsername || 'Привязан';
-      widget.hidden = true;
-      widget.innerHTML = '';
-      return;
-    }
-    status.textContent = 'Не привязан';
-    if (!data?.botReady || !data?.botUsername) {
-      widget.hidden = true;
-      widget.innerHTML = '';
-      return;
-    }
-    renderTelegramLoginWidget(widget, data.botUsername);
-  } catch (_) {
-    status.textContent = 'Не привязан';
+  if (linked) {
+    status.textContent = telegramUsername || 'Привязан';
+    if (trial) trial.hidden = true;
+    widget.hidden = true;
+    widget.innerHTML = '';
+    return;
+  }
+
+  status.textContent = 'Не привязан';
+  if (trial) {
+    const days = Number(trialDays) || 14;
+    trial.textContent = `За привязку — ${days} дней Premium`;
+    trial.hidden = !trialAvailable;
+  }
+
+  if (botReady && botUsername) {
+    renderTelegramLoginWidget(widget, botUsername);
+  } else {
     widget.hidden = true;
     widget.innerHTML = '';
   }
+}
+
+function syncTelegramBlock() {
+  const cloud = window.MrfAuth?.profile;
+  const local = (typeof Store !== 'undefined' && Store.getProfile) ? Store.getProfile() : {};
+  const tgCfg = (window.MrfAuth && typeof MrfAuth.getTelegramConfig === 'function')
+    ? MrfAuth.getTelegramConfig()
+    : { botUsername: '', botReady: false, trialDays: 14 };
+
+  const linked = !!(cloud?.telegramLinked || local.telegramLinked);
+  const telegramUsername = cloud?.telegramUsername || local.telegramUsername || null;
+  const trialUsed = !!(cloud?.telegramTrialUsed || local.telegramTrialUsed);
+  const trialAvailable = !linked && !trialUsed;
+
+  // Instant paint from profile + cached bot config (no wait for network)
+  paintTelegramBlock({
+    linked,
+    telegramUsername,
+    trialAvailable,
+    botUsername: tgCfg.botUsername,
+    botReady: tgCfg.botReady,
+    trialDays: tgCfg.trialDays
+  });
+
+  const logged = !!(window.MrfAuth && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn());
+  if (!logged || !isProfileEditMode() || !MrfAuth.api) return;
+
+  // Background refresh — update cache / widget if needed
+  void MrfAuth.api('/api/me?resource=telegram').then((data) => {
+    if (!data || !document.getElementById('telegram-link')) return;
+    if (typeof MrfAuth.writeTelegramCache === 'function') {
+      MrfAuth.writeTelegramCache({
+        botUsername: data.botUsername || '',
+        botReady: !!data.botReady,
+        trialDays: data.trialDays || 14
+      });
+    }
+    if (data.profile) {
+      MrfAuth.profile = { ...(MrfAuth.profile || {}), ...data.profile };
+      if (typeof MrfAuth.applyProfileLocal === 'function') MrfAuth.applyProfileLocal(MrfAuth.profile);
+    }
+    paintTelegramBlock({
+      linked: !!data.linked,
+      telegramUsername: data.telegramUsername || null,
+      trialAvailable: !!data.trialAvailable,
+      botUsername: data.botUsername || '',
+      botReady: !!data.botReady,
+      trialDays: data.trialDays || 14
+    });
+  }).catch(() => {});
 }
 window.syncTelegramBlock = syncTelegramBlock;
 
 function renderTelegramLoginWidget(host, botUsername) {
   if (!host || !botUsername) return;
+  // Avoid wiping an already-mounted widget for the same bot (prevents flicker)
+  if (host.dataset.bot === botUsername && host.querySelector('iframe, script[data-telegram-login]')) {
+    host.hidden = false;
+    return;
+  }
+  host.dataset.bot = botUsername;
   host.hidden = false;
   host.innerHTML = '';
   const script = document.createElement('script');

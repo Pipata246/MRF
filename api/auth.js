@@ -13,10 +13,25 @@ const {
   validatePassword,
   publicProfile
 } = require('../lib/auth-utils');
+const {
+  getTelegramBotUsername,
+  getTelegramBotToken,
+  TRIAL_DAYS
+} = require('../lib/telegram-auth');
 
 async function loadProfile(sb, userId) {
   const { data } = await sb.from('profiles').select('*').eq('id', userId).maybeSingle();
   return publicProfile(data);
+}
+
+function telegramPublicConfig() {
+  const botUsername = getTelegramBotUsername();
+  const botReady = !!(botUsername && getTelegramBotToken());
+  return {
+    botUsername: botReady ? botUsername : '',
+    botReady,
+    trialDays: TRIAL_DAYS
+  };
 }
 
 module.exports = withHandler(async function auth(req, res) {
@@ -25,12 +40,16 @@ module.exports = withHandler(async function auth(req, res) {
 
   // GET /api/auth?action=health
   if (req.method === 'GET' && action === 'health') {
+    const tg = telegramPublicConfig();
     return send(res, 200, {
       ok: true,
       service: 'mrf-api',
       supabaseConfigured: !!(getUrl() && getAnon()),
       apiSlotsUsed: 4,
-      apiSlotsMax: 12
+      apiSlotsMax: 12,
+      telegramBotUsername: tg.botUsername,
+      telegramBotReady: tg.botReady,
+      telegramTrialDays: tg.trialDays
     });
   }
 
