@@ -6439,6 +6439,8 @@ body.theme-light .color-swatch-custom.is-open {
     --mrf-tg-glass-top: 100px;
     /* Other tabs: tuck chrome up to the glass edge */
     --mrf-tg-flush-top: calc(var(--mrf-tg-glass-top, 100px) - 14px);
+    /* Search + Library shared title row offset */
+    --mrf-tg-tab-chrome: 14px;
   }
   html[data-ui="mobile"][data-tg="1"] body::before {
     content: '';
@@ -6539,17 +6541,20 @@ body.theme-light .color-swatch-custom.is-open {
   html[data-ui="mobile"][data-tg="1"] .mobile-back-fab {
     top: calc(var(--mrf-tg-glass-top, 100px) + 10px);
   }
-  /* Other tabs: drop extra safe-area — main already cleared the glass */
-  html[data-ui="mobile"][data-tg="1"] body:not(.is-home-page) .search-home-head {
-    padding-top: 8px;
+  /* Search + Library: same chrome level (Search a touch lower; Library matches) */
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page:not(.is-search-results) .search-home-head {
+    padding-top: var(--mrf-tg-tab-chrome, 14px) !important;
     margin-bottom: 10px;
   }
   html[data-ui="mobile"][data-tg="1"] body.is-library-page .feed,
   html[data-ui="mobile"][data-tg="1"] body.is-liked-page .feed {
-    padding-top: 8px;
+    padding-top: var(--mrf-tg-tab-chrome, 14px) !important;
   }
-  html[data-ui="mobile"][data-tg="1"] body.is-library-page .library-header {
-    padding-top: 0;
+  html[data-ui="mobile"][data-tg="1"] body.is-library-page .library-header,
+  html[data-ui="mobile"][data-tg="1"] body.is-library-page .search-home-head,
+  html[data-ui="mobile"][data-tg="1"] body.is-liked-page .library-header {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
   }
   html[data-ui="mobile"][data-tg="1"] body:not(.is-home-page) .topbar {
     padding-top: 6px;
