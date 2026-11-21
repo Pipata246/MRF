@@ -17,100 +17,20 @@ const {
   getTelegramBotUsername,
   getTelegramBotToken,
   getTelegramBotId,
-  getTelegramWebhookSecret,
   verifyTelegramAuth,
   createTelegramLinkToken,
-  parseTelegramLinkToken,
   buildTelegramDeepLink,
-  sendTelegramMessage,
   ensureTelegramWebhook,
   requestPublicOrigin,
-  trialEndsAt,
   TRIAL_DAYS
 } = require('../lib/telegram-auth');
+const { applyTelegramLink } = require('../lib/telegram-link');
+const {
+  handleTelegramUpdate,
+  getTelegramWebhookSecret
+} = require('../lib/telegram-bot');
 
-async function applyTelegramLink(admin, uid, tg) {
-  const { data: mine, error: mineErr } = await admin
-    .from('profiles')
-    .select('*')
-    .eq('id', uid)
-    .maybeSingle();
-  if (mineErr) return { ok: false, status: 400, error: mineErr.message };
-  if (!mine) return { ok: false, status: 404, error: 'Профиль не найден' };
-
-  if (mine.telegram_id != null) {
-    if (Number(mine.telegram_id) === tg.id) {
-      return { ok: true, alreadyLinked: true, trialGranted: false, profile: publicProfile(mine) };
-    }
-    return { ok: false, status: 409, error: 'Telegram уже привязан к этому аккаунту' };
-  }
-
-  if (mine.telegram_trial_used) {
-    return { ok: false, status: 409, error: 'Привязка недоступна для этого аккаунта' };
-  }
-
-  const { data: taken } = await admin
-    .from('profiles')
-    .select('id')
-    .eq('telegram_id', tg.id)
-    .maybeSingle();
-  if (taken && taken.id !== uid) {
-    return { ok: false, status: 409, error: 'Этот Telegram уже привязан к другому аккаунту' };
-  }
-
-  const now = new Date();
-  const patch = {
-    telegram_id: tg.id,
-    telegram_username: tg.username,
-    telegram_linked_at: now.toISOString(),
-    telegram_trial_used: true,
-    updated_at: now.toISOString()
-  };
-
-  let trialGranted = false;
-  const active = isPremiumActive(mine);
-  const trialEnd = trialEndsAt(now);
-  if (!active) {
-    patch.is_premium = true;
-    patch.premium_started_at = mine.premium_started_at || now.toISOString();
-    patch.premium_ends_at = trialEnd.toISOString();
-    trialGranted = true;
-  } else if (mine.premium_ends_at) {
-    const curEnd = Date.parse(mine.premium_ends_at);
-    if (!Number.isFinite(curEnd) || trialEnd.getTime() > curEnd) {
-      patch.premium_ends_at = trialEnd.toISOString();
-      trialGranted = true;
-    }
-  }
-
-  const { data: updated, error: upErr } = await admin
-    .from('profiles')
-    .update(patch)
-    .eq('id', uid)
-    .is('telegram_id', null)
-    .eq('telegram_trial_used', false)
-    .select('*')
-    .maybeSingle();
-
-  if (upErr) {
-    if (/profiles_telegram_id_uidx|duplicate|unique/i.test(upErr.message || '')) {
-      return { ok: false, status: 409, error: 'Этот Telegram уже привязан к другому аккаунту' };
-    }
-    return { ok: false, status: 400, error: upErr.message };
-  }
-  if (!updated) {
-    return { ok: false, status: 409, error: 'Не удалось привязать — обнови страницу' };
-  }
-
-  return {
-    ok: true,
-    alreadyLinked: false,
-    trialGranted,
-    trialDays: trialGranted ? TRIAL_DAYS : 0,
-    profile: publicProfile(updated)
-  };
-}
-
+/** Legacy webhook URL — forwards to the same bot handler as /api/telegram */
 async function handleTelegramWebhook(req, res) {
   if (req.method !== 'POST') {
     return send(res, 405, { error: 'Method not allowed' }, { Allow: 'POST' });
@@ -120,61 +40,11 @@ async function handleTelegramWebhook(req, res) {
   if (!expected || got !== expected) {
     return send(res, 401, { ok: false, error: 'Unauthorized' });
   }
-
   const body = await readBody(req);
-  const msg = body.message || body.edited_message;
-  if (!msg || !msg.from || msg.from.is_bot) {
-    return send(res, 200, { ok: true });
-  }
-
-  const text = String(msg.text || '').trim();
-  const startMatch = text.match(/^\/start(?:@[A-Za-z0-9_]+)?(?:\s+(.+))?$/i);
-  if (!startMatch) {
-    return send(res, 200, { ok: true });
-  }
-
-  const payload = String(startMatch[1] || '').trim();
-  const chatId = msg.chat?.id || msg.from.id;
-  const parsed = parseTelegramLinkToken(payload);
-  if (!parsed) {
-    try {
-      await sendTelegramMessage(chatId, 'Открой MRF → Профиль → Привязать Telegram.');
-    } catch (_) {}
-    return send(res, 200, { ok: true });
-  }
-
-  let admin;
+  const origin = requestPublicOrigin(req) || process.env.MRF_PUBLIC_ORIGIN || '';
   try {
-    admin = adminClient();
-  } catch (_) {
-    return send(res, 200, { ok: true });
-  }
-
-  const tg = {
-    id: Number(msg.from.id),
-    username: msg.from.username
-      ? String(msg.from.username).replace(/^@+/, '').slice(0, 64)
-      : null,
-    firstName: msg.from.first_name ? String(msg.from.first_name).slice(0, 128) : null
-  };
-  if (!Number.isFinite(tg.id) || tg.id <= 0) {
-    return send(res, 200, { ok: true });
-  }
-
-  const result = await applyTelegramLink(admin, parsed.userId, tg);
-  try {
-    if (result.ok) {
-      await sendTelegramMessage(
-        chatId,
-        result.trialGranted
-          ? 'Готово. Telegram привязан — Premium на 14 дней.'
-          : 'Готово. Telegram привязан.'
-      );
-    } else {
-      await sendTelegramMessage(chatId, result.error || 'Не удалось привязать.');
-    }
+    await handleTelegramUpdate(body, String(origin).replace(/\/$/, ''));
   } catch (_) {}
-
   return send(res, 200, { ok: true });
 }
 

@@ -6,6 +6,7 @@
     { "src": "api/library.js", "use": "@vercel/node" },
     { "src": "api/recommendations.js", "use": "@vercel/node" },
     { "src": "api/billing.js", "use": "@vercel/node" },
+    { "src": "api/telegram.js", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
@@ -14,6 +15,13 @@
     { "src": "/api/library", "dest": "/api/library.js" },
     { "src": "/api/recommendations", "dest": "/api/recommendations.js" },
     { "src": "/api/billing", "dest": "/api/billing.js" },
+    { "src": "/api/telegram", "dest": "/api/telegram.js" },
     { "src": "/(.*)", "dest": "/public/$1" }
+  ],
+  "crons": [
+    {
+      "path": "/api/telegram?action=reminders",
+      "schedule": "0 10 * * *"
+    }
   ]
 }

@@ -36,7 +36,8 @@ const API = {
   '/api/me': require('../api/me'),
   '/api/library': require('../api/library'),
   '/api/recommendations': require('../api/recommendations'),
-  '/api/billing': require('../api/billing')
+  '/api/billing': require('../api/billing'),
+  '/api/telegram': require('../api/telegram')
 };
 
 const MIME = {

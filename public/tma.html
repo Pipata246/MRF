@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <title>MRF</title>
+  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: #0b0b0c;
+      --text: #f4f4f5;
+      --muted: #a1a1aa;
+      --accent: #ee90b7;
+    }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    body.tma-boot {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100dvh;
+      padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .tma-card { max-width: 320px; width: 100%; }
+    .tma-mark {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 18px;
+      border-radius: 18px;
+      background: color-mix(in srgb, var(--accent) 18%, #18181b);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .tma-mark img { width: 56px; height: 56px; }
+    .tma-title {
+      margin: 0 0 8px;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .tma-text {
+      margin: 0 0 20px;
+      font-size: 14px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+    .tma-btn {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      min-height: 48px;
+      padding: 0 18px;
+      width: 100%;
+      font-size: 15px;
+      font-weight: 600;
+      color: #111;
+      background: var(--accent);
+      cursor: pointer;
+    }
+    .tma-btn:disabled { opacity: 0.55; cursor: default; }
+    .tma-spin {
+      width: 28px;
+      height: 28px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      border: 2px solid color-mix(in srgb, var(--accent) 25%, #3f3f46);
+      border-top-color: var(--accent);
+      animation: tma-spin 0.75s linear infinite;
+    }
+    @keyframes tma-spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="tma-boot">
+  <div class="tma-card" id="tma-root">
+    <div class="tma-spin" id="tma-spin" aria-hidden="true"></div>
+    <div class="tma-mark" hidden id="tma-mark">
+      <img src="img/logo.svg" alt="MRF"/>
+    </div>
+    <h1 class="tma-title" id="tma-title">MRF</h1>
+    <p class="tma-text" id="tma-text">Входим…</p>
+    <button type="button" class="tma-btn" id="tma-btn" hidden>Открыть</button>
+  </div>
+  <script>
+  (function () {
+    const title = document.getElementById('tma-title');
+    const text = document.getElementById('tma-text');
+    const btn = document.getElementById('tma-btn');
+    const spin = document.getElementById('tma-spin');
+    const mark = document.getElementById('tma-mark');
+
+    function setUi(state) {
+      if (state === 'loading') {
+        spin.hidden = false;
+        mark.hidden = true;
+        btn.hidden = true;
+        title.textContent = 'MRF';
+        text.textContent = 'Входим…';
+        return;
+      }
+      spin.hidden = true;
+      mark.hidden = false;
+      if (state === 'need_link') {
+        title.textContent = 'Привяжи Telegram';
+        text.textContent = 'Открой сайт MRF → Профиль → Привязать Telegram. Потом зайди сюда снова.';
+        btn.hidden = false;
+        btn.textContent = 'Открыть сайт';
+        btn.onclick = () => {
+          const url = location.origin + '/profile.html';
+          if (window.Telegram?.WebApp?.openLink) Telegram.WebApp.openLink(url);
+          else location.href = url;
+        };
+        return;
+      }
+      if (state === 'error') {
+        title.textContent = 'Не удалось войти';
+        text.textContent = 'Открой Mini App из бота ещё раз.';
+        btn.hidden = false;
+        btn.textContent = 'Повторить';
+        btn.onclick = () => location.reload();
+        return;
+      }
+    }
+
+    function forceFullscreen(tg) {
+      try { tg.ready(); } catch (_) {}
+      try { tg.expand(); } catch (_) {}
+      try {
+        if (typeof tg.requestFullscreen === 'function') tg.requestFullscreen();
+      } catch (_) {}
+      try {
+        if (typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes();
+      } catch (_) {}
+      try { tg.setHeaderColor('#0b0b0c'); } catch (_) {}
+      try { tg.setBackgroundColor('#0b0b0c'); } catch (_) {}
+      // Keep trying briefly — Telegram applies fullscreen after gesture/ready
+      let n = 0;
+      const tick = setInterval(() => {
+        n += 1;
+        try { tg.expand(); } catch (_) {}
+        try {
+          if (typeof tg.requestFullscreen === 'function') tg.requestFullscreen();
+        } catch (_) {}
+        if (n >= 8) clearInterval(tick);
+      }, 400);
+    }
+
+    async function login() {
+      setUi('loading');
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (!tg || !tg.initData) {
+        setUi('error');
+        text.textContent = 'Открой это окно через кнопку в боте MRF.';
+        return;
+      }
+      forceFullscreen(tg);
+
+      // Capture paid return into storage for site confirm
+      try {
+        const p = new URLSearchParams(location.search);
+        if (p.get('paid') === '1' && p.get('pid')) {
+          localStorage.setItem('mrf_pay_wait_v1', JSON.stringify({
+            localId: p.get('pid'),
+            fromReturn: true,
+            t: Date.now()
+          }));
+        }
+      } catch (_) {}
+
+      let res;
+      try {
+        res = await fetch('/api/telegram?action=tma_login', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData: tg.initData })
+        });
+      } catch (_) {
+        setUi('error');
+        return;
+      }
+
+      let data = null;
+      try { data = await res.json(); } catch (_) { data = null; }
+
+      if (res.status === 404 || (data && /не привязан/i.test(data.error || ''))) {
+        setUi('need_link');
+        return;
+      }
+      if (!res.ok || !data?.ok) {
+        setUi('error');
+        if (data?.error) text.textContent = data.error;
+        return;
+      }
+
+      title.textContent = 'Готово';
+      text.textContent = 'Открываем MRF…';
+      spin.hidden = false;
+      mark.hidden = true;
+      btn.hidden = true;
+
+      // Prefer home; billing return goes through confirm on premium/home
+      const paid = new URLSearchParams(location.search).get('paid') === '1';
+      const next = paid ? '/premium.html' + location.search : '/index.html';
+      location.replace(next);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => { void login(); });
+    } else {
+      void login();
+    }
+  })();
+  </script>
+</body>
+</html>

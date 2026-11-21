@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Point @makerf_bot webhook at production /api/me?resource=tg_hook
+ * Point bot webhook at production /api/telegram?action=webhook
  * Usage: node scripts/set-telegram-webhook.js [https://mrf-murex.vercel.app]
  */
 const path = require('path');

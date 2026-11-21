@@ -98,6 +98,20 @@ async function markPaymentPaid(admin, row, yooPayment) {
   }
 
   await grantPremiumFromPlan(admin, row.user_id, plan);
+
+  // Telegram notify (linked accounts only) — never blocks grant
+  try {
+    const { data: prof } = await admin
+      .from('profiles')
+      .select('*')
+      .eq('id', row.user_id)
+      .maybeSingle();
+    if (prof?.telegram_id) {
+      const { notifyTelegramPayment } = require('../lib/telegram-bot');
+      await notifyTelegramPayment(prof, 'succeeded', row.plan);
+    }
+  } catch (_) {}
+
   return { already: false, row: locked };
 }
 
@@ -127,7 +141,21 @@ async function markPaymentTerminal(admin, row, status, yooPayment) {
     error = retry.error;
   }
   if (error) throw error;
-  return updated || row;
+  const finalRow = updated || row;
+  if (updated && (status === 'canceled' || status === 'expired')) {
+    try {
+      const { data: prof } = await admin
+        .from('profiles')
+        .select('*')
+        .eq('id', row.user_id)
+        .maybeSingle();
+      if (prof?.telegram_id) {
+        const { notifyTelegramPayment } = require('../lib/telegram-bot');
+        await notifyTelegramPayment(prof, status, row.plan);
+      }
+    } catch (_) {}
+  }
+  return finalRow;
 }
 
 /** Re-check YooKassa + apply grant / cancel / expire. Grant only on first pending→succeeded. */

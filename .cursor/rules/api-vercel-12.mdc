@@ -24,6 +24,7 @@ alwaysApply: true
 | 3 | `api/library.js` | Likes / follows / albums / playlists (`?resource=...`) |
 | 4 | `api/recommendations.js` | Home feed + mood mixes (`?resource=home\|mood`) |
 | 5 | `api/billing.js` | YooKassa Premium (`?action=plans\|create\|status\|pending\|webhook`) |
-| 6–12 | **RESERVED** | Future domains only (e.g. stream / official music) — one domain per file |
+| 6 | `api/telegram.js` | Bot webhook + Mini App login (`?action=webhook\|tma_login\|tma_config\|reminders`) |
+| 7–12 | **RESERVED** | Future domains only (e.g. stream / official music) — one domain per file |
 
 When adding a feature: prefer extending slots 1–4. Open a new reserved slot only for a **new domain** that cannot fit cleanly.
