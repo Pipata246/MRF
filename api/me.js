@@ -17,7 +17,7 @@ const {
   getTelegramBotUsername,
   getTelegramBotToken,
   getTelegramBotId,
-  verifyTelegramLogin,
+  verifyTelegramAuth,
   trialEndsAt,
   TRIAL_DAYS
 } = require('../lib/telegram-auth');
@@ -369,7 +369,7 @@ module.exports = withHandler(async function me(req, res) {
         return send(res, 503, { ok: false, error: 'Привязка Telegram временно недоступна' });
       }
       const body = await readBody(req);
-      const verified = verifyTelegramLogin(body);
+      const verified = await verifyTelegramAuth(body);
       if (!verified.ok) return send(res, 400, { ok: false, error: verified.error });
 
       const tg = verified.telegram;

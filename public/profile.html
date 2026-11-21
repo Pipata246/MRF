@@ -128,26 +128,23 @@
       </div>
 
       <div class="settings-section pf-tg-section" id="telegram-link">
-        <h3>Telegram</h3>
         <div class="pf-tg-card" id="pf-tg-card">
           <div class="pf-tg-offer" id="pf-tg-trial" hidden>
-            <div class="pf-tg-offer-top">
-              <span class="pf-tg-offer-badge">Пробный период</span>
+            <div class="pf-tg-offer-head">
+              <span class="pf-tg-offer-kicker">MRF Premium</span>
               <span class="pf-tg-offer-once">1 раз</span>
             </div>
-            <div class="pf-tg-offer-title" id="pf-tg-trial-title">14 дней Premium бесплатно</div>
-            <div class="pf-tg-offer-text">После первой привязки Telegram</div>
-            <ul class="pf-tg-offer-perks" aria-label="Что входит">
+            <div class="pf-tg-offer-title" id="pf-tg-trial-title">14 дней бесплатно</div>
+            <div class="pf-tg-offer-text">Полный доступ сразу после привязки Telegram</div>
+            <ul class="pf-tg-offer-perks">
               <li>Любой трек</li>
-              <li>Shuffle</li>
+              <li>Shuffle и скип</li>
               <li>Все цвета</li>
             </ul>
           </div>
-          <div class="pf-tg-row">
-            <div class="pf-tg-meta">
-              <div class="pf-tg-title">Статус</div>
-              <div class="pf-tg-status" id="pf-tg-status">Не привязан</div>
-            </div>
+          <div class="pf-tg-linked" id="pf-tg-linked" hidden>
+            <div class="pf-tg-linked-label">Telegram</div>
+            <div class="pf-tg-status" id="pf-tg-status">Не привязан</div>
           </div>
           <button type="button" class="pf-tg-bind" id="pf-tg-bind" hidden onclick="startTelegramBind()">
             <svg class="pf-tg-bind-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
@@ -687,6 +684,7 @@ window.syncPremiumBlock = syncPremiumBlock;
 
 function paintTelegramBlock({ linked, telegramUsername, trialAvailable, botUsername, botId, botReady, trialDays }) {
   const status = document.getElementById('pf-tg-status');
+  const linkedBox = document.getElementById('pf-tg-linked');
   const trial = document.getElementById('pf-tg-trial');
   const trialTitle = document.getElementById('pf-tg-trial-title');
   const bindBtn = document.getElementById('pf-tg-bind');
@@ -701,35 +699,43 @@ function paintTelegramBlock({ linked, telegramUsername, trialAvailable, botUsern
   if (section) section.hidden = !logged || !isProfileEditMode();
   if (card) card.classList.toggle('is-linked', !!linked);
 
-  if (!logged) {
-    status.textContent = 'Не привязан';
-    if (trial) trial.hidden = true;
-    if (bindBtn) bindBtn.hidden = true;
+  const hideWidget = () => {
     widget.hidden = true;
     widget.innerHTML = '';
+  };
+
+  if (!logged) {
+    status.textContent = 'Не привязан';
+    if (linkedBox) linkedBox.hidden = true;
+    if (trial) trial.hidden = true;
+    if (bindBtn) bindBtn.hidden = true;
+    hideWidget();
     return;
   }
 
   if (linked) {
     status.textContent = telegramUsername || 'Привязан';
+    if (linkedBox) linkedBox.hidden = false;
     if (trial) trial.hidden = true;
     if (bindBtn) bindBtn.hidden = true;
-    widget.hidden = true;
-    widget.innerHTML = '';
+    hideWidget();
     return;
   }
 
   status.textContent = 'Не привязан';
+  if (linkedBox) linkedBox.hidden = true;
   const days = Number(trialDays) || 14;
-  if (trialTitle) trialTitle.textContent = `${days} дней Premium бесплатно`;
+  if (trialTitle) trialTitle.textContent = `${days} дней бесплатно`;
   if (trial) trial.hidden = !trialAvailable;
   if (bindBtn) {
     bindBtn.hidden = !(botReady && botUsername && botId);
     bindBtn.disabled = false;
+    const label = bindBtn.querySelector('.pf-tg-bind-label');
+    if (label) label.textContent = 'Привязать Telegram';
   }
   widget.hidden = true;
   if (botReady && botUsername) ensureTelegramLoginWidget(widget, botUsername);
-  else widget.innerHTML = '';
+  else hideWidget();
 }
 
 function syncTelegramBlock() {
@@ -784,6 +790,12 @@ function syncTelegramBlock() {
 }
 window.syncTelegramBlock = syncTelegramBlock;
 
+function buildTelegramReturnUrl() {
+  const returnTo = new URL(location.origin + '/profile.html');
+  returnTo.searchParams.set('edit', '1');
+  return returnTo;
+}
+
 function ensureTelegramLoginWidget(host, botUsername) {
   if (!host || !botUsername) return;
   if (host.dataset.bot === botUsername && host.querySelector('iframe, script[data-telegram-login]')) {
@@ -798,13 +810,49 @@ function ensureTelegramLoginWidget(host, botUsername) {
   script.src = 'https://telegram.org/js/telegram-widget.js?22';
   script.setAttribute('data-telegram-login', botUsername);
   script.setAttribute('data-size', 'large');
-  script.setAttribute('data-radius', '10');
+  script.setAttribute('data-radius', '12');
   script.setAttribute('data-userpic', 'false');
-  script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+  script.setAttribute('data-auth-url', buildTelegramReturnUrl().toString());
   host.appendChild(script);
 }
 
-function startTelegramBind() {
+function buildTelegramOauthUrl(botId) {
+  const returnTo = buildTelegramReturnUrl();
+  return `https://oauth.telegram.org/auth?bot_id=${encodeURIComponent(botId)}`
+    + `&origin=${encodeURIComponent(location.origin)}`
+    + `&lang=ru`
+    + `&return_to=${encodeURIComponent(returnTo.toString())}`;
+}
+
+function loadTelegramOidcScript() {
+  if (window.Telegram && Telegram.Login && typeof Telegram.Login.auth === 'function') {
+    return Promise.resolve(true);
+  }
+  if (window.__mrfTgOidcPromise) return window.__mrfTgOidcPromise;
+  window.__mrfTgOidcPromise = new Promise((resolve) => {
+    const existing = document.querySelector('script[data-mrf-tg-oidc]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(!!(window.Telegram && Telegram.Login)));
+      existing.addEventListener('error', () => resolve(false));
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://oauth.telegram.org/js/telegram-login.js';
+    s.async = true;
+    s.dataset.mrfTgOidc = '1';
+    s.onload = () => resolve(!!(window.Telegram && Telegram.Login && Telegram.Login.auth));
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+  return window.__mrfTgOidcPromise;
+}
+
+function startTelegramBindRedirect(botId) {
+  showNotif('Подтверди вход в Telegram');
+  location.assign(buildTelegramOauthUrl(botId));
+}
+
+async function startTelegramBind() {
   const cfg = window.__mrfTgBind || {};
   const botId = cfg.botId;
   const botUsername = cfg.botUsername;
@@ -812,38 +860,64 @@ function startTelegramBind() {
     showNotif('Telegram не настроен');
     return;
   }
-  // Prefer clicking the official widget iframe/button if already injected
-  const host = document.getElementById('pf-tg-widget');
-  const iframe = host && host.querySelector('iframe');
-  if (iframe && iframe.contentWindow) {
-    try {
-      // Reveal briefly so user can use official control if popup blocked
-      host.hidden = false;
-      host.setAttribute('aria-hidden', 'false');
-    } catch (_) {}
+
+  const isMobile = document.documentElement.getAttribute('data-ui') === 'mobile'
+    || window.matchMedia('(max-width: 900px)').matches;
+
+  // Mobile: same-window oauth (popups are unreliable)
+  if (isMobile) {
+    startTelegramBindRedirect(botId);
+    return;
   }
 
-  const origin = location.origin;
-  const returnTo = new URL(location.href);
-  returnTo.searchParams.set('edit', '1');
-  returnTo.hash = 'telegram-link';
-  const url = `https://oauth.telegram.org/auth?bot_id=${encodeURIComponent(botId)}`
-    + `&origin=${encodeURIComponent(origin)}`
-    + `&request_access=`
-    + `&return_to=${encodeURIComponent(returnTo.toString())}`;
-  const w = 550;
-  const h = 470;
-  const left = Math.max(0, (window.screen.width - w) / 2);
-  const top = Math.max(0, (window.screen.height - h) / 2);
-  const popup = window.open(
-    url,
-    'mrf_telegram_oauth',
-    `width=${w},height=${h},left=${left},top=${top},status=0,toolbar=0,menubar=0`
-  );
-  if (!popup) {
-    // Popup blocked — full-page redirect
-    location.href = url;
+  const ready = await loadTelegramOidcScript();
+  if (!ready || !window.Telegram?.Login?.auth) {
+    startTelegramBindRedirect(botId);
+    return;
   }
+
+  showNotif('Подтверди вход в Telegram');
+
+  let opened = null;
+  const realOpen = window.open.bind(window);
+  window.open = function patchedOpen() {
+    opened = realOpen.apply(window, arguments);
+    return opened;
+  };
+
+  let settled = false;
+  const finish = (data) => {
+    if (settled) return;
+    settled = true;
+    if (!data || data.error) {
+      if (data && data.error === 'popup_closed') return;
+      showNotif('Не удалось войти');
+      return;
+    }
+    if (data.id_token) void onTelegramAuth({ id_token: data.id_token });
+    else showNotif('Не удалось войти');
+  };
+
+  try {
+    Telegram.Login.auth({ client_id: Number(botId), scope: ['profile'], lang: 'ru' }, finish);
+  } catch (_) {
+    window.open = realOpen;
+    startTelegramBindRedirect(botId);
+    return;
+  }
+  window.open = realOpen;
+
+  if (!opened) {
+    startTelegramBindRedirect(botId);
+    return;
+  }
+  setTimeout(() => {
+    try {
+      if (!settled && (!opened || opened.closed)) startTelegramBindRedirect(botId);
+    } catch (_) {
+      if (!settled) startTelegramBindRedirect(botId);
+    }
+  }, 500);
 }
 window.startTelegramBind = startTelegramBind;
 
@@ -860,10 +934,9 @@ async function onTelegramAuth(user) {
     }
     if (res?.trialGranted) showNotif('Premium на 2 недели');
     else showNotif('Telegram привязан');
-    // Clean oauth query leftovers
     try {
       const u = new URL(location.href);
-      ['id', 'first_name', 'last_name', 'username', 'photo_url', 'auth_date', 'hash'].forEach((k) => u.searchParams.delete(k));
+      ['id', 'first_name', 'last_name', 'username', 'photo_url', 'auth_date', 'hash', 'id_token'].forEach((k) => u.searchParams.delete(k));
       u.searchParams.set('edit', '1');
       history.replaceState(history.state || {}, '', u.pathname + u.search + '#telegram-link');
     } catch (_) {}
