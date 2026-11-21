@@ -6592,10 +6592,25 @@ body.theme-light .color-swatch-custom.is-open {
   }
 
   /* ——— SEARCH HOME: glass → title/search head (no back) ——— */
+  /* Empty #topbar-root was leaving a crooked border strip — kill it */
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page:not(.is-search-results) #topbar-root {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
   html[data-ui="mobile"][data-tg="1"] body.is-search-page:not(.is-search-results) .search-home-head {
     padding-top: 8px !important;
     margin-top: 0 !important;
     margin-bottom: 12px !important;
+    border: none !important;
+    box-shadow: none !important;
   }
   html[data-ui="mobile"][data-tg="1"] body.is-search-page:not(.is-search-results) .feed {
     padding-top: 0 !important;
@@ -6603,15 +6618,21 @@ body.theme-light .color-swatch-custom.is-open {
 
   /* ——— SEARCH RESULTS: glass → fixed topbar → back under topbar ——— */
   html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results main.main-content {
-    padding-top: calc(var(--mrf-tg-pad, 100px) + var(--mrf-tg-bar-h, 52px) + 44px) !important;
+    padding-top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 52px) !important;
   }
   html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results #topbar-root {
     position: fixed !important;
-    top: var(--mrf-tg-pad, 100px) !important;
+    top: var(--mrf-tg-pad, 64px) !important;
     left: 0;
     right: 0;
     z-index: 60;
     margin: 0;
+    border-bottom: none !important;
+  }
+  /* Back a bit lower — same breathing room as album/artist deep pages */
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results.has-mobile-back .mobile-back-fab.is-on {
+    top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 16px) !important;
+    z-index: 70 !important;
   }
 
   /* ——— LIBRARY: glass → media head (no back) ——— */
@@ -6641,8 +6662,7 @@ body.theme-light .color-swatch-custom.is-open {
     padding-top: 52px !important; /* room for back under header */
   }
 
-  /* ——— BACK (liked / search-results / generic) — under header ——— */
-  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results.has-mobile-back .mobile-back-fab.is-on,
+  /* ——— BACK (liked) — under header ——— */
   html[data-ui="mobile"][data-tg="1"] body.is-liked-page .mobile-back-fab.is-on {
     top: var(--mrf-tg-back-top) !important;
     left: max(14px, env(safe-area-inset-left, 0px)) !important;
@@ -8232,11 +8252,13 @@ body.theme-light .color-swatch-custom.is-open {
     top: calc(58px + 14px + env(safe-area-inset-top, 0px));
   }
   html[data-ui="mobile"][data-tg="1"] body.is-liked-page .mobile-back-fab.is-on,
-  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results.has-mobile-back .mobile-back-fab.is-on,
   html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page) .mobile-back-fab.is-on,
   html[data-ui="mobile"][data-tg="1"] body.is-playlist-page .mobile-back-fab.is-on,
   html[data-ui="mobile"][data-tg="1"] body:not(.is-search-page):not(.is-library-page):not(.is-liked-page):not(.is-home-page) .mobile-back-fab.is-on {
     top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 8px) !important;
+  }
+  html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results.has-mobile-back .mobile-back-fab.is-on {
+    top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 16px) !important;
   }
   .home-feature {
     min-height: calc(252px + env(safe-area-inset-top, 0px));
