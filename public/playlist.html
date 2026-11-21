@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Плейлист — MRF</title>
-  <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
+  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   /* Layout boot: large screens = PC, smaller = mobile shell */
@@ -267,8 +267,16 @@ async function renderPlaylist(id) {
         : isMoodMix
           ? 'Настроение'
           : 'Микс';
-  const countLine = authorHandle && isPublicForeign
-    ? `${escHtml(authorHandle)} · ${count} ${count === 1 ? 'трек' : count < 5 ? 'трека' : 'треков'}`
+  const authorNick = pl.author?.username
+    ? (typeof accountUsernameOf === 'function' ? accountUsernameOf(pl.author.username) : String(pl.author.username).replace(/^@+/, ''))
+    : '';
+  const authorHtml = authorHandle && isPublicForeign
+    ? (authorNick
+      ? `<button type="button" class="account-handle-link" onclick="event.stopPropagation();openAccount('${String(authorNick).replace(/'/g, "\\'")}')">${escHtml(authorHandle)}</button>`
+      : escHtml(authorHandle))
+    : '';
+  const countLine = authorHtml
+    ? `${authorHtml} · ${count} ${count === 1 ? 'трек' : count < 5 ? 'трека' : 'треков'}`
     : `${count} ${count === 1 ? 'трек' : count < 5 ? 'трека' : 'треков'}`;
 
   feed.innerHTML = `
@@ -300,6 +308,7 @@ async function renderPlaylist(id) {
     </div>`;
 
   if (typeof syncPlayingRows === 'function') syncPlayingRows();
+  if (typeof syncPrisonPlayerUi === 'function') syncPrisonPlayerUi();
 }
 window.renderPlaylist = renderPlaylist;
 
@@ -355,6 +364,7 @@ function shufflePlaylistNow() {
   const key = playlistSrcKey(_currentPlaylistId);
   const tracks = _src[key];
   if (!tracks?.length) return;
+  if (typeof mrfRequirePremium === 'function' && !mrfRequirePremium('shuffle')) return;
   if (typeof isShuffle !== 'undefined') isShuffle = true;
   const start = Math.floor(Math.random() * tracks.length);
   playFromSrc(key, start);

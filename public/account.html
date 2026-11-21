@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Аккаунт — MRF</title>
+  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
+  <link rel="stylesheet" href="style.css"/>
+  <script>
+  (function () {
+    try {
+      var desktop = window.matchMedia('(min-width: 901px)').matches;
+      document.documentElement.setAttribute('data-ui', desktop ? 'desktop' : 'mobile');
+    } catch (e) {
+      document.documentElement.setAttribute('data-ui', 'mobile');
+    }
+  })();
+  </script>
+</head>
+<body>
+<div id="sidebar-root"></div>
+<main class="main-content">
+  <div id="topbar-root"></div>
+  <div class="feed">
+    <div class="profile-page account-page" id="account-page">
+      <div id="account-boot" class="profile-boot">
+        <span class="mrf-ball-spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      </div>
+      <div id="account-hero"></div>
+      <div id="account-library"></div>
+    </div>
+  </div>
+</main>
+<div id="player-root"></div>
+<script src="mock.js"></script>
+<script src="backend.js"></script>
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="account-page.js"></script>
+<script src="mrf-ready.js"></script>
+<script src="soft-nav.js"></script>
+<script>
+var _accountLoadGen = 0;
+
+function bootAccountPage() {
+  initShared();
+  loadAccountPage();
+}
+window.bootAccountPage = bootAccountPage;
+
+if (typeof whenDomReady === 'function') whenDomReady(bootAccountPage);
+else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootAccountPage);
+else bootAccountPage();
+
+async function loadAccountPage(forcedUser) {
+  const params = new URLSearchParams(location.search);
+  let u = (forcedUser != null && forcedUser !== '') ? String(forcedUser) : (params.get('u') || '');
+  if (!u) {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('mrf_route_account') || '{}');
+      if (saved && saved.u) u = String(saved.u);
+    } catch (_) {}
+  }
+  u = accountUsernameOf(u);
+  const page = document.getElementById('account-page');
+  const hero = document.getElementById('account-hero');
+  const lib = document.getElementById('account-library');
+  const boot = document.getElementById('account-boot');
+  if (!page || !hero || !lib) return;
+
+  if (!u) {
+    if (boot) boot.hidden = true;
+    hero.innerHTML = '';
+    lib.innerHTML = `<div class="search-empty" style="padding:60px 0"><p style="color:var(--text-3)">Аккаунт не найден</p></div>`;
+    return;
+  }
+
+  if (!params.get('u') || accountUsernameOf(params.get('u')) !== u) {
+    try {
+      const next = typeof mrfUrl === 'function' ? mrfUrl('account', { u }) : `account.html?u=${encodeURIComponent(u)}`;
+      history.replaceState(history.state || { mrfSoft: 1 }, '', next);
+    } catch (_) {}
+  }
+  try { sessionStorage.setItem('mrf_route_account', JSON.stringify({ u })); } catch (_) {}
+
+  const gen = ++_accountLoadGen;
+  if (boot) boot.hidden = false;
+  lib.innerHTML = '';
+  hero.innerHTML = '';
+
+  const data = await fetchPublicAccount(u);
+  if (gen !== _accountLoadGen) return;
+  if (boot) boot.hidden = true;
+
+  if (!data?.profile) {
+    lib.innerHTML = `<div class="search-empty" style="padding:60px 0"><p style="color:var(--text-3)">Аккаунт не найден</p></div>`;
+    return;
+  }
+
+  if (data.isSelf) {
+    const url = typeof mrfUrl === 'function' ? mrfUrl('profile') : 'profile.html';
+    if (typeof mrfGo === 'function') mrfGo(url);
+    else location.href = url;
+    return;
+  }
+
+  document.title = (data.profile.name || accountHandleOf(data.profile.username)) + ' — MRF';
+  renderAccountHero(hero, data.profile, {
+    isSelf: false,
+    library: data,
+    counts: data.counts
+  });
+  renderAccountLibrary(lib, data, { srcKey: 'account_likes_' + u });
+}
+window.loadAccountPage = loadAccountPage;
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Любимые треки — MRF</title>
-  <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
+  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   /* Layout boot: large screens = PC, smaller = mobile shell */
@@ -196,6 +196,7 @@ function renderLikedPage() {
   }
   if (playBtn) playBtn.style.display = n ? '' : 'none';
   if (shuffleBtn) shuffleBtn.style.display = n ? '' : 'none';
+  if (typeof syncPrisonPlayerUi === 'function') syncPrisonPlayerUi();
   if (searchWrap) searchWrap.hidden = !n;
   document.getElementById('liked-sticky-bar')?.classList.add('is-ready');
   if (hero) hero.classList.toggle('is-empty', !n);
@@ -242,6 +243,7 @@ function playAllLiked() {
 function shuffleLiked() {
   const tracks = _src['liked'];
   if (!tracks?.length) return;
+  if (typeof mrfRequirePremium === 'function' && !mrfRequirePremium('shuffle')) return;
   if (typeof isShuffle !== 'undefined') isShuffle = true;
   playFromSrc('liked', Math.floor(Math.random() * tracks.length));
   if (typeof updateShuffleBtn === 'function') updateShuffleBtn();

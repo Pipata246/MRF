@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MRF Premium</title>
+  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+  <script>
+  (function () {
+    try {
+      var desktop = window.matchMedia('(min-width: 901px)').matches;
+      document.documentElement.setAttribute('data-ui', desktop ? 'desktop' : 'mobile');
+    } catch (e) {
+      document.documentElement.setAttribute('data-ui', 'mobile');
+    }
+  })();
+  </script>
+</head>
+<body>
+<div id="sidebar-root"></div>
+<main class="main-content" id="main-content">
+  <div id="topbar-root"></div>
+  <div class="feed prem-feed" id="prem-feed">
+
+    <section class="prem-hero" aria-labelledby="prem-hero-title">
+      <div class="prem-hero-glow" aria-hidden="true"></div>
+      <div class="prem-hero-mark" aria-hidden="true" id="prem-hero-logo"></div>
+      <p class="prem-kicker">MRF Premium</p>
+      <h1 class="prem-hero-title" id="prem-hero-title">Слушай как хочешь</h1>
+      <p class="prem-hero-lead">Free — можно. Premium — без наручников: любой трек, любой порядок, свой стиль.</p>
+      <div class="prem-hero-cta" id="prem-hero-cta"></div>
+    </section>
+
+    <section class="prem-compare" aria-label="Сравнение">
+      <div class="prem-compare-col prem-compare-free">
+        <div class="prem-compare-label">Free</div>
+        <ul class="prem-compare-list">
+          <li>Только по порядку</li>
+          <li>Без выбора трека в списке</li>
+          <li>Без next / prev</li>
+          <li>Без перемешивания</li>
+          <li>2 цвета акцента</li>
+        </ul>
+      </div>
+      <div class="prem-compare-col prem-compare-pro">
+        <div class="prem-compare-label">Premium</div>
+        <ul class="prem-compare-list">
+          <li>Любой трек сразу</li>
+          <li>Полный контроль очереди</li>
+          <li>Свободный next / prev</li>
+          <li>Shuffle и «вразброс»</li>
+          <li>Все цвета и свой акцент</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="prem-perks" aria-label="Возможности">
+      <article class="prem-perk">
+        <div class="prem-perk-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M8 5v14l11-7L8 5z" fill="currentColor"/></svg>
+        </div>
+        <h2 class="prem-perk-title">Любой трек</h2>
+        <p class="prem-perk-text">Кликай что угодно в чартах, плейлистах и поиске — без «кассетного» порядка.</p>
+      </article>
+      <article class="prem-perk">
+        <div class="prem-perk-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h2 class="prem-perk-title">Свободный скип</h2>
+        <p class="prem-perk-text">Next, prev и свайпы работают всегда. Ты решаешь, что играет дальше.</p>
+      </article>
+      <article class="prem-perk">
+        <div class="prem-perk-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h2 class="prem-perk-title">Перемешивание</h2>
+        <p class="prem-perk-text">Shuffle в плеере, «вразброс» в любимых и плейлистах — полный хаос по желанию.</p>
+      </article>
+      <article class="prem-perk">
+        <div class="prem-perk-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg>
+        </div>
+        <h2 class="prem-perk-title">Свой цвет</h2>
+        <p class="prem-perk-text">Вся палитра акцентов и свой hex. Free оставляет только розовый и зелёный.</p>
+      </article>
+      <article class="prem-perk">
+        <div class="prem-perk-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M12 3l1.8 5.4H19l-4.2 3.2 1.6 5.4L12 13.8 7.6 17l1.6-5.4L5 8.4h5.2L12 3z" fill="currentColor"/></svg>
+        </div>
+        <h2 class="prem-perk-title">Без апселла</h2>
+        <p class="prem-perk-text">Баннер Premium исчезает. Чистый интерфейс — ты уже внутри.</p>
+      </article>
+    </section>
+
+    <section class="prem-visual" aria-label="Стиль Premium">
+      <div class="prem-visual-side">
+        <div class="prem-visual-label">Плеер</div>
+        <div class="prem-visual-bars" aria-hidden="true">
+          <span style="--h:38%"></span>
+          <span style="--h:62%"></span>
+          <span style="--h:88%"></span>
+          <span style="--h:54%"></span>
+          <span style="--h:74%"></span>
+          <span style="--h:46%"></span>
+          <span style="--h:80%"></span>
+        </div>
+        <p class="prem-visual-cap">Любой трек · скип · shuffle</p>
+      </div>
+      <div class="prem-visual-divider" aria-hidden="true"></div>
+      <div class="prem-visual-side">
+        <div class="prem-visual-label">Акцент</div>
+        <div class="prem-visual-swatches" aria-hidden="true">
+          <i class="is-free" style="background:#EE90B7" title="Free"></i>
+          <i class="is-free" style="background:#27AE60" title="Free"></i>
+          <i class="is-locked" style="background:#E35A90"></i>
+          <i class="is-locked" style="background:#68C7EC"></i>
+          <i class="is-locked" style="background:#9b59b6"></i>
+          <i class="is-locked" style="background:#f39c12"></i>
+        </div>
+        <p class="prem-visual-cap">Все цвета · свой hex</p>
+      </div>
+    </section>
+
+    <footer class="prem-foot">
+      <div class="prem-foot-cta" id="prem-foot-cta"></div>
+      <p class="prem-foot-note" id="prem-foot-note"></p>
+    </footer>
+
+  </div>
+</main>
+<div id="player-root"></div>
+<script src="mock.js"></script>
+<script src="backend.js"></script>
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="mrf-ready.js"></script>
+<script src="soft-nav.js"></script>
+<script>
+function renderPremiumPage() {
+  const logo = document.getElementById('prem-hero-logo');
+  if (logo && typeof mrfLogoSVG === 'function') {
+    logo.innerHTML = mrfLogoSVG(88);
+  }
+  const on = typeof mrfUserHasPremium === 'function' && mrfUserHasPremium();
+  const ctaHtml = on
+    ? `<button type="button" class="btn-primary prem-cta is-owned" disabled>У вас Premium</button>`
+    : `<button type="button" class="btn-primary prem-cta" disabled>Скоро в продаже</button>`;
+  const hero = document.getElementById('prem-hero-cta');
+  const foot = document.getElementById('prem-foot-cta');
+  if (hero) hero.innerHTML = ctaHtml;
+  if (foot) foot.innerHTML = ctaHtml;
+  const note = document.getElementById('prem-foot-note');
+  if (note) {
+    note.textContent = on
+      ? 'Все возможности уже открыты в этом аккаунте.'
+      : 'Оплата появится на этой странице.';
+  }
+  document.body.classList.toggle('is-premium-owned', on);
+  if (typeof syncPrisonPlayerUi === 'function') syncPrisonPlayerUi();
+  if (typeof syncMrfPremFab === 'function') syncMrfPremFab();
+}
+window.renderPremiumPage = renderPremiumPage;
+
+function bootPremiumPage() {
+  initShared();
+  renderPremiumPage();
+}
+window.bootPremiumPage = bootPremiumPage;
+
+if (typeof whenDomReady === 'function') whenDomReady(bootPremiumPage);
+else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootPremiumPage);
+else bootPremiumPage();
+
+if (!window.__mrfPremiumAuthBound) {
+  window.__mrfPremiumAuthBound = true;
+  window.addEventListener('mrf:auth', () => {
+    if (typeof getPageId === 'function' && getPageId() === 'premium') renderPremiumPage();
+  });
+}
+</script>
+</body>
+</html>

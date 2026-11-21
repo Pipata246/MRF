@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Профиль — MRF</title>
-  <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
+  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   /* Layout boot: large screens = PC, smaller = mobile shell */
@@ -46,12 +46,15 @@
           </div>
           <div class="auth-field">
             <label class="auth-label" for="auth-username">Никнейм</label>
-            <input type="text" class="auth-input" id="auth-username" placeholder="@nickname" autocomplete="username" maxlength="25"/>
+            <div class="auth-user-wrap">
+              <span class="auth-user-at" aria-hidden="true">@</span>
+              <input type="text" class="auth-input auth-user-input" id="auth-username" placeholder="nickname" autocomplete="username" maxlength="24" spellcheck="false" autocapitalize="off" inputmode="text"/>
+            </div>
           </div>
           <div class="auth-field">
             <label class="auth-label" for="auth-password">Пароль</label>
             <div class="auth-pass-wrap">
-              <input type="password" class="auth-input" id="auth-password" placeholder="Пароль" autocomplete="current-password" maxlength="72"/>
+              <input type="password" class="auth-input" id="auth-password" placeholder="От 8 символов, латиница" autocomplete="current-password" maxlength="72"/>
               <button type="button" class="auth-pass-toggle" id="auth-pass-toggle" onclick="toggleAuthPassword('auth-password', this)" aria-label="Показать пароль" title="Показать пароль">
                 <svg class="auth-pass-ico auth-pass-ico-show" viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg>
                 <svg class="auth-pass-ico auth-pass-ico-hide" viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true" hidden><path d="M3 3l18 18M10.6 10.6A3 3 0 0012 15a3 3 0 002.4-4.4M9.9 5.1A10.4 10.4 0 0112 5c6.5 0 10 7 10 7a18.3 18.3 0 01-4.2 4.8M6.1 6.1C3.9 7.7 2 12 2 12a18.5 18.5 0 005.2 5.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -82,8 +85,20 @@
       </div>
 
       <div id="profile-authed-block" hidden>
-      <!-- Hero -->
-      <div class="profile-hero">
+      <!-- Public view of my account -->
+      <div id="profile-public-view">
+        <div id="profile-public-hero"></div>
+        <div id="profile-public-library"></div>
+      </div>
+
+      <!-- Edit -->
+      <div id="profile-edit-view" hidden>
+      <div class="pf-edit-toolbar" id="pf-edit-toolbar-main">
+        <button type="button" class="btn-secondary pf-edit-close" onclick="setProfileEditMode(false)">Закрыть</button>
+      </div>
+
+      <div id="profile-edit-main">
+      <div class="profile-hero profile-edit-hero">
         <div class="profile-hero-main">
           <div class="profile-avatar-wrap" onclick="document.getElementById('avatar-upload').click()">
             <div class="profile-avatar" id="profile-avatar-display"></div>
@@ -93,21 +108,44 @@
             <input type="file" id="avatar-upload" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="uploadAvatar(this)"/>
           </div>
           <div class="profile-info">
-            <h2 id="profile-name-display">Пользователь</h2>
-            <div class="profile-handle" id="profile-username-display">@mrf_user</div>
-            <div class="plan-badge" id="profile-plan-badge">Подписка не оформлена</div>
+            <h2 id="profile-edit-name-display">Пользователь</h2>
+            <div class="profile-handle" id="profile-edit-username-display">@mrf_user</div>
           </div>
         </div>
       </div>
 
-      <!-- Профиль -->
+      <div class="settings-section pf-sub-section" id="subscription">
+        <h3>Подписка</h3>
+        <div class="pf-sub-card" id="pf-sub-card">
+          <div class="pf-sub-head">
+            <div class="pf-sub-meta">
+              <div class="pf-sub-title">MRF Premium</div>
+              <div class="pf-sub-status" id="pf-sub-status">Нет</div>
+            </div>
+            <button type="button" class="btn-secondary pf-sub-cta" id="pf-sub-cta" onclick="openPremiumCheckout()">Подробнее</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section pf-tg-section" id="telegram-link">
+        <h3>Telegram</h3>
+        <div class="pf-tg-card" id="pf-tg-card">
+          <div class="pf-tg-head">
+            <div class="pf-tg-meta">
+              <div class="pf-tg-title">Привязка</div>
+              <div class="pf-tg-status" id="pf-tg-status">Не привязан</div>
+            </div>
+          </div>
+          <div class="pf-tg-widget" id="pf-tg-widget" hidden></div>
+        </div>
+      </div>
+
       <div class="settings-section pf-identity-section">
         <h3>Профиль</h3>
         <div class="pf-field">
           <label class="pf-field-label" for="pf-name">Имя</label>
           <div class="pf-field-control">
             <input type="text" class="settings-input pf-field-input" id="pf-name" placeholder="Имя" maxlength="64" autocomplete="nickname"/>
-            <button type="button" class="btn-primary profile-save-btn" onclick="saveProfile()">Сохранить</button>
           </div>
         </div>
         <div class="pf-field">
@@ -118,6 +156,13 @@
             </div>
           </div>
           <input type="hidden" id="pf-username" value=""/>
+        </div>
+        <div class="pf-field">
+          <label class="pf-field-label" for="pf-bio">Описание</label>
+          <div class="pf-field-control pf-field-control-stack">
+            <textarea class="settings-input pf-field-input pf-bio-input" id="pf-bio" rows="3" maxlength="160" placeholder="О себе"></textarea>
+            <button type="button" class="btn-primary profile-save-btn" onclick="saveProfile()">Сохранить</button>
+          </div>
         </div>
       </div>
 
@@ -143,16 +188,16 @@
               <span class="accent-hex" id="accent-hex-label">#EE90B7</span>
             </div>
             <div class="color-swatches" id="color-swatches">
-              <button type="button" class="color-swatch" style="background:#EE90B7" data-color="#EE90B7" onclick="setAccent('#EE90B7',this)" aria-label="#EE90B7"></button>
-              <button type="button" class="color-swatch" style="background:#E35A90" data-color="#E35A90" onclick="setAccent('#E35A90',this)" aria-label="#E35A90"></button>
-              <button type="button" class="color-swatch" style="background:#f39c12" data-color="#f39c12" onclick="setAccent('#f39c12',this)" aria-label="#f39c12"></button>
-              <button type="button" class="color-swatch" style="background:#27ae60" data-color="#27ae60" onclick="setAccent('#27ae60',this)" aria-label="#27ae60"></button>
-              <button type="button" class="color-swatch" style="background:#1dd1a1" data-color="#1dd1a1" onclick="setAccent('#1dd1a1',this)" aria-label="#1dd1a1"></button>
-              <button type="button" class="color-swatch" style="background:#68C7EC" data-color="#68C7EC" onclick="setAccent('#68C7EC',this)" aria-label="#68C7EC"></button>
-              <button type="button" class="color-swatch" style="background:#e74c3c" data-color="#e74c3c" onclick="setAccent('#e74c3c',this)" aria-label="#e74c3c"></button>
-              <button type="button" class="color-swatch" style="background:#9b59b6" data-color="#9b59b6" onclick="setAccent('#9b59b6',this)" aria-label="#9b59b6"></button>
-              <button type="button" class="color-swatch" style="background:#a29bfe" data-color="#a29bfe" onclick="setAccent('#a29bfe',this)" aria-label="#a29bfe"></button>
-              <button type="button" class="color-swatch color-swatch-custom" id="color-swatch-custom" title="Свой цвет" aria-label="Свой цвет" aria-haspopup="dialog" aria-controls="modal-accent-picker" onclick="toggleAccentPicker(event)">
+              <button type="button" class="color-swatch" style="background:#EE90B7" data-color="#EE90B7" data-free="1" onclick="setAccent('#EE90B7',this)" aria-label="#EE90B7"></button>
+              <button type="button" class="color-swatch" style="background:#27AE60" data-color="#27AE60" data-free="1" onclick="setAccent('#27AE60',this)" aria-label="#27AE60"></button>
+              <button type="button" class="color-swatch" style="background:#E35A90" data-color="#E35A90" data-prem="1" onclick="setAccent('#E35A90',this)" aria-label="#E35A90"></button>
+              <button type="button" class="color-swatch" style="background:#f39c12" data-color="#f39c12" data-prem="1" onclick="setAccent('#f39c12',this)" aria-label="#f39c12"></button>
+              <button type="button" class="color-swatch" style="background:#1dd1a1" data-color="#1dd1a1" data-prem="1" onclick="setAccent('#1dd1a1',this)" aria-label="#1dd1a1"></button>
+              <button type="button" class="color-swatch" style="background:#68C7EC" data-color="#68C7EC" data-prem="1" onclick="setAccent('#68C7EC',this)" aria-label="#68C7EC"></button>
+              <button type="button" class="color-swatch" style="background:#e74c3c" data-color="#e74c3c" data-prem="1" onclick="setAccent('#e74c3c',this)" aria-label="#e74c3c"></button>
+              <button type="button" class="color-swatch" style="background:#9b59b6" data-color="#9b59b6" data-prem="1" onclick="setAccent('#9b59b6',this)" aria-label="#9b59b6"></button>
+              <button type="button" class="color-swatch" style="background:#a29bfe" data-color="#a29bfe" data-prem="1" onclick="setAccent('#a29bfe',this)" aria-label="#a29bfe"></button>
+              <button type="button" class="color-swatch color-swatch-custom" id="color-swatch-custom" data-prem="1" title="Свой цвет" aria-label="Свой цвет" aria-haspopup="dialog" aria-controls="modal-accent-picker" onclick="toggleAccentPicker(event)">
                 <svg class="color-swatch-custom-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
                   <path fill="currentColor" d="M20.71 4.04a1 1 0 0 0-1.41 0l-1.34 1.34-1.06-1.06 1.06-1.06a1 1 0 1 0-1.41-1.41L15.2 2.26 13.97 1.03a1 1 0 0 0-1.41 0L9.9 3.69a1 1 0 0 0 0 1.41l1.23 1.23-7.5 7.5a2 2 0 0 0-.53 1.9l.5 1.9 1.9.5a2 2 0 0 0 1.9-.53l7.5-7.5 1.23 1.23a1 1 0 0 0 1.41 0l2.66-2.66a1 1 0 0 0 0-1.41L19.1 5.85l1.61-1.81a1 1 0 0 0 0-1.41zM7.4 17.1l-.7-.19.19-.7 6.8-6.8 1.2 1.2-6.49 6.49z"/>
                 </svg>
@@ -182,11 +227,9 @@
       <!-- Аккаунт -->
       <div class="settings-section pf-account-section" id="account">
         <h3>Аккаунт</h3>
-        <button type="button" class="btn-secondary pf-logout-btn" onclick="logoutProfile()">Выйти</button>
-        <div class="pf-danger-zone">
-          <div class="pf-danger-title">Удалить аккаунт</div>
-          <input type="password" class="settings-input pf-danger-input" id="pf-delete-password" placeholder="Пароль" autocomplete="current-password" maxlength="72"/>
-          <button type="button" class="btn-danger" id="pf-delete-btn" onclick="deleteAccountProfile()">Удалить</button>
+        <div class="pf-account-actions">
+          <button type="button" class="btn-secondary pf-account-btn" onclick="logoutProfile()">Выйти</button>
+          <button type="button" class="btn-danger pf-account-btn" onclick="openDeleteAccountModal()">Удалить аккаунт</button>
         </div>
       </div>
 
@@ -200,8 +243,27 @@
           <span class="pf-version">v2.0.0</span>
         </div>
       </div>
+
+      </div><!-- /profile-edit-main -->
+
+      </div><!-- /profile-edit-view -->
       </div><!-- /profile-authed-block -->
 
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="overlay-delete-account" onclick="closeDeleteAccountModal()"></div>
+  <div class="modal pf-delete-modal hidden" id="modal-delete-account" role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
+    <button type="button" class="pf-delete-modal-x" onclick="closeDeleteAccountModal()" aria-label="Закрыть">✕</button>
+    <div class="pf-delete-modal-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <h3 class="pf-delete-modal-title" id="delete-account-title">Удалить аккаунт</h3>
+    <p class="pf-delete-warn">Аккаунт удалится навсегда</p>
+    <input type="password" class="modal-input pf-delete-pass" id="pf-delete-password" placeholder="Пароль" autocomplete="current-password" maxlength="72" aria-label="Пароль"/>
+    <div class="pf-delete-modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeDeleteAccountModal()">Отмена</button>
+      <button type="button" class="btn-danger" id="pf-delete-btn" onclick="deleteAccountProfile()">Удалить</button>
     </div>
   </div>
 
@@ -241,6 +303,7 @@
 <script src="backend.js"></script>
 <script src="shared.js"></script>
 <script src="app.js"></script>
+<script src="account-page.js"></script>
 <script src="mrf-ready.js"></script>
 <script src="soft-nav.js"></script>
 <script>
@@ -338,8 +401,32 @@ function setAuthSubmitLoading(on) {
   }
 }
 
+function sanitizeAuthUsernameInput() {
+  const el = document.getElementById('auth-username');
+  if (!el) return;
+  const cleaned = String(el.value || '')
+    .replace(/^@+/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '')
+    .slice(0, 24);
+  if (el.value !== cleaned) el.value = cleaned;
+}
+
+if (!window.__mrfAuthUserBound) {
+  window.__mrfAuthUserBound = true;
+  document.addEventListener('input', (e) => {
+    if (e.target && e.target.id === 'auth-username') sanitizeAuthUsernameInput();
+  });
+  document.addEventListener('paste', (e) => {
+    if (e.target && e.target.id === 'auth-username') {
+      requestAnimationFrame(() => sanitizeAuthUsernameInput());
+    }
+  });
+}
+
 async function submitAuth() {
   setAuthError('');
+  sanitizeAuthUsernameInput();
   const username = document.getElementById('auth-username')?.value || '';
   const password = document.getElementById('auth-password')?.value || '';
   const password2 = document.getElementById('auth-password2')?.value || '';
@@ -418,11 +505,94 @@ function refreshTopbarProfile() {
   else if (typeof injectTopbar === 'function') injectTopbar();
 }
 
+var _profileEditMode = false;
+var _profilePublicGen = 0;
+
+function isProfileEditMode() {
+  return !!_profileEditMode;
+}
+
+function setProfileEditMode(on) {
+  _profileEditMode = !!on;
+  try {
+    const url = typeof mrfUrl === 'function'
+      ? mrfUrl('profile', on ? { edit: '1' } : null)
+      : (on ? 'profile.html?edit=1' : 'profile.html');
+    history.replaceState(history.state || { mrfSoft: 1 }, '', url);
+  } catch (_) {}
+  applyProfileModeUi();
+  if (!on) void refreshMyPublicProfile();
+}
+window.setProfileEditMode = setProfileEditMode;
+
+/** Always open public profile view (nav / avatar). Ignores leftover edit state. */
+function showPublicProfileView() {
+  _profileEditMode = false;
+  try {
+    const url = typeof mrfUrl === 'function' ? mrfUrl('profile') : 'profile.html';
+    if (location.search) history.replaceState(history.state || { mrfSoft: 1 }, '', url);
+  } catch (_) {}
+  applyProfileModeUi();
+  loadProfilePage();
+}
+window.showPublicProfileView = showPublicProfileView;
+
+function applyProfileModeUi() {
+  const edit = isProfileEditMode();
+  const pub = document.getElementById('profile-public-view');
+  const ed = document.getElementById('profile-edit-view');
+  if (pub) pub.hidden = edit;
+  if (ed) ed.hidden = !edit;
+}
+
+async function refreshMyPublicProfile() {
+  const hero = document.getElementById('profile-public-hero');
+  const lib = document.getElementById('profile-public-library');
+  if (!hero || !lib) return;
+  if (!(window.MrfAuth && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn())) {
+    hero.innerHTML = '';
+    lib.innerHTML = '';
+    return;
+  }
+  const nick = accountUsernameOf(MrfAuth.profile?.username || Store.getProfile()?.username || '');
+  if (!nick) return;
+  const gen = ++_profilePublicGen;
+  lib.innerHTML = typeof loaderHTMLShared === 'function' ? loaderHTMLShared() : '';
+  const data = await fetchPublicAccount(nick);
+  if (gen !== _profilePublicGen) return;
+  if (!data?.profile) {
+    const cloud = MrfAuth.profile || Store.getProfile() || {};
+    renderAccountHero(hero, {
+      name: cloud.name || 'Пользователь',
+      username: cloud.username,
+      bio: cloud.bio || '',
+      avatar: cloud.avatar || null
+    }, { isSelf: true, editMode: false, library: {} });
+    lib.innerHTML = `<div class="search-empty" style="padding:28px 0"><p style="color:var(--text-3)">Пока пусто</p></div>`;
+    return;
+  }
+  renderAccountHero(hero, data.profile, {
+    isSelf: true,
+    editMode: false,
+    library: data,
+    counts: data.counts
+  });
+  renderAccountLibrary(lib, data, { srcKey: 'my_account_likes' });
+}
+
 function loadProfilePage() {
   const page = document.querySelector('.profile-page');
   if (!page) return;
 
+  // Soft-nav re-runs scripts but `var` does not reset — sync from URL every enter
+  try {
+    _profileEditMode = new URLSearchParams(location.search).get('edit') === '1';
+  } catch (_) {
+    _profileEditMode = false;
+  }
+
   syncAuthUi();
+  applyProfileModeUi();
 
   const cloud = window.MrfAuth?.profile;
   const profile = Store.getProfile();
@@ -430,6 +600,18 @@ function loadProfilePage() {
   const name = cloud?.name || profile.name || 'Пользователь';
   const username = normalizeUsername(cloud?.username || profile.username);
   const nick = String(username || '').replace(/^@+/, '');
+  const bio = cloud?.bio != null ? cloud.bio : (profile.bio || '');
+  const mergedPrem = {
+    premium: cloud?.premium ?? profile.premium,
+    plan: cloud?.plan || profile.plan,
+    premiumEndsAt: cloud?.premiumEndsAt || profile.premiumEndsAt
+  };
+  const premium = typeof mrfPremiumStillActive === 'function'
+    ? mrfPremiumStillActive(mergedPrem)
+    : !!(mergedPrem.premium || mergedPrem.plan === 'premium');
+  const planLabel = premium
+    ? (cloud?.planLabel || profile.planLabel || 'Премиум')
+    : 'Нет';
 
   const avatarEl = document.getElementById('profile-avatar-display');
   if (avatarEl) {
@@ -438,18 +620,19 @@ function loadProfilePage() {
     else avatarEl.textContent = (name || 'П')[0].toUpperCase();
   }
 
-  const nameEl = document.getElementById('profile-name-display');
-  const userEl = document.getElementById('profile-username-display');
+  const nameEl = document.getElementById('profile-edit-name-display');
+  const userEl = document.getElementById('profile-edit-username-display');
   if (nameEl) nameEl.textContent = name;
   if (userEl) userEl.textContent = username;
-  const planEl = document.getElementById('profile-plan-badge');
-  if (planEl) planEl.textContent = cloud?.planLabel || 'Подписка не оформлена';
 
   const pf = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
   pf('pf-name', name);
   pf('pf-username', username);
+  pf('pf-bio', bio);
   const nickText = document.getElementById('pf-username-text');
   if (nickText) nickText.textContent = nick || 'user';
+  syncPremiumBlock(premium, planLabel);
+  void syncTelegramBlock();
 
   const tog = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
   tog('s-autoplay', settings.autoplay === true);
@@ -460,8 +643,102 @@ function loadProfilePage() {
   if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
   syncAccentPaletteUI();
   refreshTopbarProfile();
+
+  if (window.MrfAuth && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn() && !isProfileEditMode()) {
+    void refreshMyPublicProfile();
+  }
 }
 window.loadProfilePage = loadProfilePage;
+
+function syncPremiumBlock(premium, planLabel) {
+  const on = !!premium;
+  const label = planLabel || (on ? 'Премиум' : 'Нет');
+  const card = document.getElementById('pf-sub-card');
+  const status = document.getElementById('pf-sub-status');
+  const cta = document.getElementById('pf-sub-cta');
+  if (card) card.classList.toggle('is-premium', on);
+  if (status) status.textContent = label;
+  if (cta) {
+    cta.hidden = on;
+    cta.disabled = false;
+  }
+}
+window.syncPremiumBlock = syncPremiumBlock;
+
+async function syncTelegramBlock() {
+  const status = document.getElementById('pf-tg-status');
+  const widget = document.getElementById('pf-tg-widget');
+  const section = document.getElementById('telegram-link');
+  if (!status || !widget) return;
+
+  const logged = !!(window.MrfAuth && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn());
+  if (section) section.hidden = !logged || !isProfileEditMode();
+  if (!logged) {
+    status.textContent = 'Не привязан';
+    widget.hidden = true;
+    widget.innerHTML = '';
+    return;
+  }
+
+  try {
+    const data = await MrfAuth.api('/api/me?resource=telegram');
+    if (data?.linked) {
+      status.textContent = data.telegramUsername || 'Привязан';
+      widget.hidden = true;
+      widget.innerHTML = '';
+      return;
+    }
+    status.textContent = 'Не привязан';
+    if (!data?.botReady || !data?.botUsername) {
+      widget.hidden = true;
+      widget.innerHTML = '';
+      return;
+    }
+    renderTelegramLoginWidget(widget, data.botUsername);
+  } catch (_) {
+    status.textContent = 'Не привязан';
+    widget.hidden = true;
+    widget.innerHTML = '';
+  }
+}
+window.syncTelegramBlock = syncTelegramBlock;
+
+function renderTelegramLoginWidget(host, botUsername) {
+  if (!host || !botUsername) return;
+  host.hidden = false;
+  host.innerHTML = '';
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = 'https://telegram.org/js/telegram-widget.js?22';
+  script.setAttribute('data-telegram-login', botUsername);
+  script.setAttribute('data-size', 'large');
+  script.setAttribute('data-radius', '10');
+  script.setAttribute('data-request-access', 'write');
+  script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+  host.appendChild(script);
+}
+
+async function onTelegramAuth(user) {
+  if (!user || !window.MrfAuth?.api) return;
+  try {
+    const res = await MrfAuth.api('/api/me?resource=telegram', {
+      method: 'POST',
+      body: user
+    });
+    if (res?.profile) {
+      MrfAuth.profile = res.profile;
+      if (typeof MrfAuth.applyProfileLocal === 'function') MrfAuth.applyProfileLocal(res.profile);
+    }
+    if (res?.trialGranted) showNotif('Premium на 2 недели');
+    else showNotif('Telegram привязан');
+    loadProfilePage();
+    if (typeof syncPrisonPlayerUi === 'function') syncPrisonPlayerUi();
+    if (typeof syncMrfPremFab === 'function') syncMrfPremFab();
+  } catch (e) {
+    showNotif(e?.message || 'Не удалось привязать');
+  }
+}
+window.onTelegramAuth = onTelegramAuth;
 
 if (!window.__mrfProfileAuthBound) {
   window.__mrfProfileAuthBound = true;
@@ -581,6 +858,27 @@ function loadAccentHSVFromHex(hex) {
   setAccentHSV(hsv.h, hsv.s, hsv.v);
 }
 
+function syncAccentPremiumLocks() {
+  const prem = typeof mrfUserHasPremium === 'function' ? mrfUserHasPremium() : false;
+  document.querySelectorAll('.color-swatches .color-swatch[data-prem="1"]').forEach((btn) => {
+    btn.classList.toggle('is-premium-locked', !prem);
+    btn.setAttribute('aria-disabled', prem ? 'false' : 'true');
+    if (!prem) btn.title = 'Premium';
+    else btn.removeAttribute('title');
+  });
+  const shuffleRow = document.getElementById('s-shuffle')?.closest('.settings-row');
+  if (shuffleRow) shuffleRow.classList.toggle('is-premium-locked', !prem);
+  const shuffleInput = document.getElementById('s-shuffle');
+  if (shuffleInput) {
+    shuffleInput.disabled = !prem;
+    if (!prem && shuffleInput.checked) {
+      shuffleInput.checked = false;
+      Store.setSettings({ shuffleOnPlay: false });
+    }
+  }
+}
+window.syncAccentPremiumLocks = syncAccentPremiumLocks;
+
 function syncAccentPaletteUI() {
   const settings = Store.getSettings();
   const theme = settings.theme || 'dark';
@@ -588,9 +886,9 @@ function syncAccentPaletteUI() {
     ? getAccentForTheme(theme, settings)
     : (settings.accentColor || '#EE90B7')).toUpperCase();
   const hint = document.getElementById('accent-theme-hint');
-  if (hint) hint.textContent = theme === 'light' ? 'Для светлой темы' : 'Для тёмной темы';
+  if (hint) hint.textContent = theme === 'light' ? 'Светлая' : 'Тёмная';
   const modalHint = document.getElementById('accent-picker-theme-hint');
-  if (modalHint) modalHint.textContent = theme === 'light' ? 'Для светлой темы' : 'Для тёмной темы';
+  if (modalHint) modalHint.textContent = theme === 'light' ? 'Светлая' : 'Тёмная';
   const hex = document.getElementById('accent-hex-label');
   if (hex) hex.textContent = cur;
   loadAccentHSVFromHex(cur);
@@ -602,6 +900,7 @@ function syncAccentPaletteUI() {
     if (on) matched = true;
   });
   document.getElementById('color-swatch-custom')?.classList.toggle('active', !matched);
+  syncAccentPremiumLocks();
 }
 window.syncAccentPaletteUI = syncAccentPaletteUI;
 
@@ -630,6 +929,7 @@ window.openAccentPicker = openAccentPicker;
 function toggleAccentPicker(ev) {
   ev?.preventDefault?.();
   ev?.stopPropagation?.();
+  if (typeof mrfRequirePremium === 'function' && !mrfRequirePremium('accent')) return;
   if (isAccentPickerOpen()) closeAccentPicker();
   else openAccentPicker();
 }
@@ -736,6 +1036,7 @@ async function saveProfile() {
     return;
   }
   let name = document.getElementById('pf-name')?.value.trim() || '';
+  const bio = document.getElementById('pf-bio')?.value || '';
   const username = normalizeUsername(MrfAuth.profile?.username || document.getElementById('pf-username')?.value);
   if (!name) {
     showNotif('Укажи имя');
@@ -745,7 +1046,7 @@ async function saveProfile() {
   const btn = document.querySelector('.profile-save-btn');
   if (btn) btn.disabled = true;
   try {
-    const res = await MrfAuth.updateProfile({ name });
+    const res = await MrfAuth.updateProfile({ name, bio });
     if (!res.ok) {
       showNotif(res.error || 'Не удалось сохранить');
       return;
@@ -754,12 +1055,14 @@ async function saveProfile() {
     const shownName = profile?.name || name;
     const shownUser = normalizeUsername(profile?.username || username);
 
-    const nameEl = document.getElementById('profile-name-display');
-    const userEl = document.getElementById('profile-username-display');
+    const nameEl = document.getElementById('profile-edit-name-display');
+    const userEl = document.getElementById('profile-edit-username-display');
     if (nameEl) nameEl.textContent = shownName;
     if (userEl) userEl.textContent = shownUser;
     const nickText = document.getElementById('pf-username-text');
     if (nickText) nickText.textContent = shownUser.replace(/^@+/, '');
+    const bioEl = document.getElementById('pf-bio');
+    if (bioEl && profile?.bio != null) bioEl.value = profile.bio;
 
     const avatarEl = document.getElementById('profile-avatar-display');
     if (avatarEl && !(profile?.avatar || Store.getProfile().avatar)) {
@@ -767,7 +1070,7 @@ async function saveProfile() {
     }
 
     refreshTopbarProfile();
-    showNotif('Профиль сохранён');
+    showNotif('Сохранено');
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -775,10 +1078,38 @@ async function saveProfile() {
 window.saveProfile = saveProfile;
 
 function saveSetting(key, value) {
+  if (key === 'shuffleOnPlay' && value && typeof mrfRequirePremium === 'function' && !mrfRequirePremium('shuffle')) {
+    const el = document.getElementById('s-shuffle');
+    if (el) el.checked = false;
+    return;
+  }
   Store.setSettings({ [key]: value });
   showNotif('Сохранено');
 }
 window.saveSetting = saveSetting;
+
+function openDeleteAccountModal() {
+  if (!(window.MrfAuth && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn())) {
+    showNotif('Сначала войди в аккаунт');
+    return;
+  }
+  const modal = document.getElementById('modal-delete-account');
+  const overlay = document.getElementById('overlay-delete-account');
+  const input = document.getElementById('pf-delete-password');
+  if (input) input.value = '';
+  modal?.classList.remove('hidden');
+  overlay?.classList.remove('hidden');
+  setTimeout(() => input?.focus(), 40);
+}
+window.openDeleteAccountModal = openDeleteAccountModal;
+
+function closeDeleteAccountModal() {
+  document.getElementById('modal-delete-account')?.classList.add('hidden');
+  document.getElementById('overlay-delete-account')?.classList.add('hidden');
+  const input = document.getElementById('pf-delete-password');
+  if (input) input.value = '';
+}
+window.closeDeleteAccountModal = closeDeleteAccountModal;
 
 async function deleteAccountProfile() {
   if (!(window.MrfAuth && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn())) {
@@ -787,19 +1118,19 @@ async function deleteAccountProfile() {
   }
   const password = document.getElementById('pf-delete-password')?.value || '';
   if (!password) {
-    showNotif('Введи пароль для подтверждения');
+    showNotif('Введи пароль');
     return;
   }
-  if (!confirm('Удалить аккаунт навсегда? Это нельзя отменить.')) return;
 
   const btn = document.getElementById('pf-delete-btn');
   if (btn) btn.disabled = true;
   try {
     const res = await MrfAuth.deleteAccount({ password });
     if (!res.ok) {
-      showNotif(res.error || 'Не удалось удалить аккаунт');
+      showNotif(res.error || 'Не удалось удалить');
       return;
     }
+    closeDeleteAccountModal();
     showNotif('Аккаунт удалён');
     loadProfilePage();
   } finally {
@@ -812,6 +1143,8 @@ function setAccent(color, el) {
   if (!color) return;
   const hex = normalizeAccentHex(color) || String(color).trim();
   if (!hex) return;
+  const free = typeof mrfIsFreeAccent === 'function' ? mrfIsFreeAccent(hex) : true;
+  if (!free && typeof mrfRequirePremium === 'function' && !mrfRequirePremium('accent')) return;
   const theme = Store.getSettings().theme || 'dark';
   const patch = theme === 'light'
     ? { accentColorLight: hex, accentColor: hex }

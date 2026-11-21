@@ -82,8 +82,12 @@
   }
   function validatePassword(p) {
     const s = String(p || '');
+    if (!s) return 'Введи пароль';
     if (s.length < 8) return 'Пароль: минимум 8 символов';
     if (s.length > 72) return 'Пароль слишком длинный';
+    if (!/^[A-Za-z0-9!@#$%^&*()_+\-=.,?]+$/.test(s)) {
+      return 'Пароль: только латиница, цифры и !@#$%^&*()_+-=.,?';
+    }
     return '';
   }
 
@@ -95,8 +99,16 @@
         id: profile.id,
         name: profile.name,
         username: profile.username,
+        bio: profile.bio != null ? profile.bio : '',
         avatar: profile.avatar || null,
-        plan: profile.plan || 'MRF Free',
+        premium: !!profile.premium,
+        plan: profile.plan || (profile.premium ? 'premium' : 'free'),
+        planLabel: profile.planLabel || (profile.premium ? 'Премиум' : 'Нет'),
+        premiumStartedAt: profile.premiumStartedAt || null,
+        premiumEndsAt: profile.premiumEndsAt || null,
+        telegramLinked: !!profile.telegramLinked,
+        telegramUsername: profile.telegramUsername || null,
+        telegramTrialUsed: !!profile.telegramTrialUsed,
         joinedAt: profile.joinedAt
       });
     } finally {
@@ -220,8 +232,11 @@
           id: null,
           name: 'Пользователь',
           username: '',
+          bio: '',
           avatar: null,
+          premium: false,
           plan: 'free',
+          planLabel: 'Нет',
           joinedAt: null
         });
       }
@@ -364,7 +379,8 @@
   async function login({ username, password }) {
     const uErr = validateUsername(username);
     if (uErr) return { ok: false, error: uErr };
-    if (!password) return { ok: false, error: 'Введи пароль' };
+    const pErr = validatePassword(password);
+    if (pErr) return { ok: false, error: pErr };
     try {
       const data = await api('/api/auth', {
         method: 'POST',
@@ -418,11 +434,14 @@
     }
   }
 
-  async function updateProfile({ name } = {}) {
+  async function updateProfile({ name, bio } = {}) {
     try {
+      const body = {};
+      if (name != null) body.name = name;
+      if (bio != null) body.bio = bio;
       const data = await api('/api/me?resource=profile', {
         method: 'PATCH',
-        body: { name }
+        body
       });
       MrfAuth.profile = data.profile;
       applyProfileLocal(data.profile);
@@ -460,6 +479,8 @@
   }
 
   MrfAuth.hasAuthHint = hasAuthHint;
+  MrfAuth.api = api;
+  MrfAuth.applyProfileLocal = applyProfileLocal;
 
   MrfAuth.normalizeUsername = normalizeUsername;
   MrfAuth.displayUsername = displayUsername;

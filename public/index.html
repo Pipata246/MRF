@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MRF — Главная</title>
-  <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
+  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   /* Layout boot: large screens = PC, smaller = mobile shell */
@@ -147,6 +147,43 @@
 
     </div>
 
+    <footer class="home-footer" aria-label="Подвал">
+      <div class="home-footer-top">
+        <div class="home-footer-brand">
+          <div class="home-footer-logo" id="home-footer-logo" aria-hidden="true"></div>
+          <div class="home-footer-brand-text">
+            <div class="home-footer-name">MRF</div>
+            <div class="home-footer-tag">make russia free</div>
+          </div>
+        </div>
+        <nav class="home-footer-cols" aria-label="Ссылки">
+          <div class="home-footer-col">
+            <div class="home-footer-col-title">Слушать</div>
+            <a href="index.html">Главная</a>
+            <a href="search.html">Поиск</a>
+            <a href="charts.html">Чарты</a>
+            <a href="artists.html">Исполнители</a>
+            <a href="albums.html">Альбомы</a>
+          </div>
+          <div class="home-footer-col">
+            <div class="home-footer-col-title">Библиотека</div>
+            <a href="library.html">Моя библиотека</a>
+            <a href="liked.html">Любимые</a>
+            <a href="playlists.html">Плейлисты</a>
+            <a href="profile.html">Профиль</a>
+          </div>
+          <div class="home-footer-col">
+            <div class="home-footer-col-title">Premium</div>
+            <a href="premium.html">MRF Premium</a>
+            <button type="button" class="home-footer-btn" onclick="openPremiumCheckout()">Подробнее</button>
+          </div>
+        </nav>
+      </div>
+      <div class="home-footer-bottom">
+        <span>© <span id="home-footer-year">2026</span> MRF</span>
+      </div>
+    </footer>
+
   </div>
 </main>
 <div id="player-root"></div>
@@ -157,8 +194,20 @@
 <script src="mrf-ready.js"></script>
 <script src="soft-nav.js"></script>
 <script>
+function syncHomeFooter() {
+  const logo = document.getElementById('home-footer-logo');
+  if (logo && typeof mrfLogoSVG === 'function' && !logo.dataset.ready) {
+    logo.innerHTML = mrfLogoSVG(36);
+    logo.dataset.ready = '1';
+  }
+  const y = document.getElementById('home-footer-year');
+  if (y) y.textContent = String(new Date().getFullYear());
+}
+window.syncHomeFooter = syncHomeFooter;
+
 whenDomReady(() => {
   initShared();
+  syncHomeFooter();
   if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
   else if (typeof applyAccentColor === 'function') applyAccentColor(Store.getSettings().accentColor);
   if (window.MrfAuth && typeof MrfAuth.onChange === 'function' && !window.__mrfHomeAuthBound) {

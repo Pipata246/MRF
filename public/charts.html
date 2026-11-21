@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Чарты — MRF</title>
-  <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
+  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   /* Layout boot: large screens = PC, smaller = mobile shell */
@@ -130,6 +130,8 @@ async function loadCharts() {
   if (!document.getElementById('charts-list')) return;
   _rawCharts = all;
   _src['charts'] = all;
+  // Keep world top-100 for home → full-queue playback (ignore genre filter)
+  if (_genre === 'all') _src['charts_world'] = all;
   renderChartsList(all);
   if (typeof syncPlayingRows === 'function') syncPlayingRows();
 }

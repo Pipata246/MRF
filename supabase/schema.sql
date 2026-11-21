@@ -11,14 +11,39 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   username text not null,
   display_name text not null default '',
+  bio text not null default '',
   avatar_url text,
+  is_premium boolean not null default false,
+  premium_started_at timestamptz,
+  premium_ends_at timestamptz,
+  telegram_id bigint,
+  telegram_username text,
+  telegram_linked_at timestamptz,
+  telegram_trial_used boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint profiles_username_format check (username ~ '^[a-z0-9_]{3,24}$'),
-  constraint profiles_username_unique unique (username)
+  constraint profiles_username_unique unique (username),
+  constraint profiles_bio_len check (char_length(bio) <= 160),
+  constraint profiles_premium_window_check check (
+    premium_ends_at is null
+    or premium_started_at is null
+    or premium_ends_at >= premium_started_at
+  )
 );
 
 create index if not exists profiles_username_lower_idx on public.profiles (lower(username));
+create index if not exists profiles_username_trgm_like_idx
+  on public.profiles (username text_pattern_ops);
+create index if not exists profiles_premium_ends_at_idx
+  on public.profiles (premium_ends_at)
+  where premium_ends_at is not null;
+create unique index if not exists profiles_telegram_id_uidx
+  on public.profiles (telegram_id)
+  where telegram_id is not null;
+create index if not exists profiles_telegram_trial_used_idx
+  on public.profiles (telegram_trial_used)
+  where telegram_trial_used = true;
 
 -- ── Settings (per user) ────────────────────────────────────
 create table if not exists public.user_settings (
@@ -183,6 +208,46 @@ create trigger profiles_lock_username
   before update on public.profiles
   for each row execute function public.profiles_lock_username();
 
+-- Premium + Telegram: clients cannot self-grant; service_role can update
+create or replace function public.profiles_lock_is_premium()
+returns trigger
+language plpgsql
+as $$
+begin
+  -- Block self-grant from logged-in users; SQL editor / service_role may update
+  if tg_op = 'UPDATE'
+     and coalesce(auth.jwt() ->> 'role', '') = 'authenticated' then
+    if new.is_premium is distinct from old.is_premium then
+      new.is_premium := old.is_premium;
+    end if;
+    if new.premium_started_at is distinct from old.premium_started_at then
+      new.premium_started_at := old.premium_started_at;
+    end if;
+    if new.premium_ends_at is distinct from old.premium_ends_at then
+      new.premium_ends_at := old.premium_ends_at;
+    end if;
+    if new.telegram_id is distinct from old.telegram_id then
+      new.telegram_id := old.telegram_id;
+    end if;
+    if new.telegram_username is distinct from old.telegram_username then
+      new.telegram_username := old.telegram_username;
+    end if;
+    if new.telegram_linked_at is distinct from old.telegram_linked_at then
+      new.telegram_linked_at := old.telegram_linked_at;
+    end if;
+    if new.telegram_trial_used is distinct from old.telegram_trial_used then
+      new.telegram_trial_used := old.telegram_trial_used;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_lock_is_premium on public.profiles;
+create trigger profiles_lock_is_premium
+  before update on public.profiles
+  for each row execute function public.profiles_lock_is_premium();
+
 drop trigger if exists playlists_set_updated_at on public.playlists;
 create trigger playlists_set_updated_at
   before update on public.playlists
@@ -290,15 +355,27 @@ drop policy if exists liked_all_own on public.liked_tracks;
 create policy liked_all_own on public.liked_tracks
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists liked_select_public on public.liked_tracks;
+create policy liked_select_public on public.liked_tracks
+  for select using (true);
+
 -- Followed
 drop policy if exists followed_all_own on public.followed_artists;
 create policy followed_all_own on public.followed_artists
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists followed_select_public on public.followed_artists;
+create policy followed_select_public on public.followed_artists
+  for select using (true);
+
 -- Albums
 drop policy if exists albums_all_own on public.saved_albums;
 create policy albums_all_own on public.saved_albums
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists albums_select_public on public.saved_albums;
+create policy albums_select_public on public.saved_albums
+  for select using (true);
 
 -- Playlists: owner full access + public read
 drop policy if exists playlists_all_own on public.playlists;
@@ -338,13 +415,9 @@ create policy saved_playlists_all_own on public.saved_playlists
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 drop policy if exists profiles_select_public_authors on public.profiles;
-create policy profiles_select_public_authors on public.profiles
-  for select using (
-    exists (
-      select 1 from public.playlists p
-      where p.user_id = profiles.id and p.is_public = true
-    )
-  );
+drop policy if exists profiles_select_public on public.profiles;
+create policy profiles_select_public on public.profiles
+  for select using (true);
 
 drop policy if exists recent_plays_all_own on public.recent_plays;
 create policy recent_plays_all_own on public.recent_plays

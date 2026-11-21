@@ -11,8 +11,11 @@ const MOCK = {
     id: 'user_demo',
     name: 'Пользователь',
     username: '@mrf_user',
-    description: 'Любитель хорошей музыки',
-    plan: 'MRF Free',
+    bio: '',
+    description: '',
+    premium: false,
+    plan: 'free',
+    planLabel: 'Нет',
     avatar: null,
     joinedAt: '2024-01-01'
   },

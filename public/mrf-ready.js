@@ -32,18 +32,42 @@ window.shadeHex = shadeHex;
 function getAccentForTheme(theme, settings) {
   const s = settings || (typeof Store !== 'undefined' ? Store.getSettings() : {}) || {};
   const t = theme || s.theme || 'dark';
-  if (t === 'light') return s.accentColorLight || s.accentColor || '#E35A90';
-  return s.accentColorDark || s.accentColor || '#EE90B7';
+  const raw = t === 'light'
+    ? (s.accentColorLight || s.accentColor || '#27AE60')
+    : (s.accentColorDark || s.accentColor || '#EE90B7');
+  const fallback = t === 'light' ? '#27AE60' : '#EE90B7';
+  if (typeof mrfClampAccentForPlan === 'function') return mrfClampAccentForPlan(raw, fallback);
+  return raw;
 }
 window.getAccentForTheme = getAccentForTheme;
 
 function applyThemeFromSettings() {
-  const s = Store.getSettings();
+  const s = Store.getSettings() || {};
   const theme = s.theme || 'dark';
+  const accent = getAccentForTheme(theme, s);
+  // Persist clamp for free users who had a locked color saved locally
+  if (typeof mrfUserHasPremium === 'function' && !mrfUserHasPremium()) {
+    const patch = {};
+    const dark = (typeof mrfClampAccentForPlan === 'function')
+      ? mrfClampAccentForPlan(s.accentColorDark || s.accentColor, '#EE90B7')
+      : '#EE90B7';
+    const light = (typeof mrfClampAccentForPlan === 'function')
+      ? mrfClampAccentForPlan(s.accentColorLight || s.accentColor, '#27AE60')
+      : '#27AE60';
+    if (String(s.accentColorDark || '').toUpperCase() !== dark) patch.accentColorDark = dark;
+    if (String(s.accentColorLight || '').toUpperCase() !== light) patch.accentColorLight = light;
+    const curKey = theme === 'light' ? 'accentColorLight' : 'accentColorDark';
+    const curVal = theme === 'light' ? light : dark;
+    if (String(s.accentColor || '').toUpperCase() !== curVal) patch.accentColor = curVal;
+    if (s.shuffleOnPlay) patch.shuffleOnPlay = false;
+    if (Object.keys(patch).length) Store.setSettings(patch);
+  }
   document.documentElement.setAttribute('data-theme', theme);
   document.body.classList.toggle('theme-light', theme === 'light');
-  applyAccentColor(getAccentForTheme(theme, s));
+  applyAccentColor(accent);
   if (typeof syncAccentPaletteUI === 'function') syncAccentPaletteUI();
+  if (typeof syncAccentPremiumLocks === 'function') syncAccentPremiumLocks();
+  if (typeof syncPrisonPlayerUi === 'function') syncPrisonPlayerUi();
 }
 window.applyThemeFromSettings = applyThemeFromSettings;
 
@@ -687,6 +711,7 @@ function toggleFollowFromPanel(id, name, picture) {
 function playFromQueue(i) {
   if (typeof queue === 'undefined' || !queue[i]) return;
   if (typeof queueIndex === 'number' && i !== queueIndex) {
+    if (typeof mrfRequirePremium === 'function' && !mrfRequirePremium('pick')) return;
     window._trackFlowDir = i > queueIndex ? 1 : -1;
   }
   queueIndex = i;

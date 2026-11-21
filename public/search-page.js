@@ -1,6 +1,6 @@
 /* MRF — search-page.js (external to avoid let collisions with app.js) */
 var _searchPageTimer = null;
-var _searchPageResults = { tracks: [], artists: [], albums: [], playlists: [] };
+var _searchPageResults = { tracks: [], artists: [], albums: [], playlists: [], accounts: [] };
 
 function searchPlaylistAuthorLabel(pl) {
   const raw = pl?.author?.username || '';
@@ -15,15 +15,21 @@ function searchPlaylistCardHTML(pl) {
     ? mrfUrl('playlist', { id: pl.id })
     : `playlist.html?id=${encodeURIComponent(pl.id)}`;
   const handle = searchPlaylistAuthorLabel(pl);
+  const nick = pl.author?.username
+    ? (typeof accountUsernameOf === 'function' ? accountUsernameOf(pl.author.username) : String(pl.author.username).replace(/^@+/, ''))
+    : '';
   const sub = handle
     ? handle
     : `${pl.trackCount || pl.tracks?.length || 0} треков`;
+  const safeNick = nick ? (typeof jsStr === 'function' ? jsStr(nick) : String(nick).replace(/'/g, "\\'")) : '';
   return `
     <div class="lib-card" onclick="(window.mrfGo||function(u){location.href=u})('${href}')">
       ${pl.cover ? `<img src="${escHtml(pl.cover)}" class="lib-card-cover" alt="">` : `<div class="lib-card-cover-placeholder">${noteSVGShared()}</div>`}
       <div class="lib-card-body">
         <div class="lib-card-title">${escHtml(pl.name || 'Плейлист')}</div>
-        <div class="lib-card-sub">${escHtml(sub)}</div>
+        <div class="lib-card-sub">${handle && safeNick
+          ? `<button type="button" class="account-handle-link" onclick="event.stopPropagation();openAccount('${safeNick}')">${escHtml(handle)}</button>`
+          : escHtml(sub)}</div>
       </div>
     </div>`;
 }
@@ -429,16 +435,19 @@ async function pageRunSearch(q) {
   if (box) box.innerHTML = loaderHTMLShared('Ищем…');
 
   try {
-    const [rawTracks, rawArtists, rawAlbums, publicPlaylists] = await Promise.all([
+    const nickQ = (typeof accountLooksLikeNick === 'function' && accountLooksLikeNick(q)) ? q : '';
+    const [rawTracks, rawArtists, rawAlbums, publicPlaylists, accounts] = await Promise.all([
       dzArr(`/search/track?q=${encodeURIComponent(q)}&limit=50`),
       dzArr(`/search/artist?q=${encodeURIComponent(q)}&limit=20`),
       dzArr(`/search/album?q=${encodeURIComponent(q)}&limit=20`),
-      searchPublicPlaylists(q)
+      searchPublicPlaylists(q),
+      nickQ && typeof searchAccountsApi === 'function' ? searchAccountsApi(nickQ) : Promise.resolve([])
     ]);
     _searchPageResults.tracks  = (rawTracks || []).map(normDZ);
     _searchPageResults.artists = (rawArtists || []).slice().sort((a, b) => (+b.nb_fan || 0) - (+a.nb_fan || 0));
     _searchPageResults.albums  = rawAlbums || [];
     _searchPageResults.playlists = publicPlaylists || [];
+    _searchPageResults.accounts = accounts || [];
 
     // reset tabs to "all"
     document.querySelectorAll('#search-tabs .tab-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
@@ -457,6 +466,16 @@ function switchSearchTab(tab, btn) {
   if (tab === 'artists')   renderSearchArtists();
   if (tab === 'albums')    renderSearchAlbums();
   if (tab === 'playlists') renderSearchPlaylists();
+  if (tab === 'accounts')  renderSearchAccounts();
+}
+
+function renderSearchAccounts() {
+  const box = document.getElementById('search-results');
+  if (!box) return;
+  const items = _searchPageResults.accounts || [];
+  box.innerHTML = items.length
+    ? `<div class="accounts-search-grid">${items.map(accountCardHTML).join('')}</div>`
+    : `<div class="search-empty"><p>Аккаунты не найдены</p></div>`;
 }
 
 function renderSearchPlaylists() {
@@ -476,6 +495,7 @@ function renderSearchAll() {
   const artists = _searchPageResults.artists;
   const albums = _searchPageResults.albums;
   const playlists = _searchPageResults.playlists || [];
+  const accounts = _searchPageResults.accounts || [];
 
   if (tracks.length) {
     const best = tracks[0];
@@ -512,6 +532,10 @@ function renderSearchAll() {
   if (playlists.length) {
     html += `<div class="section"><div class="section-header"><h3 class="section-title" style="font-size:16px">Плейлисты</h3></div>
       <div class="lib-grid">${playlists.slice(0, 6).map(searchPlaylistCardHTML).join('')}</div></div>`;
+  }
+  if (accounts.length) {
+    html += `<div class="section"><div class="section-header"><h3 class="section-title" style="font-size:16px">Аккаунты</h3></div>
+      <div class="accounts-search-grid">${accounts.slice(0, 6).map(accountCardHTML).join('')}</div></div>`;
   }
   if (!html) {
     html = `<div class="search-empty" style="padding:60px 0">

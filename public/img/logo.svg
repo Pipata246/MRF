@@ -1,19 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" width="1254" height="1254" role="img" aria-label="MRF" fill="currentColor">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000" role="img" aria-label="MRF" fill="currentColor">
   <title>MRF</title>
-  <circle cx="626" cy="615" r="603" fill="none" stroke="currentColor" stroke-width="38"/>
-  <rect x="429" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
-  <rect x="515" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
-  <rect x="600" y="193" width="54" height="287" rx="27" ry="27"/>
-  <rect x="686" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
-  <rect x="772" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
-  <text
-    x="626"
-    y="848"
-    text-anchor="middle"
-    font-family="Arial Black, Helvetica Neue, Impact, sans-serif"
-    font-size="310"
-    font-weight="900"
-    font-style="italic"
-    letter-spacing="-14"
-  >MRF</text>
+  <circle cx="500" cy="500" r="458" fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+  <g transform="translate(500 500) scale(0.9) translate(-500 -505)">
+    <g fill="currentColor">
+      <rect x="310" y="292" width="48" height="156" rx="24"/>
+      <rect x="394" y="236" width="48" height="212" rx="24"/>
+      <rect x="478" y="172" width="48" height="276" rx="24"/>
+      <rect x="562" y="236" width="48" height="212" rx="24"/>
+      <rect x="646" y="292" width="48" height="156" rx="24"/>
+    </g>
+    <g fill="currentColor">
+      <path d="M240 722V538h46l34 100 34-100h46v184h-42V592l-20 64h-36l-20-64v130h-42z"/>
+      <path fill-rule="evenodd" d="M448 538h78c46 0 72 24 72 62 0 34-22 56-58 62l56 70h-50l-50-64h-14v64h-44V538zm44 40v50h36c20 0 32-10 32-25s-12-25-32-25h-36z"/>
+      <path d="M620 722V538h118v40H664v46h86v40H664v58H620z"/>
+    </g>
+  </g>
 </svg>

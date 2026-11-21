@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Артист — MRF</title>
-  <link rel="icon" href="img/favicon.svg?v=2" type="image/svg+xml" sizes="any"/>
+  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   /* Layout boot: large screens = PC, smaller = mobile shell */
@@ -242,15 +242,15 @@ async function loadArtistPage(forced) {
           <div class="artist-page-fans">${statsBits.map(escHtml).join(' · ')}</div>
           <div class="artist-page-actions">
             <button class="btn-primary" onclick="playFromSrc('${key}',0)" style="padding:10px 20px;font-size:13px" ${!_src[key].length ? 'disabled' : ''}>
-              <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
               Слушать
-            </button>
+          </button>
             <button class="btn-secondary" id="follow-btn" onclick="toggleArtistFollow()" style="padding:10px 18px;font-size:13px">
-              ${isFollowing ? 'Вы подписаны' : 'Подписаться'}
-            </button>
-          </div>
+            ${isFollowing ? 'Вы подписаны' : 'Подписаться'}
+          </button>
         </div>
       </div>
+    </div>
     </section>
 
     <div class="artist-page-tabs" role="tablist">

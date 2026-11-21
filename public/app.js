@@ -1171,7 +1171,7 @@ function resolvePlaybackSourceLabel(key) {
   const k = String(key || '');
   if (!k) return '';
   if (k === 'liked' || k === 'favs') return 'Любимые треки';
-  if (k === 'charts' || k === 'rising') return 'Чарты';
+  if (k === 'charts' || k === 'charts_world' || k === 'rising') return 'Чарты';
   if (k === 'home') return 'Главная';
   if (k === 'recent') return 'Недавние';
   if (k === 's-tracks' || k === 'mobile_flyout_tracks' || k === 'flyout_tracks' || k === 'search_trend') {
@@ -1230,25 +1230,94 @@ function setPlaybackSource(key) {
 }
 window.setPlaybackSource = setPlaybackSource;
 
+/** Home shows 5 chart rows; playback always uses the full world charts queue. */
+let _chartsExpandPromise = null;
+async function ensureFullChartsList() {
+  if (_src['charts_world']?.length) return _src['charts_world'];
+  if (!_chartsExpandPromise) {
+    _chartsExpandPromise = dzArr('/chart/0/tracks?limit=100')
+      .then((rows) => (rows || []).map(normDZ))
+      .then((all) => {
+        if (all.length) {
+          _src['charts_world'] = all;
+          // Seed charts page cache only when empty / unfiltered
+          if (!_src['charts']?.length) _src['charts'] = all;
+        }
+        return all;
+      })
+      .finally(() => { _chartsExpandPromise = null; });
+  }
+  return _chartsExpandPromise;
+}
+
+async function playHomeChartsExpanded(index) {
+  const homeList = _src['home'] || [];
+  const prefer = homeList[Math.max(0, Number(index) || 0)] || homeList[0] || null;
+  try {
+    const all = await ensureFullChartsList();
+    if (all?.length) {
+      let idx = 0;
+      if (prefer) {
+        const found = all.findIndex((t) =>
+          (prefer.id != null && String(t.id) === String(prefer.id))
+          || (prefer.deezerId != null && String(t.deezerId || '') === String(prefer.deezerId))
+        );
+        idx = found >= 0 ? found : Math.min(Math.max(0, Number(index) || 0), all.length - 1);
+      }
+      playFromSrc('charts_world', idx);
+      return;
+    }
+  } catch (_) {}
+  if (homeList.length) {
+    // fallback only if full chart fetch failed
+    const idx = Math.min(Math.max(0, Number(index) || 0), homeList.length - 1);
+    playFromSrc('__home_raw', idx);
+  }
+}
+window.playHomeChartsExpanded = playHomeChartsExpanded;
+window.ensureFullChartsList = ensureFullChartsList;
+
 function playFromSrc(key, index) {
-  const list = _src[key];
+  // Home preview → full world charts queue (same as charts.html)
+  if (key === 'home') {
+    void playHomeChartsExpanded(index);
+    return;
+  }
+  const srcKey = key === '__home_raw' ? 'home' : key;
+  const list = _src[srcKey];
   if (!list?.length) return;
+  const idx = Math.max(0, Number(index) || 0);
+  const prem = typeof mrfUserHasPremium === 'function' ? mrfUserHasPremium() : false;
+  if (!prem) {
+    const cur = queueIndex >= 0 ? queue[queueIndex] : null;
+    const next = list[idx];
+    const sameTrack = !!(cur && next && cur.id != null && String(cur.id) === String(next.id));
+    // Free: only start from the first track (or replay the current one)
+    if (idx !== 0 && !sameTrack) {
+      if (typeof mrfRequirePremium === 'function') mrfRequirePremium('pick');
+      return;
+    }
+    if (isShuffle) {
+      isShuffle = false;
+      if (typeof syncShuffleRepeatUi === 'function') syncShuffleRepeatUi();
+    }
+  }
   _trackFlowDir = 1;
   window._trackFlowDir = 1;
-  setPlaybackSource(key);
-  // «Перемешивание при запуске» — включать shuffle при старте нового списка
+  setPlaybackSource(srcKey);
+  // «Перемешивание при запуске» — только Premium
   try {
-    if (typeof Store !== 'undefined' && Store.getSettings().shuffleOnPlay && !isShuffle) {
+    if (prem && typeof Store !== 'undefined' && Store.getSettings().shuffleOnPlay && !isShuffle) {
       isShuffle = true;
       if (typeof syncShuffleRepeatUi === 'function') syncShuffleRepeatUi();
       else el('btn-shuffle')?.classList.toggle('active-btn', true);
     }
   } catch {}
   _originalQueue = list.map(t => ({ ...t }));
-  if (isShuffle) {
+  if (isShuffle && prem) {
     // перемешиваем, выбранный трек ставим первым
-    const current = _originalQueue[index];
-    const rest = _originalQueue.filter((_, i) => i !== index);
+    const current = _originalQueue[idx];
+    const rest = _originalQueue.filter((_, i) => i !== idx);
     for (let i = rest.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [rest[i], rest[j]] = [rest[j], rest[i]];
@@ -1257,7 +1326,7 @@ function playFromSrc(key, index) {
     queueIndex = 0;
   } else {
     queue = _originalQueue.map(t => ({ ...t }));
-    queueIndex = index;
+    queueIndex = idx;
   }
   if (typeof notifyQueueChanged === 'function') notifyQueueChanged();
   playNow();
@@ -1510,6 +1579,8 @@ window._trackFlowDir = 0;
 function nextTrack(opts) {
   if (!queue.length) return;
   const auto = !!(opts && opts.auto);
+  // Free prison: only auto-advance; manual skip is Premium
+  if (!auto && typeof mrfRequirePremium === 'function' && !mrfRequirePremium('skip')) return;
   _trackFlowDir = 1;
   window._trackFlowDir = 1;
 
@@ -1534,12 +1605,15 @@ function nextTrack(opts) {
 window.nextTrack = nextTrack;
 function prevTrack() {
   if (!queue.length) return;
-  if (audio.currentTime>3) { audio.currentTime=0; return; }
+  // Free: restart current track only; jumping back is Premium
+  if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+  if (typeof mrfRequirePremium === 'function' && !mrfRequirePremium('skip')) return;
   _trackFlowDir = -1;
   window._trackFlowDir = -1;
-  queueIndex = (queueIndex-1+queue.length)%queue.length;
+  queueIndex = (queueIndex - 1 + queue.length) % queue.length;
   playNow();
 }
+window.prevTrack = prevTrack;
 function syncShuffleRepeatUi() {
   const on = !!isShuffle;
   el('btn-shuffle')?.classList.toggle('active-btn', on);
@@ -1566,6 +1640,13 @@ function syncShuffleRepeatUi() {
 window.syncShuffleRepeatUi = syncShuffleRepeatUi;
 
 function toggleShuffle() {
+  if (typeof mrfRequirePremium === 'function' && !mrfRequirePremium('shuffle')) {
+    if (isShuffle) {
+      isShuffle = false;
+      syncShuffleRepeatUi();
+    }
+    return;
+  }
   isShuffle = !isShuffle;
   syncShuffleRepeatUi();
 

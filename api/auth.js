@@ -167,7 +167,8 @@ module.exports = withHandler(async function auth(req, res) {
     const uname = normalizeUsername(body.username);
     const uErr = validateUsername(uname);
     if (uErr) return send(res, 400, { ok: false, error: uErr });
-    if (!body.password) return send(res, 400, { ok: false, error: 'Введи пароль' });
+    const pErr = validatePassword(body.password);
+    if (pErr) return send(res, 400, { ok: false, error: pErr });
 
     const anon = anonClient();
     const { data, error } = await anon.auth.signInWithPassword({

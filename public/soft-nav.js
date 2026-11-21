@@ -278,6 +278,9 @@
     if (toPage !== 'playlist') {
       try { sessionStorage.removeItem('mrf_route_playlist'); } catch (_) {}
     }
+    if (toPage !== 'account') {
+      try { sessionStorage.removeItem('mrf_route_account'); } catch (_) {}
+    }
     window.__mrfNavGen = (window.__mrfNavGen || 0) + 1;
   }
 
@@ -315,6 +318,15 @@
           } catch (_) {}
         }
         if (id) sessionStorage.setItem('mrf_route_playlist', JSON.stringify({ id }));
+      } else if (p === 'account') {
+        const u = absUrl.searchParams.get('u') || '';
+        if (!u) {
+          try {
+            const prev = JSON.parse(sessionStorage.getItem('mrf_route_account') || '{}');
+            if (prev.u) return;
+          } catch (_) {}
+        }
+        if (u) sessionStorage.setItem('mrf_route_account', JSON.stringify({ u }));
       }
     } catch {}
   }
@@ -419,14 +431,34 @@
       window.renderArtistsPage();
     } else if (pname === 'albums' && typeof window.renderAlbumsPage === 'function') {
       window.renderAlbumsPage();
-    } else if (pname === 'profile' && typeof window.loadProfilePage === 'function') {
-      window.loadProfilePage();
+    } else if (pname === 'profile') {
+      // Entering profile from anywhere → public view (strip edit leftover)
+      if (absUrl.searchParams.get('edit') !== '1') {
+        if (typeof window.showPublicProfileView === 'function') window.showPublicProfileView();
+        else if (typeof window.loadProfilePage === 'function') window.loadProfilePage();
+      } else if (typeof window.loadProfilePage === 'function') {
+        window.loadProfilePage();
+      }
+    } else if (pname === 'account') {
+      let u = absUrl.searchParams.get('u') || '';
+      if (!u) {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem('mrf_route_account') || '{}');
+          u = saved.u || '';
+        } catch (_) {}
+      }
+      if (typeof window.loadAccountPage === 'function') window.loadAccountPage(u || undefined);
+      else if (typeof window.bootAccountPage === 'function') window.bootAccountPage();
     } else if ((pname === 'index' || pname === '' || pname === 'home') && typeof window.loadHomePage === 'function') {
       window.__mrfHomeBootPromise = Promise.resolve()
         .then(() => window.loadHomePage())
         .catch(() => {});
+      if (typeof window.syncHomeFooter === 'function') window.syncHomeFooter();
     } else if (pname === 'charts' && typeof window.loadCharts === 'function') {
       void window.loadCharts();
+    } else if (pname === 'premium') {
+      if (typeof window.renderPremiumPage === 'function') window.renderPremiumPage();
+      else if (typeof window.bootPremiumPage === 'function') window.bootPremiumPage();
     }
   }
 
@@ -444,6 +476,19 @@
     // Same URL in address bar: skip only for ordinary navigations.
     // On popstate (back/forward) location already changed, but main content is still the old page — must fetch.
     // Exception: re-clicking Search while already there resets to search home.
+    // Exception: Profile always opens the public view (not settings/edit).
+    if (!fromPop && pageName(abs) === 'profile' && pageName(location.href) === 'profile') {
+      if (typeof showPublicProfileView === 'function') showPublicProfileView();
+      else if (typeof setProfileEditMode === 'function') {
+        setProfileEditMode(false);
+        if (typeof loadProfilePage === 'function') loadProfilePage();
+      } else if (typeof loadProfilePage === 'function') {
+        try { history.replaceState(history.state || { mrfSoft: 1 }, '', abs.pathname.endsWith('.html') ? abs.href.replace(/\?.*$/, '') || 'profile.html' : abs.href); } catch (_) {}
+        loadProfilePage();
+      }
+      updateChromeNavButtons();
+      return;
+    }
     if (!fromPop && abs.pathname === location.pathname && abs.search === location.search) {
       if (pageName(abs) === 'search') {
         if (typeof resetSearchHome === 'function') resetSearchHome({ replaceUrl: true });

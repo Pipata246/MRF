@@ -76,8 +76,11 @@ window.addEventListener('resize', () => {
   window.__mrfUiLayoutT = setTimeout(() => {
     const prev = document.documentElement.getAttribute('data-ui');
     const next = applyUiLayoutMode();
-    if (prev !== next && typeof ensureFsPlayerChrome === 'function') {
-      try { ensureFsPlayerChrome(); } catch (_) {}
+    if (prev !== next) {
+      if (typeof ensureFsPlayerChrome === 'function') {
+        try { ensureFsPlayerChrome(); } catch (_) {}
+      }
+      try { syncMrfPremFab(); } catch (_) {}
     }
   }, 120);
 });
@@ -100,20 +103,41 @@ function getPageId(href) {
 const PAGE = getPageId();
 window.getPageId = getPageId;
 
+/** Shared MRF mark geometry (vector wordmark — no system fonts). */
+function mrfLogoMarkInner(opts = {}) {
+  const ringClass = opts.ringClass ? ` class="${opts.ringClass}"` : '';
+  const barsClass = opts.barsClass ? ` class="${opts.barsClass}"` : '';
+  const barClass = opts.barClass || '';
+  const wordClass = opts.wordClass ? ` class="${opts.wordClass}"` : '';
+  const bar = (i, x, y, h) => {
+    const cls = barClass ? ` class="${barClass}" style="--i:${i}"` : '';
+    return `<rect${cls} x="${x}" y="${y}" width="48" height="${h}" rx="24"/>`;
+  };
+  return `
+    <circle${ringClass} cx="500" cy="500" r="458" fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+    <g transform="translate(500 500) scale(0.9) translate(-500 -505)">
+      <g${barsClass} fill="currentColor">
+        ${bar(0, 310, 292, 156)}
+        ${bar(1, 394, 236, 212)}
+        ${bar(2, 478, 172, 276)}
+        ${bar(3, 562, 236, 212)}
+        ${bar(4, 646, 292, 156)}
+      </g>
+      <g${wordClass} fill="currentColor">
+        <path d="M240 722V538h46l34 100 34-100h46v184h-42V592l-20 64h-36l-20-64v130h-42z"/>
+        <path fill-rule="evenodd" d="M448 538h78c46 0 72 24 72 62 0 34-22 56-58 62l56 70h-50l-50-64h-14v64h-44V538zm44 40v50h36c20 0 32-10 32-25s-12-25-32-25h-36z"/>
+        <path d="M620 722V538h118v40H664v46h86v40H664v58H620z"/>
+      </g>
+    </g>`;
+}
+
 /** Inline MRF mark — uses currentColor / --accent */
 function mrfLogoSVG(size = 52) {
   const s = Number(size) || 52;
-  return `<svg class="logo-img" viewBox="0 0 1254 1254" width="${s}" height="${s}" role="img" aria-label="MRF" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="626" cy="615" r="603" fill="none" stroke="currentColor" stroke-width="38"/>
-    <rect x="429" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
-    <rect x="515" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
-    <rect x="600" y="193" width="54" height="287" rx="27" ry="27"/>
-    <rect x="686" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
-    <rect x="772" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
-    <text x="626" y="848" text-anchor="middle" font-family="Arial Black, Helvetica Neue, Impact, sans-serif" font-size="310" font-weight="900" font-style="italic" letter-spacing="-14">MRF</text>
-  </svg>`;
+  return `<svg class="logo-img" viewBox="0 0 1000 1000" width="${s}" height="${s}" role="img" aria-label="MRF" fill="currentColor" xmlns="http://www.w3.org/2000/svg">${mrfLogoMarkInner()}</svg>`;
 }
 window.mrfLogoSVG = mrfLogoSVG;
+window.mrfLogoMarkInner = mrfLogoMarkInner;
 
 /* ══════════════════════════════════
    ИНЖЕКТ SIDEBAR
@@ -328,6 +352,7 @@ function injectTopbar() {
   // Restore back/forward active state after topbar rebuild (soft-nav)
   if (typeof updateChromeNavButtons === 'function') updateChromeNavButtons();
   else if (typeof updateNavBtns === 'function') updateNavBtns();
+  try { syncMrfPremFab(); } catch (_) {}
 }
 
 /** Root tabs in bottom nav — no back button here */
@@ -391,6 +416,8 @@ function mobileGoBack() {
   let url = 'index.html';
   if (['playlist', 'liked', 'playlists', 'albums', 'artists', 'album', 'profile'].includes(page)) {
     url = 'library.html';
+  } else if (page === 'premium') {
+    url = 'profile.html';
   } else if (['artist', 'charts'].includes(page)) {
     url = 'search.html';
   }
@@ -528,6 +555,7 @@ function updateSearchModeUI() {
   document.body.classList.toggle('is-playlist-page', page === 'playlist');
   document.body.classList.toggle('is-home-page', home);
   document.body.classList.toggle('is-profile-page', page === 'profile');
+  document.body.classList.toggle('is-premium-page', page === 'premium');
   document.body.classList.toggle('is-deep-page', isMobileDeepPage(page));
   if (!home) document.body.classList.remove('is-home-scrolled');
   if (!onSearch) document.body.classList.remove('is-search-results');
@@ -539,6 +567,14 @@ function updateSearchModeUI() {
 
 function goProfile() {
   const url = typeof mrfUrl === 'function' ? mrfUrl('profile') : 'profile.html';
+  // Always land on public profile, never stay in settings/edit
+  if (typeof getPageId === 'function' && getPageId() === 'profile') {
+    if (typeof showPublicProfileView === 'function') {
+      showPublicProfileView();
+      return;
+    }
+    if (typeof setProfileEditMode === 'function') setProfileEditMode(false);
+  }
   if (typeof mrfGo === 'function') mrfGo(url);
   else location.href = url;
 }
@@ -602,13 +638,13 @@ function mrfGuestGateHTML(opts) {
       <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
       </svg>
-    </div>
+          </div>
     <h2 class="lib-guest-gate-title">${title}</h2>
     <p class="lib-guest-gate-text">${text}</p>
     <div class="lib-guest-gate-actions">
       <button type="button" class="btn-primary lib-guest-gate-cta" onclick="goProfile()">Войти</button>
       <button type="button" class="btn-secondary lib-guest-gate-secondary" onclick="(window.mrfGo||function(u){location.href=u})('${homeHref}')">На главную</button>
-    </div>
+        </div>
   </div>`;
 }
 window.mrfGuestGateHTML = mrfGuestGateHTML;
@@ -779,7 +815,7 @@ function bindTopbarSearchFlyout() {
   };
   if (clearBtn) {
     clearBtn.onclick = e => {
-      e.stopPropagation();
+  e.stopPropagation();
       input.value = '';
       clearBtn.classList.add('hidden');
       if (isSearchPage()) runSearchOnPage('');
@@ -1012,10 +1048,10 @@ function injectPlayer() {
         <div class="player-cover" id="player-cover" title="Подробнее"></div>
         <div class="player-track-info">
           <div class="player-title-row">
-            <div class="player-title" id="player-title">Ничего не играет</div>
+          <div class="player-title" id="player-title">Ничего не играет</div>
             <button type="button" class="player-like" id="player-like-btn" onclick="event.stopPropagation();toggleFavPlayer()" title="В избранное">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/></svg>
-            </button>
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8"/></svg>
+        </button>
           </div>
           <div class="player-artist" id="player-artist">Выбери трек</div>
         </div>
@@ -1199,14 +1235,14 @@ function initShared() {
   if (coldBoot) {
     try { showPageBoot(); } catch (_) {}
   }
-
+  
   applyUiLayoutMode();
 
   // восстанавливаем ширину sidebar (только desktop PC)
   const isCollapsed = localStorage.getItem('mrf_sidebar_collapsed') === '1';
   if (isDesktopLayout()) {
-    document.body.style.setProperty('--sidebar-w', isCollapsed ? '60px' : '240px');
-    if (isCollapsed) document.body.classList.add('sidebar-collapsed');
+  document.body.style.setProperty('--sidebar-w', isCollapsed ? '60px' : '240px');
+  if (isCollapsed) document.body.classList.add('sidebar-collapsed');
   } else {
     document.body.style.setProperty('--sidebar-w', '0px');
     document.body.classList.remove('sidebar-collapsed');
@@ -1242,6 +1278,8 @@ function initShared() {
     syncActiveTrackClass(t || null);
   }
 
+  try { syncMrfPremFab(); } catch (_) {}
+  try { syncPrisonPlayerUi(); } catch (_) {}
   console.log('[MRF] initShared completed');
   if (coldBoot) hidePageBootWhenAuthReady();
 }
@@ -1251,6 +1289,24 @@ function initShared() {
 ══════════════════════════════════ */
 const el = id => document.getElementById(id);
 const qs = sel => document.querySelector(sel);
+
+function accountUsernameOf(raw) {
+  if (window.MrfAuth?.normalizeUsername) return MrfAuth.normalizeUsername(raw);
+  return String(raw || '')
+    .trim()
+    .replace(/^@+/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '')
+    .slice(0, 24);
+}
+window.accountUsernameOf = accountUsernameOf;
+
+function accountHandleOf(raw) {
+  if (window.MrfAuth?.displayUsername) return MrfAuth.displayUsername(raw) || '';
+  const n = accountUsernameOf(raw);
+  return n ? '@' + n : '';
+}
+window.accountHandleOf = accountHandleOf;
 
 /** Build page URL — always keep .html so soft-nav/static servers keep ?query */
 function mrfUrl(page, params) {
@@ -1265,6 +1321,15 @@ function mrfUrl(page, params) {
   return q ? `${base}?${q}` : base;
 }
 window.mrfUrl = mrfUrl;
+
+function openAccount(username) {
+  const u = accountUsernameOf(username);
+  if (!u) return;
+  const url = mrfUrl('account', { u });
+  if (typeof mrfGo === 'function') mrfGo(url);
+  else location.href = url;
+}
+window.openAccount = openAccount;
 
 function escHtml(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1282,35 +1347,220 @@ function mrfBallSpinHTML(extraClass) {
 }
 window.mrfBallSpinHTML = mrfBallSpinHTML;
 
+function mrfPremiumStillActive(p) {
+  if (!p) return false;
+  const flagged = !!(p.premium || p.plan === 'premium');
+  if (!flagged) return false;
+  const endRaw = p.premiumEndsAt || p.premium_ends_at;
+  if (endRaw) {
+    const end = Date.parse(endRaw);
+    if (Number.isFinite(end) && end <= Date.now()) return false;
+  }
+  return true;
+}
+
+function mrfUserHasPremium() {
+  const cloud = window.MrfAuth?.profile;
+  if (cloud) {
+    if (mrfPremiumStillActive(cloud)) return true;
+    if (cloud.premium === false || cloud.plan === 'free') return false;
+  }
+  try {
+    const p = typeof Store !== 'undefined' && Store.getProfile ? Store.getProfile() : null;
+    return mrfPremiumStillActive(p);
+  } catch (_) {
+    return false;
+  }
+}
+window.mrfUserHasPremium = mrfUserHasPremium;
+window.mrfPremiumStillActive = mrfPremiumStillActive;
+
+/** Free accents: brand pink + Spotify-like green */
+const MRF_FREE_ACCENTS = ['#EE90B7', '#27AE60'];
+window.MRF_FREE_ACCENTS = MRF_FREE_ACCENTS;
+
+function mrfNormalizeAccentHex(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return '';
+  if (s[0] !== '#') s = '#' + s;
+  s = s.toUpperCase();
+  if (/^#[0-9A-F]{6}$/.test(s)) return s;
+  if (/^#[0-9A-F]{3}$/.test(s)) {
+    return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`;
+  }
+  return '';
+}
+window.mrfNormalizeAccentHex = mrfNormalizeAccentHex;
+
+function mrfIsFreeAccent(hex) {
+  const n = mrfNormalizeAccentHex(hex);
+  return !!n && MRF_FREE_ACCENTS.includes(n);
+}
+window.mrfIsFreeAccent = mrfIsFreeAccent;
+
+function mrfClampAccentForPlan(hex, fallback) {
+  const n = mrfNormalizeAccentHex(hex);
+  if (mrfUserHasPremium()) return n || mrfNormalizeAccentHex(fallback) || MRF_FREE_ACCENTS[0];
+  if (n && MRF_FREE_ACCENTS.includes(n)) return n;
+  return mrfNormalizeAccentHex(fallback) || MRF_FREE_ACCENTS[0];
+}
+window.mrfClampAccentForPlan = mrfClampAccentForPlan;
+
+function mrfRequirePremium(kind) {
+  if (mrfUserHasPremium()) return true;
+  const msg = kind === 'accent'
+    ? 'Цвет — в Premium'
+    : kind === 'shuffle'
+      ? 'Перемешивание — в Premium'
+      : kind === 'pick'
+        ? 'Выбор трека — в Premium'
+        : 'Переключение — в Premium';
+  if (typeof showNotification === 'function') showNotification(msg);
+  else if (typeof showNotif === 'function') showNotif(msg);
+  return false;
+}
+window.mrfRequirePremium = mrfRequirePremium;
+
+function syncPrisonPlayerUi() {
+  const prem = mrfUserHasPremium();
+  document.body?.classList.toggle('is-free-plan', !prem);
+  document.body?.classList.toggle('is-premium-plan', prem);
+  const lockSel = [
+    '#btn-shuffle', '#fs-btn-shuffle', '#fs-q-shuffle',
+    '#shuffle-liked-btn',
+    '.liked-shuffle-btn',
+    '.playlist-shuffle-btn',
+    '[onclick*="shuffleLiked"]',
+    '[onclick*="shufflePlaylistNow"]',
+    '[onclick*="toggleShuffle"]',
+    '.player-controls .ctrl-btn[onclick*="prevTrack"]',
+    '.player-controls .ctrl-next',
+    '.fs-ctrl[onclick*="prevTrack"]',
+    '.fs-ctrl[onclick*="nextTrack"]',
+    '.rp-ctrl-btn[onclick*="prevTrack"]',
+    '.rp-ctrl-btn[onclick*="nextTrack"]'
+  ];
+  document.querySelectorAll(lockSel.join(',')).forEach((btn) => {
+    const onclick = btn.getAttribute('onclick') || '';
+    const isShuffleBtn = btn.id === 'btn-shuffle' || btn.id === 'fs-btn-shuffle' || btn.id === 'fs-q-shuffle'
+      || btn.id === 'shuffle-liked-btn'
+      || btn.classList.contains('liked-shuffle-btn')
+      || btn.classList.contains('playlist-shuffle-btn')
+      || onclick.includes('toggleShuffle')
+      || onclick.includes('shuffleLiked')
+      || onclick.includes('shufflePlaylistNow');
+    const isSkip = onclick.includes('nextTrack')
+      || onclick.includes('prevTrack')
+      || btn.classList.contains('ctrl-next');
+    if (!isShuffleBtn && !isSkip) return;
+    btn.classList.toggle('is-premium-locked', !prem);
+    btn.setAttribute('aria-disabled', prem ? 'false' : 'true');
+    if (!prem) {
+      btn.title = isShuffleBtn ? 'Перемешивание — Premium' : 'Переключение — Premium';
+    } else if (isShuffleBtn) {
+      btn.title = btn.id === 'shuffle-liked-btn' ? 'Вразброс' : 'Перемешать';
+    }
+  });
+  if (!prem && typeof isShuffle !== 'undefined' && isShuffle) {
+    try {
+      isShuffle = false;
+      if (typeof syncShuffleRepeatUi === 'function') syncShuffleRepeatUi();
+    } catch (_) {}
+  }
+}
+window.syncPrisonPlayerUi = syncPrisonPlayerUi;
+
+function openPremiumCheckout() {
+  const url = typeof mrfUrl === 'function' ? mrfUrl('premium') : 'premium.html';
+  if (typeof mrfGo === 'function') mrfGo(url);
+  else location.href = url;
+}
+window.openPremiumCheckout = openPremiumCheckout;
+
+function syncMrfPremFab() {
+  if (!document.body) return;
+  let fab = document.getElementById('mrf-prem-fab');
+  const onPremiumPage = typeof getPageId === 'function' && getPageId() === 'premium';
+  const show = !mrfUserHasPremium() && !onPremiumPage;
+  if (!show) {
+    if (fab) fab.hidden = true;
+    return;
+  }
+  const markHTML = `<svg class="mrf-prem-fab-mark" viewBox="0 0 1000 1000" width="40" height="40" aria-hidden="true" fill="currentColor" xmlns="http://www.w3.org/2000/svg">${mrfLogoMarkInner()}</svg>
+    <span class="mrf-prem-fab-tag">Prem</span>
+    <span class="mrf-prem-fab-copy">
+      <span class="mrf-prem-fab-kicker">MRF</span>
+      <span class="mrf-prem-fab-title">Premium</span>
+    </span>`;
+  if (!fab) {
+    fab = document.createElement('button');
+    fab.type = 'button';
+    fab.id = 'mrf-prem-fab';
+    fab.className = 'mrf-prem-fab';
+    fab.setAttribute('aria-label', 'MRF Premium');
+    fab.innerHTML = markHTML;
+    fab.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openPremiumCheckout();
+    });
+  } else if (!fab.querySelector('.mrf-prem-fab-copy')) {
+    fab.innerHTML = markHTML;
+  }
+
+  // PC: banner in topbar next to profile. Mobile: floating ball on body (unchanged).
+  const desktop = typeof isDesktopLayout === 'function' ? isDesktopLayout() : window.matchMedia('(min-width: 901px)').matches;
+  const topbar = document.querySelector('#topbar-root .topbar, .topbar');
+  const avatar = document.getElementById('topbar-avatar');
+  if (desktop && topbar) {
+    if (avatar && avatar.parentElement === topbar) topbar.insertBefore(fab, avatar);
+    else if (fab.parentElement !== topbar) topbar.appendChild(fab);
+  } else if (fab.parentElement !== document.body) {
+    document.body.appendChild(fab);
+  }
+  fab.hidden = false;
+}
+window.syncMrfPremFab = syncMrfPremFab;
+
+if (!window.__mrfPremFabAuthBound) {
+  window.__mrfPremFabAuthBound = true;
+  window.addEventListener('mrf:auth', () => {
+    try { syncMrfPremFab(); } catch (_) {}
+    try { syncPrisonPlayerUi(); } catch (_) {}
+    try {
+      if (typeof applyThemeFromSettings === 'function') applyThemeFromSettings();
+    } catch (_) {}
+  });
+}
+
 function loaderHTMLShared(msg) {
   const label = msg ? `<span>${msg}</span>` : '';
   return `<div class="loading-placeholder">${mrfBallSpinHTML()}${label}</div>`;
 }
 
-/** Boot logo — bars assemble, then soft jump (accent from theme). */
+/** Boot logo — assemble + calm progress (PC + mobile). */
 function mrfBootLogoHTML(size = 112) {
   const s = Number(size) || 112;
-  return `<div class="page-boot-mark">
-    <svg class="page-boot-logo" viewBox="0 0 1254 1254" width="${s}" height="${s}" role="img" aria-label="MRF" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <circle class="page-boot-ring" cx="626" cy="615" r="603" fill="none" stroke="currentColor" stroke-width="38"/>
-      <g class="page-boot-bars" fill="currentColor">
-        <rect class="page-boot-bar" style="--i:0" x="429" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
-        <rect class="page-boot-bar" style="--i:1" x="515" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
-        <rect class="page-boot-bar" style="--i:2" x="600" y="193" width="54" height="287" rx="27" ry="27"/>
-        <rect class="page-boot-bar" style="--i:3" x="686" y="268" width="53" height="220" rx="26.5" ry="26.5"/>
-        <rect class="page-boot-bar" style="--i:4" x="772" y="314" width="53" height="158" rx="26.5" ry="26.5"/>
-      </g>
-      <text class="page-boot-word" x="626" y="848" text-anchor="middle" font-family="Arial Black, Helvetica Neue, Impact, sans-serif" font-size="310" font-weight="900" font-style="italic" letter-spacing="-14">MRF</text>
-    </svg>
+  return `<div class="page-boot-inner" role="status" aria-live="polite" aria-label="Загрузка">
+    <div class="page-boot-mark">
+      <svg class="page-boot-logo" viewBox="0 0 1000 1000" width="${s}" height="${s}" role="img" aria-label="MRF" fill="currentColor" xmlns="http://www.w3.org/2000/svg">${mrfLogoMarkInner({
+        ringClass: 'page-boot-ring',
+        barsClass: 'page-boot-bars',
+        barClass: 'page-boot-bar',
+        wordClass: 'page-boot-word'
+      })}</svg>
+    </div>
+    <div class="page-boot-progress" aria-hidden="true"><span></span></div>
+    <p class="page-boot-hint" id="page-boot-hint" hidden></p>
   </div>`;
 }
 window.mrfBootLogoHTML = mrfBootLogoHTML;
 
 function pageBootInnerHTML() {
-  const mobile = typeof isMobileLayout === 'function'
-    ? isMobileLayout()
-    : !window.matchMedia('(min-width: 901px)').matches;
-  return mobile ? mrfBootLogoHTML(112) : mrfBallSpinHTML();
+  const desktop = typeof isDesktopLayout === 'function'
+    ? isDesktopLayout()
+    : window.matchMedia('(min-width: 901px)').matches;
+  return mrfBootLogoHTML(desktop ? 128 : 104);
 }
 
 function syncBootAccentFromSettings() {
@@ -1331,6 +1581,33 @@ function syncBootAccentFromSettings() {
   } catch (_) {}
 }
 
+function clearPageBootSlowHint() {
+  if (window.__mrfBootSlowTimer) {
+    clearTimeout(window.__mrfBootSlowTimer);
+    window.__mrfBootSlowTimer = null;
+  }
+  window.__mrfBootSlowHintShown = false;
+}
+
+function schedulePageBootSlowHint() {
+  clearPageBootSlowHint();
+  window.__mrfBootSlowTimer = setTimeout(() => {
+    window.__mrfBootSlowTimer = null;
+    if (!document.body?.classList.contains('is-page-booting')) return;
+    if (document.getElementById('mrf-page-boot')?.classList.contains('is-done')) return;
+    if (window.__mrfBootSlowHintShown) return;
+    window.__mrfBootSlowHintShown = true;
+    const msg = 'Ничего не зависло — подгружаем рекомендации в кэш';
+    const hint = document.getElementById('page-boot-hint');
+    if (hint) {
+      hint.hidden = false;
+      hint.textContent = msg;
+      requestAnimationFrame(() => hint.classList.add('is-show'));
+    }
+    if (typeof showNotif === 'function') showNotif(msg, 4200);
+  }, 10000);
+}
+
 function showPageBoot() {
   syncBootAccentFromSettings();
   const existing = document.getElementById('mrf-page-boot');
@@ -1338,6 +1615,7 @@ function showPageBoot() {
     document.body.classList.add('is-page-booting');
     existing.classList.remove('is-done');
     existing.innerHTML = pageBootInnerHTML();
+    schedulePageBootSlowHint();
     return;
   }
   if (!document.body) return;
@@ -1345,20 +1623,24 @@ function showPageBoot() {
   const el = document.createElement('div');
   el.id = 'mrf-page-boot';
   el.className = 'page-boot';
-  el.setAttribute('aria-hidden', 'true');
+  el.setAttribute('aria-busy', 'true');
+  el.setAttribute('aria-live', 'polite');
   el.innerHTML = pageBootInnerHTML();
   document.body.appendChild(el);
+  schedulePageBootSlowHint();
 }
 window.showPageBoot = showPageBoot;
 
 function hidePageBoot() {
+  clearPageBootSlowHint();
   document.body.classList.remove('is-page-booting');
   const el = document.getElementById('mrf-page-boot');
   if (!el) return;
   el.classList.add('is-done');
+  el.removeAttribute('aria-busy');
   setTimeout(() => {
     if (el.parentNode) el.remove();
-  }, 260);
+  }, 340);
 }
 window.hidePageBoot = hidePageBoot;
 
@@ -1812,7 +2094,7 @@ function pickCreatePlaylistTrack(i) {
 function confirmCreatePlaylist() {
   const name = document.getElementById('playlist-name-input')?.value.trim();
   if (!name) { showNotif('Введи название'); return; }
-
+  
   const pl = Store.createPlaylist(name, '');
   if (!pl) return;
   _createPlDraftTracks.forEach(t => Store.addTrackToPlaylist(pl.id, t));
@@ -1827,7 +2109,7 @@ function confirmCreatePlaylist() {
   renderSidebarPlaylists();
   notifyLibraryChanged();
   showNotif('Плейлист создан');
-
+  
   const url = typeof mrfUrl === 'function' ? mrfUrl('playlist', { id: pl.id }) : `playlist.html?id=${encodeURIComponent(pl.id)}`;
   if (typeof mrfGo === 'function') mrfGo(url);
   else location.href = url;
@@ -1936,11 +2218,11 @@ function showAddToPlaylist(track) {
   const modal = document.getElementById('modal-add-to-playlist');
   const overlay = document.getElementById('modal-overlay');
   const list = document.getElementById('modal-playlist-list');
-
+  
   const pls = typeof Store.getOwnedPlaylists === 'function'
     ? Store.getOwnedPlaylists()
     : (Store.getPlaylists() || []).filter((p) => p && p.origin !== 'saved' && !p.readOnly);
-
+  
   if (!pls.length) {
     if (list) list.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px">
       <p>Нет плейлистов</p>
@@ -1963,7 +2245,7 @@ function showAddToPlaylist(track) {
       </div>`;
     }).join('') + `<button class="btn-secondary" onclick="closeModal();showCreatePlaylist()" style="margin-top:12px;width:100%;padding:10px;font-size:12px">+ Новый плейлист</button>`;
   }
-
+  
   if (modal) modal.classList.remove('hidden');
   if (overlay) overlay.classList.remove('hidden');
 }
@@ -1971,25 +2253,25 @@ function showAddToPlaylist(track) {
 function toggleTrackInPlaylist(playlistId, trackId, el) {
   const pl = Store.getPlaylist(playlistId);
   if (!pl || (typeof Store.isOwnedPlaylist === 'function' && !Store.isOwnedPlaylist(pl))) return;
-
+  
   const inPlaylist = pl.tracks?.some(t => String(t.id) === String(trackId));
-
+  
   if (inPlaylist) {
     Store.removeTrackFromPlaylist(playlistId, trackId);
     el.classList.remove('added');
     showNotif('Убрано из плейлиста');
   } else if (_pendingTrackForPlaylist) {
-    Store.addTrackToPlaylist(playlistId, _pendingTrackForPlaylist);
+      Store.addTrackToPlaylist(playlistId, _pendingTrackForPlaylist);
     if (window._bulkPending?.length) {
       window._bulkPending.forEach(f => Store.addTrackToPlaylist(playlistId, {
         id: f.id, title: f.title, artistName: f.artist, cover: f.cover, duration: f.duration, preview: f.preview
       }));
       window._bulkPending = [];
     }
-    el.classList.add('added');
-    showNotif('Добавлено в плейлист');
+      el.classList.add('added');
+      showNotif('Добавлено в плейлист');
   }
-
+  
   notifyLibraryChanged();
 }
 
@@ -2053,17 +2335,17 @@ function updateNowPlayingPanel(track) {
   if (typeof queue === 'undefined' || typeof queueIndex === 'undefined') return;
   const t = track || queue[queueIndex];
   if (!t) return;
-
+  
   const cover = t.album?.cover_xl || t.album?.cover_medium || t.cover || '';
   const title = t.title || '';
   const artist = t.artist?.name || t.artist || '';
-
+  
   const npCover = document.getElementById('np-cover');
   const npTitle = document.getElementById('np-title');
   const npArtist = document.getElementById('np-artist-name');
   const npArtistCover = document.getElementById('np-artist-cover');
   const npArtistNameBig = document.getElementById('np-artist-name-big');
-
+  
   if (npCover) {
     npCover.style.backgroundImage = cover ? `url("${cover}")` : 'none';
     npCover.style.backgroundSize = 'cover';
