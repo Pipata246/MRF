@@ -9803,76 +9803,158 @@ body.theme-light .prem-visual {
   justify-content: space-between;
   gap: 14px;
 }
+.pf-tg-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
 .pf-tg-title {
   font-size: 14px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text);
 }
 .pf-tg-status {
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
 }
 .pf-tg-card.is-linked .pf-tg-status {
   color: var(--accent);
-  font-weight: 600;
-}
-.pf-tg-bind {
-  flex-shrink: 0;
-  padding: 9px 16px;
-  font-size: 13px;
-  border-radius: 999px;
 }
 .pf-tg-offer {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 14px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+    linear-gradient(160deg, color-mix(in srgb, var(--accent) 16%, transparent) 0%, transparent 55%),
     var(--bg-3);
 }
+.pf-tg-offer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
 .pf-tg-offer-badge {
-  flex-shrink: 0;
-  padding: 5px 8px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #111;
   background: var(--accent);
   line-height: 1.2;
 }
-.pf-tg-offer-title {
-  font-size: 14px;
+.pf-tg-offer-once {
+  font-size: 11px;
   font-weight: 700;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+}
+.pf-tg-offer-title {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
   color: var(--text);
-  margin-bottom: 3px;
 }
 .pf-tg-offer-text {
   font-size: 12px;
+  font-weight: 600;
   line-height: 1.35;
   color: var(--text-2);
 }
+.pf-tg-offer-perks {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pf-tg-offer-perks li {
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+}
+.pf-tg-bind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff;
+  background: #2AABEE;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset;
+  transition: opacity 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+}
+.pf-tg-bind:hover {
+  filter: brightness(1.06);
+}
+.pf-tg-bind:active {
+  transform: scale(0.985);
+}
+.pf-tg-bind:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+.pf-tg-bind-ico {
+  flex-shrink: 0;
+  display: block;
+}
+.pf-tg-bind-label {
+  line-height: 1;
+}
 .pf-tg-widget {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  border: 0 !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
 }
 @media (max-width: 900px) {
-  .pf-tg-row {
-    flex-wrap: wrap;
+  .pf-tg-section .pf-tg-card {
+    gap: 12px;
+  }
+  .pf-tg-offer {
+    padding: 14px;
+    border-radius: 14px;
+  }
+  .pf-tg-offer-title {
+    font-size: 18px;
   }
   .pf-tg-bind {
     width: 100%;
-  }
-  .pf-tg-offer {
-    flex-direction: column;
-    gap: 8px;
+    min-height: 50px;
+    border-radius: 14px;
+    font-size: 15px;
   }
 }

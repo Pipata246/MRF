@@ -130,20 +130,31 @@
       <div class="settings-section pf-tg-section" id="telegram-link">
         <h3>Telegram</h3>
         <div class="pf-tg-card" id="pf-tg-card">
+          <div class="pf-tg-offer" id="pf-tg-trial" hidden>
+            <div class="pf-tg-offer-top">
+              <span class="pf-tg-offer-badge">Пробный период</span>
+              <span class="pf-tg-offer-once">1 раз</span>
+            </div>
+            <div class="pf-tg-offer-title" id="pf-tg-trial-title">14 дней Premium бесплатно</div>
+            <div class="pf-tg-offer-text">После первой привязки Telegram</div>
+            <ul class="pf-tg-offer-perks" aria-label="Что входит">
+              <li>Любой трек</li>
+              <li>Shuffle</li>
+              <li>Все цвета</li>
+            </ul>
+          </div>
           <div class="pf-tg-row">
             <div class="pf-tg-meta">
-              <div class="pf-tg-title">Аккаунт</div>
+              <div class="pf-tg-title">Статус</div>
               <div class="pf-tg-status" id="pf-tg-status">Не привязан</div>
             </div>
-            <button type="button" class="btn-primary pf-tg-bind" id="pf-tg-bind" hidden onclick="startTelegramBind()">Привязать</button>
           </div>
-          <div class="pf-tg-offer" id="pf-tg-trial" hidden>
-            <div class="pf-tg-offer-badge">Пробный период</div>
-            <div class="pf-tg-offer-body">
-              <div class="pf-tg-offer-title" id="pf-tg-trial-title">14 дней MRF Premium</div>
-              <div class="pf-tg-offer-text">Один раз за первую привязку Telegram. Повторно не начисляется.</div>
-            </div>
-          </div>
+          <button type="button" class="pf-tg-bind" id="pf-tg-bind" hidden onclick="startTelegramBind()">
+            <svg class="pf-tg-bind-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+            </svg>
+            <span class="pf-tg-bind-label">Привязать Telegram</span>
+          </button>
           <div class="pf-tg-widget" id="pf-tg-widget" hidden aria-hidden="true"></div>
         </div>
       </div>
@@ -710,18 +721,15 @@ function paintTelegramBlock({ linked, telegramUsername, trialAvailable, botUsern
 
   status.textContent = 'Не привязан';
   const days = Number(trialDays) || 14;
-  if (trialTitle) trialTitle.textContent = `${days} дней MRF Premium`;
+  if (trialTitle) trialTitle.textContent = `${days} дней Premium бесплатно`;
   if (trial) trial.hidden = !trialAvailable;
   if (bindBtn) {
     bindBtn.hidden = !(botReady && botUsername && botId);
     bindBtn.disabled = false;
   }
-  // Keep official widget mounted but visually secondary (fallback / popup helper)
+  widget.hidden = true;
   if (botReady && botUsername) ensureTelegramLoginWidget(widget, botUsername);
-  else {
-    widget.hidden = true;
-    widget.innerHTML = '';
-  }
+  else widget.innerHTML = '';
 }
 
 function syncTelegramBlock() {
