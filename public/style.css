@@ -5478,45 +5478,142 @@ body.profile-booting #profile-authed-block {
   min-height: 72px;
   line-height: 1.4;
 }
-.pf-sub-card {
-  padding: 0;
-  border: 0;
-  background: transparent;
+.pf-plan-card,
+.pf-tg-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.pf-sub-head {
+.pf-plan-top,
+.pf-tg-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   min-width: 0;
 }
-.pf-sub-meta {
+.pf-plan-ico,
+.pf-tg-ico {
+  flex-shrink: 0;
+  width: 56px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.pf-plan-ico-svg,
+.pf-tg-ico-svg {
+  display: block;
+  width: 34px;
+  height: auto;
+}
+.pf-tg-ico-svg {
+  width: 28px;
+  height: 24px;
+}
+.pf-plan-meta,
+.pf-tg-meta {
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
-.pf-sub-title {
+.pf-plan-title,
+.pf-tg-title {
   font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text);
 }
-.pf-sub-status {
+.pf-sub-status,
+.pf-tg-status {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-3);
 }
-.pf-sub-card.is-premium .pf-sub-status {
+.pf-plan-card.is-premium .pf-sub-status,
+.pf-tg-card.is-linked .pf-tg-status {
   color: var(--accent);
 }
-.pf-sub-cta {
+.pf-sub-until {
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.pf-tg-trial {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.pf-tg-trial-once {
+  color: var(--text-3);
+  font-weight: 600;
+}
+.pf-plan-perks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pf-plan-perks span {
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+}
+.pf-sub-cta,
+.pf-tg-bind {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 36px;
   padding: 0 14px;
-  border-radius: 10px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
+}
+.pf-sub-cta[hidden],
+.pf-tg-bind[hidden],
+.pf-tg-linked-badge[hidden],
+.pf-sub-until[hidden],
+.pf-tg-trial[hidden],
+.pf-plan-perks[hidden] {
+  display: none !important;
+}
+.pf-tg-linked-badge {
+  flex-shrink: 0;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #111;
+  background: var(--accent);
+}
+.pf-tg-widget {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  border: 0 !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
 }
 /* Non-premium promo — above player, right edge (PC + mobile) */
 .mrf-prem-fab {
@@ -7232,15 +7329,20 @@ body.theme-light .color-swatch-custom.is-open {
   }
   .home-feature-fab svg { margin-left: 2px; width: 22px; height: 22px; }
 
-  /* Profile — mobile stack so nothing overflows */
+  /* Profile — mobile: Spotify-like settings stack */
   body.is-profile-page .feed {
-    padding-top: 8px;
+    padding-top: 6px;
   }
   body.is-profile-page #profile-edit-view:not([hidden]) {
     padding-top: 0;
   }
+  body.is-profile-page #profile-edit-main {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
   body.is-profile-page .pf-edit-toolbar {
-    margin: 0 0 6px;
+    margin: 0 0 2px;
   }
   .auth-card {
     max-width: none;
@@ -7255,9 +7357,12 @@ body.theme-light .color-swatch-custom.is-open {
   .profile-hero {
     flex-direction: column;
     align-items: stretch;
-    gap: 14px;
-    padding: 16px;
-    margin-bottom: 14px;
+    gap: 12px;
+    padding: 14px;
+    margin-bottom: 0;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--bg-2);
   }
   .profile-hero-main {
     gap: 14px;
@@ -7269,30 +7374,155 @@ body.theme-light .color-swatch-custom.is-open {
   }
   .profile-info h2 {
     font-size: 20px;
+    letter-spacing: -0.02em;
+  }
+  .profile-handle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-3);
   }
   .pf-field-control,
-  .pf-field-control-locked,
+  .pf-field-control-locked {
+    margin-bottom: 0;
+    max-width: none;
+  }
   .pf-edit-toolbar {
-    margin-bottom: 8px;
+    margin-bottom: 0;
   }
   .pf-edit-close {
     padding: 6px 10px;
   }
   .profile-edit-hero {
-    padding: 16px;
+    padding: 14px;
   }
   .profile-edit-hero .profile-hero-main {
     gap: 12px;
   }
+  .pf-identity-section .pf-field {
+    padding: 12px 0;
+    gap: 8px;
+  }
+  .pf-field-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-2);
+  }
+  .pf-field-input {
+    min-height: 44px;
+    padding-right: 14px !important;
+    border-radius: 10px;
+  }
+  .pf-field-control-stack {
+    gap: 10px;
+  }
+  .pf-field-control-stack .profile-save-btn {
+    position: static;
+    transform: none;
+    width: 100%;
+    min-height: 42px;
+    height: auto;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .pf-handle-lock {
+    min-height: 44px;
+    border-radius: 10px;
+  }
   .pf-account-actions {
     width: 100%;
+    gap: 10px;
   }
   .pf-account-btn {
-    flex: 1 1 auto;
+    flex: 1 1 calc(50% - 5px);
     justify-content: center;
+    min-height: 42px;
+    border-radius: 10px;
+    font-size: 13px;
   }
-  .pf-sub-cta {
-    min-height: 36px;
+  .pf-plan-section.settings-section,
+  .pf-tg-section.settings-section {
+    padding: 14px;
+    border-radius: 16px;
+  }
+  .pf-plan-section.settings-section {
+    border-color: color-mix(in srgb, var(--accent) 26%, var(--border));
+    background:
+      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 52%),
+      var(--bg-2);
+  }
+  .pf-plan-section.settings-section h3,
+  .pf-tg-section.settings-section h3 {
+    margin-bottom: 12px;
+  }
+  .pf-plan-card,
+  .pf-tg-card {
+    gap: 12px;
+  }
+  .pf-plan-top,
+  .pf-tg-top {
+    gap: 12px;
+  }
+  .pf-plan-ico,
+  .pf-tg-ico {
+    width: 58px;
+    height: 42px;
+    border-radius: 14px;
+  }
+  .pf-plan-ico-svg {
+    width: 36px;
+    height: 36px;
+  }
+  .pf-tg-ico {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+  .pf-tg-ico-svg {
+    width: 30px;
+    height: 26px;
+  }
+  .pf-plan-title,
+  .pf-tg-title {
+    font-size: 15px;
+  }
+  .pf-sub-status,
+  .pf-tg-status {
+    font-size: 13px;
+  }
+  .pf-sub-until {
+    font-size: 12px;
+  }
+  .pf-plan-card.is-premium .pf-plan-ico,
+  .pf-tg-card.is-linked .pf-tg-ico {
+    color: #111;
+    background: var(--accent);
+    border-color: transparent;
+  }
+  .pf-tg-section.settings-section {
+    border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+    background:
+      radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%),
+      var(--bg-2);
+  }
+  .pf-sub-cta,
+  .pf-tg-bind {
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 12px;
+  }
+  .pf-tg-bind {
+    color: #111;
+    background: var(--accent);
+    border: 0;
+  }
+  .pf-plan-perks {
+    padding-top: 2px;
+  }
+  .pf-tg-linked-badge {
+    min-height: 30px;
+    padding: 0 12px;
   }
   .pf-delete-modal {
     width: min(340px, 92vw);
@@ -7302,18 +7532,26 @@ body.theme-light .color-swatch-custom.is-open {
     flex-direction: column-reverse;
   }
   .settings-section {
-    padding: 16px;
-    border-radius: 12px;
-    margin-bottom: 12px;
+    padding: 14px 14px 10px;
+    border-radius: 14px;
+    margin-bottom: 0;
   }
   .settings-section h3 {
-    margin-bottom: 12px;
-    font-size: 14px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--text-3);
   }
   .settings-row {
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-wrap: nowrap;
+    gap: 12px;
     padding: 12px 0;
+  }
+  .settings-row-label {
+    font-size: 14px;
+    font-weight: 600;
   }
   .settings-row-theme {
     flex-direction: column;
@@ -7325,6 +7563,8 @@ body.theme-light .color-swatch-custom.is-open {
   .theme-toggle-btns .btn-secondary {
     flex: 1;
     justify-content: center;
+    min-height: 36px;
+    border-radius: 999px;
   }
   .settings-row-accent .settings-row-desc {
     margin-bottom: 2px;
@@ -9791,163 +10031,3 @@ body.theme-light .prem-visual {
   }
 }
 
-/* Telegram bind (profile settings) */
-.pf-tg-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.pf-tg-offer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.pf-tg-offer-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-.pf-tg-offer-kicker {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-.pf-tg-offer-once {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-3);
-}
-.pf-tg-offer-title {
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  color: var(--text);
-}
-.pf-tg-offer-text {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.35;
-  color: var(--text-2);
-}
-.pf-tg-offer-perks {
-  list-style: none;
-  margin: 4px 0 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-.pf-tg-offer-perks li {
-  position: relative;
-  padding: 0 0 0 18px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.3;
-}
-.pf-tg-offer-perks li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.35em;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
-}
-.pf-tg-linked {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.pf-tg-linked-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-3);
-}
-.pf-tg-status {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-}
-.pf-tg-card.is-linked .pf-tg-status {
-  color: var(--accent);
-}
-.pf-tg-bind {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 44px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 12px;
-  cursor: pointer;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: #111;
-  background: var(--accent);
-  transition: opacity 0.15s ease, transform 0.15s ease, filter 0.15s ease;
-}
-.pf-tg-bind:hover { filter: brightness(1.05); }
-.pf-tg-bind:active { transform: scale(0.985); }
-.pf-tg-bind:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  transform: none;
-  filter: none;
-}
-.pf-tg-bind-ico {
-  flex-shrink: 0;
-  display: block;
-}
-.pf-tg-bind-label { line-height: 1; }
-.pf-tg-card.is-linked .pf-tg-bind { display: none; }
-.pf-tg-widget {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  margin: -1px !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  clip: rect(0 0 0 0) !important;
-  border: 0 !important;
-  pointer-events: none !important;
-  opacity: 0 !important;
-}
-@media (max-width: 900px) {
-  .pf-tg-section.settings-section {
-    padding: 0;
-    overflow: hidden;
-    border-radius: 14px;
-    border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
-    background:
-      radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 55%),
-      var(--bg-2);
-  }
-  .pf-tg-offer {
-    padding: 16px 16px 12px;
-    gap: 8px;
-  }
-  .pf-tg-offer-title {
-    font-size: 24px;
-    letter-spacing: -0.03em;
-  }
-  .pf-tg-linked {
-    padding: 16px;
-  }
-  .pf-tg-bind {
-    width: calc(100% - 32px);
-    min-height: 52px;
-    margin: 4px 16px 16px;
-    border-radius: 14px;
-    font-size: 15px;
-  }
-}

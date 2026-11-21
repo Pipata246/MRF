@@ -114,46 +114,50 @@
         </div>
       </div>
 
-      <div class="settings-section pf-sub-section" id="subscription">
+      <div class="settings-section pf-plan-section" id="subscription">
         <h3>Подписка</h3>
-        <div class="pf-sub-card" id="pf-sub-card">
-          <div class="pf-sub-head">
-            <div class="pf-sub-meta">
-              <div class="pf-sub-title">MRF Premium</div>
+        <div class="pf-plan-card" id="pf-sub-card">
+          <div class="pf-plan-top">
+            <div class="pf-plan-ico" aria-hidden="true" id="pf-plan-ico"></div>
+            <div class="pf-plan-meta">
+              <div class="pf-plan-title">MRF Premium</div>
               <div class="pf-sub-status" id="pf-sub-status">Нет</div>
+              <div class="pf-sub-until" id="pf-sub-until" hidden></div>
             </div>
             <button type="button" class="btn-secondary pf-sub-cta" id="pf-sub-cta" onclick="openPremiumCheckout()">Подробнее</button>
+          </div>
+          <div class="pf-plan-perks" id="pf-plan-perks" hidden>
+            <span>Любой трек</span>
+            <span>Shuffle</span>
+            <span>Все цвета</span>
           </div>
         </div>
       </div>
 
       <div class="settings-section pf-tg-section" id="telegram-link">
+        <h3>Telegram</h3>
         <div class="pf-tg-card" id="pf-tg-card">
-          <div class="pf-tg-offer" id="pf-tg-trial" hidden>
-            <div class="pf-tg-offer-head">
-              <span class="pf-tg-offer-kicker">MRF Premium</span>
-              <span class="pf-tg-offer-once">1 раз</span>
+          <div class="pf-tg-top">
+            <div class="pf-tg-ico" aria-hidden="true">
+              <svg class="pf-tg-ico-svg" viewBox="0 0 28 24" width="28" height="24" fill="currentColor" focusable="false">
+                <path d="M27.1 3.1c.3-1.3-.7-2.1-1.9-1.7L2.2 10.3C.8 10.8.8 11.6 2 12l6.1 1.9 2.4 7.2c.3.9 0 1.3.8 1.3.5 0 .8-.2 1.1-.5l3.3-3.2 6.8 5c1.3.7 2.2.3 2.5-1.2L27.1 3.1zM9.7 18.2l-1.5-5.7L22.2 6.4 9.7 18.2z"/>
+              </svg>
             </div>
-            <div class="pf-tg-offer-title" id="pf-tg-trial-title">14 дней бесплатно</div>
-            <div class="pf-tg-offer-text">Откроется Telegram → нажми Start</div>
-            <ul class="pf-tg-offer-perks">
-              <li>Любой трек</li>
-              <li>Shuffle и скип</li>
-              <li>Все цвета</li>
-            </ul>
+            <div class="pf-tg-meta">
+              <div class="pf-tg-title">Telegram</div>
+              <div class="pf-tg-status" id="pf-tg-status">Не привязан</div>
+              <div class="pf-tg-trial" id="pf-tg-trial" hidden>
+                <span id="pf-tg-trial-title">14 дней Premium</span>
+                <span class="pf-tg-trial-once">· 1 раз</span>
+              </div>
+            </div>
+            <button type="button" class="btn-secondary pf-tg-bind" id="pf-tg-bind" hidden onclick="startTelegramBind()">
+              <span class="pf-tg-bind-label">Привязать</span>
+            </button>
+            <div class="pf-tg-linked-badge" id="pf-tg-linked-badge" hidden>Привязан</div>
           </div>
-          <div class="pf-tg-linked" id="pf-tg-linked" hidden>
-            <div class="pf-tg-linked-label">Telegram</div>
-            <div class="pf-tg-status" id="pf-tg-status">Не привязан</div>
-          </div>
-          <button type="button" class="pf-tg-bind" id="pf-tg-bind" hidden onclick="startTelegramBind()">
-            <svg class="pf-tg-bind-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-              <path fill="currentColor" d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-            </svg>
-            <span class="pf-tg-bind-label">Привязать Telegram</span>
-          </button>
-          <div class="pf-tg-widget" id="pf-tg-widget" hidden aria-hidden="true"></div>
         </div>
+        <div class="pf-tg-widget" id="pf-tg-widget" hidden aria-hidden="true"></div>
       </div>
 
       <div class="settings-section pf-identity-section">
@@ -537,7 +541,8 @@ function setProfileEditMode(on) {
     history.replaceState(history.state || { mrfSoft: 1 }, '', url);
   } catch (_) {}
   applyProfileModeUi();
-  if (!on) void refreshMyPublicProfile();
+  if (on) loadProfilePage();
+  else void refreshMyPublicProfile();
 }
 window.setProfileEditMode = setProfileEditMode;
 
@@ -647,7 +652,7 @@ function loadProfilePage() {
   pf('pf-bio', bio);
   const nickText = document.getElementById('pf-username-text');
   if (nickText) nickText.textContent = nick || 'user';
-  syncPremiumBlock(premium, planLabel);
+  syncPremiumBlock(premium, planLabel, mergedPrem.premiumEndsAt);
   void syncTelegramBlock();
   consumeTelegramAuthReturn();
 
@@ -667,31 +672,69 @@ function loadProfilePage() {
 }
 window.loadProfilePage = loadProfilePage;
 
-function syncPremiumBlock(premium, planLabel) {
+function formatPremiumUntil(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return '';
+  try {
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch (_) {
+    return '';
+  }
+}
+
+function ensurePlanIcon() {
+  const host = document.getElementById('pf-plan-ico');
+  if (!host || host.dataset.ready === '1') return;
+  if (typeof mrfLogoMarkInner === 'function') {
+    host.innerHTML = `<svg class="pf-plan-ico-svg" viewBox="0 0 1000 1000" width="34" height="34" aria-hidden="true" fill="currentColor" xmlns="http://www.w3.org/2000/svg">${mrfLogoMarkInner()}</svg>`;
+  } else {
+    host.innerHTML = `<svg class="pf-plan-ico-svg" viewBox="0 0 48 24" width="34" height="18" aria-hidden="true" fill="currentColor"><rect x="2" y="8" width="6" height="10" rx="3"/><rect x="12" y="4" width="6" height="18" rx="3"/><rect x="22" y="1" width="6" height="22" rx="3"/><rect x="32" y="4" width="6" height="18" rx="3"/><rect x="42" y="8" width="6" height="10" rx="3"/></svg>`;
+  }
+  host.dataset.ready = '1';
+}
+
+function syncPremiumBlock(premium, planLabel, endsAt) {
   const on = !!premium;
-  const label = planLabel || (on ? 'Премиум' : 'Нет');
   const card = document.getElementById('pf-sub-card');
   const status = document.getElementById('pf-sub-status');
+  const until = document.getElementById('pf-sub-until');
+  const perks = document.getElementById('pf-plan-perks');
   const cta = document.getElementById('pf-sub-cta');
+  ensurePlanIcon();
   if (card) card.classList.toggle('is-premium', on);
-  if (status) status.textContent = label;
+  if (status) status.textContent = on ? (planLabel || 'Премиум') : 'Нет';
+  if (until) {
+    const dateLabel = formatPremiumUntil(endsAt);
+    if (on && dateLabel) {
+      until.hidden = false;
+      until.textContent = 'до ' + dateLabel;
+    } else if (on && !endsAt) {
+      until.hidden = false;
+      until.textContent = 'Без срока';
+    } else {
+      until.hidden = true;
+      until.textContent = '';
+    }
+  }
+  if (perks) perks.hidden = on;
   if (cta) {
     cta.hidden = on;
     cta.disabled = false;
+    cta.setAttribute('aria-hidden', on ? 'true' : 'false');
   }
 }
 window.syncPremiumBlock = syncPremiumBlock;
 
 function paintTelegramBlock({ linked, telegramUsername, trialAvailable, botUsername, botId, botReady, trialDays }) {
   const status = document.getElementById('pf-tg-status');
-  const linkedBox = document.getElementById('pf-tg-linked');
   const trial = document.getElementById('pf-tg-trial');
   const trialTitle = document.getElementById('pf-tg-trial-title');
   const bindBtn = document.getElementById('pf-tg-bind');
-  const widget = document.getElementById('pf-tg-widget');
+  const badge = document.getElementById('pf-tg-linked-badge');
   const section = document.getElementById('telegram-link');
   const card = document.getElementById('pf-tg-card');
-  if (!status || !widget) return;
+  if (!status) return;
 
   window.__mrfTgBind = { botUsername: botUsername || '', botId: botId || '', botReady: !!botReady };
 
@@ -699,41 +742,35 @@ function paintTelegramBlock({ linked, telegramUsername, trialAvailable, botUsern
   if (section) section.hidden = !logged || !isProfileEditMode();
   if (card) card.classList.toggle('is-linked', !!linked);
 
-  const hideWidget = () => {
-    widget.hidden = true;
-    widget.innerHTML = '';
-  };
-
   if (!logged) {
     status.textContent = 'Не привязан';
-    if (linkedBox) linkedBox.hidden = true;
     if (trial) trial.hidden = true;
     if (bindBtn) bindBtn.hidden = true;
-    hideWidget();
+    if (badge) badge.hidden = true;
     return;
   }
 
   if (linked) {
     status.textContent = telegramUsername || 'Привязан';
-    if (linkedBox) linkedBox.hidden = false;
     if (trial) trial.hidden = true;
-    if (bindBtn) bindBtn.hidden = true;
-    hideWidget();
+    if (bindBtn) {
+      bindBtn.hidden = true;
+      bindBtn.setAttribute('aria-hidden', 'true');
+    }
+    if (badge) badge.hidden = false;
     return;
   }
 
   status.textContent = 'Не привязан';
-  if (linkedBox) linkedBox.hidden = true;
+  if (badge) badge.hidden = true;
   const days = Number(trialDays) || 14;
-  if (trialTitle) trialTitle.textContent = `${days} дней бесплатно`;
+  if (trialTitle) trialTitle.textContent = `${days} дней Premium`;
   if (trial) trial.hidden = !trialAvailable;
   if (bindBtn) {
     bindBtn.hidden = !(botReady && botUsername);
     bindBtn.disabled = false;
-    const label = bindBtn.querySelector('.pf-tg-bind-label');
-    if (label) label.textContent = 'Привязать Telegram';
+    bindBtn.setAttribute('aria-hidden', bindBtn.hidden ? 'true' : 'false');
   }
-  hideWidget();
 }
 
 function syncTelegramBlock() {
@@ -741,12 +778,17 @@ function syncTelegramBlock() {
   const local = (typeof Store !== 'undefined' && Store.getProfile) ? Store.getProfile() : {};
   const tgCfg = (window.MrfAuth && typeof MrfAuth.getTelegramConfig === 'function')
     ? MrfAuth.getTelegramConfig()
-    : { botUsername: '', botId: '', botReady: false, trialDays: 14 };
+    : { botUsername: '', botId: '', botReady: false, trialDays: 14, linked: false, trialAvailable: false };
 
-  const linked = !!(cloud?.telegramLinked || local.telegramLinked);
-  const telegramUsername = cloud?.telegramUsername || local.telegramUsername || null;
-  const trialUsed = !!(cloud?.telegramTrialUsed || local.telegramTrialUsed);
-  const trialAvailable = !linked && !trialUsed;
+  const linked = !!(tgCfg.linked || cloud?.telegramLinked || local.telegramLinked);
+  const telegramUsername = tgCfg.telegramUsername
+    || cloud?.telegramUsername
+    || local.telegramUsername
+    || null;
+  const trialUsed = !!(tgCfg.trialUsed || cloud?.telegramTrialUsed || local.telegramTrialUsed);
+  const trialAvailable = tgCfg.trialAvailable != null
+    ? !!tgCfg.trialAvailable
+    : (!linked && !trialUsed);
 
   paintTelegramBlock({
     linked,
@@ -768,7 +810,11 @@ function syncTelegramBlock() {
         botUsername: data.botUsername || '',
         botId: data.botId || '',
         botReady: !!data.botReady,
-        trialDays: data.trialDays || 14
+        trialDays: data.trialDays || 14,
+        linked: !!data.linked,
+        telegramUsername: data.telegramUsername || null,
+        trialUsed: !!data.trialUsed,
+        trialAvailable: !!data.trialAvailable
       });
     }
     if (data.profile) {
@@ -808,6 +854,18 @@ function startTelegramLinkPoll() {
     void MrfAuth.api('/api/me?resource=telegram').then((data) => {
       if (!data?.linked) return;
       stopTelegramLinkPoll();
+      if (typeof MrfAuth.writeTelegramCache === 'function') {
+        MrfAuth.writeTelegramCache({
+          botUsername: data.botUsername || '',
+          botId: data.botId || '',
+          botReady: !!data.botReady,
+          trialDays: data.trialDays || 14,
+          linked: true,
+          telegramUsername: data.telegramUsername || null,
+          trialUsed: !!data.trialUsed,
+          trialAvailable: false
+        });
+      }
       if (data.profile) {
         MrfAuth.profile = { ...(MrfAuth.profile || {}), ...data.profile };
         if (typeof MrfAuth.applyProfileLocal === 'function') MrfAuth.applyProfileLocal(MrfAuth.profile);

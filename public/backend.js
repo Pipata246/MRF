@@ -114,6 +114,7 @@
     } finally {
       MrfCloud._quiet = false;
     }
+    applyTelegramFromProfile(profile);
     if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
   }
 
@@ -460,15 +461,54 @@
     return !!(MrfAuth.session && MrfAuth.session.user);
   }
 
-  const TG_CACHE_KEY = 'mrf_tg_cfg_v1';
+  const TG_CACHE_KEY = 'mrf_tg_state_v2';
+
+  function emptyTelegramState() {
+    return {
+      botUsername: '',
+      botId: '',
+      botReady: false,
+      trialDays: 14,
+      linked: false,
+      telegramUsername: null,
+      trialUsed: false,
+      trialAvailable: false
+    };
+  }
+
+  function normalizeTelegramState(cfg, base) {
+    const prev = base && typeof base === 'object' ? base : emptyTelegramState();
+    const next = { ...prev };
+    if (!cfg || typeof cfg !== 'object') return next;
+    if (cfg.botUsername != null) next.botUsername = String(cfg.botUsername || '');
+    if (cfg.botId != null) next.botId = String(cfg.botId || '');
+    if (cfg.botReady != null) next.botReady = !!cfg.botReady;
+    if (cfg.trialDays != null) next.trialDays = Number(cfg.trialDays) || 14;
+    if (cfg.linked != null) next.linked = !!cfg.linked;
+    if (cfg.telegramUsername !== undefined) {
+      const u = String(cfg.telegramUsername || '').trim().replace(/^@+/, '');
+      next.telegramUsername = u ? '@' + u : null;
+    }
+    if (cfg.trialUsed != null) next.trialUsed = !!cfg.trialUsed;
+    if (cfg.trialAvailable != null) next.trialAvailable = !!cfg.trialAvailable;
+    else next.trialAvailable = !next.linked && !next.trialUsed;
+    return next;
+  }
 
   function readTelegramCache() {
+    const readOne = (store) => {
+      try {
+        const raw = store.getItem(TG_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        return normalizeTelegramState(parsed, emptyTelegramState());
+      } catch (_) {
+        return null;
+      }
+    };
     try {
-      const raw = sessionStorage.getItem(TG_CACHE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return null;
-      return parsed;
+      return readOne(localStorage) || readOne(sessionStorage);
     } catch (_) {
       return null;
     }
@@ -476,27 +516,11 @@
 
   function writeTelegramCache(cfg) {
     if (!cfg || typeof cfg !== 'object') return;
-    MrfAuth.telegram = {
-      botUsername: cfg.botUsername || '',
-      botId: cfg.botId || '',
-      botReady: !!cfg.botReady,
-      trialDays: Number(cfg.trialDays) || 14
-    };
-    try {
-      sessionStorage.setItem(TG_CACHE_KEY, JSON.stringify(MrfAuth.telegram));
-    } catch (_) {}
-    try {
-      if (MrfAuth.telegram.botReady && MrfAuth.telegram.botUsername) {
-        const id = 'mrf-tg-widget-preload';
-        if (!document.getElementById(id)) {
-          const s = document.createElement('script');
-          s.id = id;
-          s.async = true;
-          s.src = 'https://telegram.org/js/telegram-widget.js?22';
-          document.head.appendChild(s);
-        }
-      }
-    } catch (_) {}
+    const merged = normalizeTelegramState(cfg, MrfAuth.telegram || readTelegramCache() || emptyTelegramState());
+    MrfAuth.telegram = merged;
+    const raw = JSON.stringify(merged);
+    try { localStorage.setItem(TG_CACHE_KEY, raw); } catch (_) {}
+    try { sessionStorage.setItem(TG_CACHE_KEY, raw); } catch (_) {}
   }
 
   function applyTelegramFromHealth(h) {
@@ -509,16 +533,24 @@
     });
   }
 
+  function applyTelegramFromProfile(profile) {
+    if (!profile || typeof profile !== 'object') return;
+    writeTelegramCache({
+      linked: !!profile.telegramLinked,
+      telegramUsername: profile.telegramUsername || null,
+      trialUsed: !!profile.telegramTrialUsed,
+      trialAvailable: !profile.telegramLinked && !profile.telegramTrialUsed
+    });
+  }
+
   function getTelegramConfig() {
-    if (MrfAuth.telegram && (MrfAuth.telegram.botUsername || MrfAuth.telegram.botReady === false)) {
-      return MrfAuth.telegram;
-    }
+    if (MrfAuth.telegram) return MrfAuth.telegram;
     const cached = readTelegramCache();
     if (cached) {
       MrfAuth.telegram = cached;
       return cached;
     }
-    return { botUsername: '', botReady: false, trialDays: 14 };
+    return emptyTelegramState();
   }
 
   async function initBackend() {
@@ -552,6 +584,7 @@
   MrfAuth.applyProfileLocal = applyProfileLocal;
   MrfAuth.getTelegramConfig = getTelegramConfig;
   MrfAuth.writeTelegramCache = writeTelegramCache;
+  MrfAuth.applyTelegramFromProfile = applyTelegramFromProfile;
 
   MrfAuth.normalizeUsername = normalizeUsername;
   MrfAuth.displayUsername = displayUsername;
