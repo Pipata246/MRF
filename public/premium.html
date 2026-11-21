@@ -157,6 +157,14 @@
   </div>
 </div>
 
+<div class="modal-overlay prem-pay-wait-overlay hidden" id="overlay-prem-pay-wait" aria-hidden="true"></div>
+<div class="modal prem-pay-wait-modal hidden" id="modal-prem-pay-wait" role="dialog" aria-modal="true" aria-labelledby="prem-pay-wait-title" data-no-close="1">
+  <div class="prem-pay-wait-spinner" aria-hidden="true"></div>
+  <h3 class="prem-pay-wait-title" id="prem-pay-wait-title">Ожидаем платёж</h3>
+  <p class="prem-pay-wait-text" id="prem-pay-wait-text">Проверяем оплату</p>
+  <p class="prem-pay-wait-timer" id="prem-pay-wait-timer"></p>
+</div>
+
 <div id="player-root"></div>
 <script src="mock.js"></script>
 <script src="backend.js"></script>
@@ -165,12 +173,27 @@
 <script src="mrf-ready.js"></script>
 <script src="soft-nav.js"></script>
 <script>
+const MRF_PAY_WAIT_KEY = 'mrf_pay_wait_v1';
+let __mrfPayWaitTimer = null;
+let __mrfPayWaitPoll = null;
+let __mrfPayWaitActive = false;
+
+function isPremiumMobileUi() {
+  try {
+    if (document.documentElement.getAttribute('data-ui') === 'mobile') return true;
+    return window.matchMedia('(max-width: 900px)').matches;
+  } catch (_) {
+    return true;
+  }
+}
+
 function openPremiumPlansModal() {
   if (!(window.MrfAuth && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn())) {
     if (typeof showNotif === 'function') showNotif('Войди в аккаунт');
     location.href = typeof mrfUrl === 'function' ? mrfUrl('profile') : 'profile.html';
     return;
   }
+  if (__mrfPayWaitActive) return;
   const overlay = document.getElementById('overlay-prem-plans');
   const modal = document.getElementById('modal-prem-plans');
   if (overlay) overlay.classList.remove('hidden');
@@ -186,6 +209,174 @@ function closePremiumPlansModal() {
 }
 window.closePremiumPlansModal = closePremiumPlansModal;
 
+function savePayWaitState(payload) {
+  try {
+    sessionStorage.setItem(MRF_PAY_WAIT_KEY, JSON.stringify(payload || {}));
+  } catch (_) {}
+}
+
+function readPayWaitState() {
+  try {
+    const raw = sessionStorage.getItem(MRF_PAY_WAIT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || (!parsed.localId && !parsed.paymentId)) return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+}
+
+function clearPayWaitState() {
+  try { sessionStorage.removeItem(MRF_PAY_WAIT_KEY); } catch (_) {}
+}
+
+function formatPayWaitRemain(ms) {
+  const sec = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function setPayWaitCopy(title, text) {
+  const t = document.getElementById('prem-pay-wait-title');
+  const p = document.getElementById('prem-pay-wait-text');
+  if (t && title) t.textContent = title;
+  if (p && text) p.textContent = text;
+}
+
+function showPayWaitModal(payment) {
+  if (!isPremiumMobileUi()) return;
+  closePremiumPlansModal();
+  __mrfPayWaitActive = true;
+  document.body.classList.add('is-prem-pay-waiting');
+  const overlay = document.getElementById('overlay-prem-pay-wait');
+  const modal = document.getElementById('modal-prem-pay-wait');
+  if (overlay) {
+    overlay.classList.remove('hidden');
+    overlay.setAttribute('aria-hidden', 'false');
+  }
+  if (modal) modal.classList.remove('hidden');
+  setPayWaitCopy('Ожидаем платёж', 'Проверяем оплату');
+  updatePayWaitTimer(payment);
+}
+
+function hidePayWaitModal() {
+  __mrfPayWaitActive = false;
+  document.body.classList.remove('is-prem-pay-waiting');
+  if (__mrfPayWaitTimer) {
+    clearInterval(__mrfPayWaitTimer);
+    __mrfPayWaitTimer = null;
+  }
+  if (__mrfPayWaitPoll) {
+    clearTimeout(__mrfPayWaitPoll);
+    __mrfPayWaitPoll = null;
+  }
+  const overlay = document.getElementById('overlay-prem-pay-wait');
+  const modal = document.getElementById('modal-prem-pay-wait');
+  if (overlay) {
+    overlay.classList.add('hidden');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+  if (modal) modal.classList.add('hidden');
+}
+
+function updatePayWaitTimer(payment) {
+  const el = document.getElementById('prem-pay-wait-timer');
+  if (!el) return;
+  const expiresAt = payment?.expiresAt ? Date.parse(payment.expiresAt) : NaN;
+  const tick = () => {
+    if (!Number.isFinite(expiresAt)) {
+      el.textContent = '';
+      return;
+    }
+    const left = expiresAt - Date.now();
+    el.textContent = left > 0 ? formatPayWaitRemain(left) : '0:00';
+  };
+  tick();
+  if (__mrfPayWaitTimer) clearInterval(__mrfPayWaitTimer);
+  __mrfPayWaitTimer = setInterval(tick, 1000);
+}
+
+function applyPremiumProfileFromPayment(profile) {
+  if (!profile) return;
+  if (window.MrfAuth) {
+    MrfAuth.profile = profile;
+    if (typeof MrfAuth.applyProfileLocal === 'function') MrfAuth.applyProfileLocal(profile);
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('mrf:auth', { detail: { profile } }));
+  } catch (_) {}
+}
+
+function finishPayWait(status, profile) {
+  clearPayWaitState();
+  hidePayWaitModal();
+  if (profile) applyPremiumProfileFromPayment(profile);
+  if (typeof showNotif === 'function') {
+    if (status === 'succeeded') showNotif('Premium активен', 2200);
+    else if (status === 'canceled') showNotif('Оплата отменена', 2200);
+    else if (status === 'expired') showNotif('Время оплаты истекло', 2200);
+    else showNotif('Оплата не прошла', 2200);
+  }
+  renderPremiumPage();
+}
+
+async function pollPayStatusOnce(localId, paymentId) {
+  if (!window.MrfAuth?.api) return null;
+  const q = localId
+    ? `local_id=${encodeURIComponent(localId)}`
+    : `payment_id=${encodeURIComponent(paymentId || '')}`;
+  return MrfAuth.api(`/api/billing?action=status&${q}`);
+}
+
+async function runPayWaitLoop(seed) {
+  if (__mrfPayWaitActive && !seed?.forceRestart) return;
+  const localId = seed?.localId || null;
+  const paymentId = seed?.paymentId || null;
+  if (!localId && !paymentId) return;
+
+  if (__mrfPayWaitPoll) {
+    clearTimeout(__mrfPayWaitPoll);
+    __mrfPayWaitPoll = null;
+  }
+  if (__mrfPayWaitTimer) {
+    clearInterval(__mrfPayWaitTimer);
+    __mrfPayWaitTimer = null;
+  }
+
+  showPayWaitModal(seed?.payment || null);
+  savePayWaitState({
+    localId,
+    paymentId,
+    createdAt: seed?.createdAt || Date.now()
+  });
+
+  const poll = async () => {
+    try {
+      const res = await pollPayStatusOnce(localId, paymentId);
+      const payment = res?.payment || null;
+      const status = payment?.status || res?.status || '';
+      if (payment) updatePayWaitTimer(payment);
+      if (status === 'pending') {
+        setPayWaitCopy('Ожидаем платёж', 'Проверяем оплату');
+        __mrfPayWaitPoll = setTimeout(poll, 2000);
+        return;
+      }
+      if (status === 'succeeded' || status === 'canceled' || status === 'expired') {
+        finishPayWait(status, res?.profile || null);
+        return;
+      }
+      __mrfPayWaitPoll = setTimeout(poll, 2500);
+    } catch (_) {
+      setPayWaitCopy('Ожидаем платёж', 'Повторная проверка');
+      __mrfPayWaitPoll = setTimeout(poll, 3000);
+    }
+  };
+
+  await poll();
+}
+
 async function startPremiumCheckout(plan) {
   if (!(window.MrfAuth && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn())) {
     if (typeof showNotif === 'function') showNotif('Войди в аккаунт');
@@ -196,6 +387,7 @@ async function startPremiumCheckout(plan) {
     if (typeof showNotif === 'function') showNotif('Оплата недоступна');
     return;
   }
+  if (__mrfPayWaitActive) return;
   const btns = document.querySelectorAll('#modal-prem-plans [data-checkout]');
   btns.forEach((b) => { b.disabled = true; });
   try {
@@ -207,6 +399,11 @@ async function startPremiumCheckout(plan) {
       if (typeof showNotif === 'function') showNotif('Не удалось начать оплату');
       return;
     }
+    savePayWaitState({
+      localId: res.localId || res.payment?.id || null,
+      paymentId: res.paymentId || res.payment?.paymentId || null,
+      createdAt: Date.now()
+    });
     location.assign(res.confirmationUrl);
   } catch (e) {
     if (typeof showNotif === 'function') showNotif(e?.message || 'Не удалось начать оплату');
@@ -232,28 +429,73 @@ function bindPremiumCheckoutButtons() {
   });
 }
 
-async function consumePremiumPaidReturn() {
+function stripPaidQuery() {
   try {
-    const params = new URLSearchParams(location.search);
-    if (params.get('paid') !== '1') return;
-    if (typeof showNotif === 'function') showNotif('Проверяем оплату…');
-    if (window.MrfAuth?.api && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn()) {
-      try {
-        const sess = await MrfAuth.api('/api/auth?action=session');
-        if (sess?.profile && typeof MrfAuth.applyProfileLocal === 'function') {
-          MrfAuth.profile = sess.profile;
-          MrfAuth.applyProfileLocal(sess.profile);
-        }
-      } catch (_) {}
-    }
     const u = new URL(location.href);
+    if (!u.searchParams.has('paid') && !u.searchParams.has('pid')) return;
     u.searchParams.delete('paid');
+    u.searchParams.delete('pid');
     history.replaceState(history.state || {}, '', u.pathname + u.search + u.hash);
-    if (typeof showNotif === 'function') {
-      const on = typeof mrfUserHasPremium === 'function' && mrfUserHasPremium();
-      showNotif(on ? 'Premium активен' : 'Если оплата прошла — обнови через минуту');
-    }
   } catch (_) {}
+}
+
+/** On load: DB first, then URL/session — never trust redirect alone. */
+async function resolvePremiumPaymentOnBoot() {
+  if (!(window.MrfAuth?.api && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn())) {
+    stripPaidQuery();
+    return;
+  }
+
+  const params = new URLSearchParams(location.search);
+  const fromReturn = params.get('paid') === '1';
+  const pidFromUrl = params.get('pid') || '';
+  const stored = readPayWaitState();
+
+  // 1) Ask DB for any pending / recent payment
+  let pendingRes = null;
+  try {
+    pendingRes = await MrfAuth.api('/api/billing?action=pending');
+  } catch (_) {}
+
+  const dbPay = pendingRes?.payment || null;
+  if (pendingRes?.profile) applyPremiumProfileFromPayment(pendingRes.profile);
+
+  if (dbPay?.status === 'pending') {
+    stripPaidQuery();
+    await runPayWaitLoop({
+      localId: dbPay.id,
+      paymentId: dbPay.paymentId,
+      payment: dbPay,
+      createdAt: Date.parse(dbPay.createdAt) || Date.now(),
+      forceRestart: true
+    });
+    return;
+  }
+
+  if (dbPay && (dbPay.status === 'succeeded' || dbPay.status === 'canceled' || dbPay.status === 'expired')) {
+    stripPaidQuery();
+    clearPayWaitState();
+    if (fromReturn || stored) {
+      finishPayWait(dbPay.status, pendingRes?.profile || null);
+    }
+    return;
+  }
+
+  // 2) Return from YooKassa / sessionStorage — poll that id
+  const localId = pidFromUrl || stored?.localId || null;
+  const paymentId = stored?.paymentId || null;
+  if (fromReturn || localId || paymentId) {
+    stripPaidQuery();
+    await runPayWaitLoop({
+      localId,
+      paymentId,
+      createdAt: stored?.createdAt || Date.now(),
+      forceRestart: true
+    });
+    return;
+  }
+
+  stripPaidQuery();
 }
 
 function renderPremiumPage() {
@@ -284,7 +526,7 @@ window.renderPremiumPage = renderPremiumPage;
 function bootPremiumPage() {
   initShared();
   renderPremiumPage();
-  void consumePremiumPaidReturn().then(() => renderPremiumPage());
+  void resolvePremiumPaymentOnBoot().then(() => renderPremiumPage());
 }
 window.bootPremiumPage = bootPremiumPage;
 

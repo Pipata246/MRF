@@ -11,7 +11,7 @@ create table if not exists public.billing_payments (
   paid_at timestamptz,
   created_at timestamptz not null default now(),
   constraint billing_payments_plan_check check (plan in ('month', 'year')),
-  constraint billing_payments_status_check check (status in ('pending', 'succeeded', 'canceled'))
+  constraint billing_payments_status_check check (status in ('pending', 'succeeded', 'canceled', 'expired'))
 );
 
 create unique index if not exists billing_payments_yookassa_uidx

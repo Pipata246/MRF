@@ -23,7 +23,7 @@ alwaysApply: true
 | 2 | `api/me.js` | Profile + settings (`?resource=profile\|settings`) |
 | 3 | `api/library.js` | Likes / follows / albums / playlists (`?resource=...`) |
 | 4 | `api/recommendations.js` | Home feed + mood mixes (`?resource=home\|mood`) |
-| 5 | `api/billing.js` | YooKassa Premium (`?action=plans\|create\|status\|webhook`) |
+| 5 | `api/billing.js` | YooKassa Premium (`?action=plans\|create\|status\|pending\|webhook`) |
 | 6–12 | **RESERVED** | Future domains only (e.g. stream / official music) — one domain per file |
 
 When adding a feature: prefer extending slots 1–4. Open a new reserved slot only for a **new domain** that cannot fit cleanly.

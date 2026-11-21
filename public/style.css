@@ -9972,6 +9972,11 @@ a.prem-cta {
 }
 .prem-foot-cta { margin-bottom: 10px; }
 .prem-foot-note[hidden] { display: none !important; }
+/* Wait modal markup exists on all viewports; UI only on mobile (see max-width:900) */
+.prem-pay-wait-overlay,
+.prem-pay-wait-modal {
+  display: none !important;
+}
 .prem-foot-note {
   margin: 0 auto;
   max-width: 36ch;
@@ -10060,6 +10065,69 @@ body.theme-light .prem-visual {
   }
   .prem-foot {
     padding: 8px 0 calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Payment wait — blocking, no close */
+  .prem-pay-wait-overlay:not(.hidden) {
+    display: block !important;
+    z-index: 240;
+    pointer-events: auto;
+  }
+  .prem-pay-wait-modal:not(.hidden) {
+    display: flex !important;
+    z-index: 241;
+    width: min(340px, calc(100vw - 32px));
+    max-width: 340px;
+    padding: 28px 22px 24px;
+    border-radius: 18px;
+    text-align: center;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    pointer-events: auto;
+  }
+  .prem-pay-wait-modal.hidden,
+  .prem-pay-wait-overlay.hidden {
+    display: none !important;
+  }
+  .prem-pay-wait-spinner {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2.5px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+    border-top-color: var(--accent);
+    animation: prem-pay-spin 0.8s linear infinite;
+    margin-bottom: 4px;
+  }
+  @keyframes prem-pay-spin {
+    to { transform: rotate(360deg); }
+  }
+  .prem-pay-wait-title {
+    margin: 0;
+    font-family: Syne, sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .prem-pay-wait-text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.35;
+    color: var(--text-2);
+  }
+  .prem-pay-wait-timer {
+    margin: 4px 0 0;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--text-2);
+    min-height: 1.2em;
+  }
+  body.is-prem-pay-waiting {
+    overflow: hidden;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .prem-pay-wait-spinner { animation: none; }
   }
 }
 
