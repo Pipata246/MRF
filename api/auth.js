@@ -16,6 +16,7 @@ const {
 const {
   getTelegramBotUsername,
   getTelegramBotToken,
+  getTelegramBotId,
   TRIAL_DAYS
 } = require('../lib/telegram-auth');
 
@@ -26,9 +27,11 @@ async function loadProfile(sb, userId) {
 
 function telegramPublicConfig() {
   const botUsername = getTelegramBotUsername();
-  const botReady = !!(botUsername && getTelegramBotToken());
+  const botId = getTelegramBotId();
+  const botReady = !!(botUsername && getTelegramBotToken() && botId);
   return {
     botUsername: botReady ? botUsername : '',
+    botId: botReady ? botId : '',
     botReady,
     trialDays: TRIAL_DAYS
   };
@@ -48,6 +51,7 @@ module.exports = withHandler(async function auth(req, res) {
       apiSlotsUsed: 4,
       apiSlotsMax: 12,
       telegramBotUsername: tg.botUsername,
+      telegramBotId: tg.botId,
       telegramBotReady: tg.botReady,
       telegramTrialDays: tg.trialDays
     });

@@ -16,6 +16,7 @@ const {
 const {
   getTelegramBotUsername,
   getTelegramBotToken,
+  getTelegramBotId,
   verifyTelegramLogin,
   trialEndsAt,
   TRIAL_DAYS
@@ -340,7 +341,8 @@ module.exports = withHandler(async function me(req, res) {
 
   if (resource === 'telegram') {
     const botUsername = getTelegramBotUsername();
-    const botReady = !!(botUsername && getTelegramBotToken());
+    const botId = getTelegramBotId();
+    const botReady = !!(botUsername && getTelegramBotToken() && botId);
 
     if (req.method === 'GET') {
       const { data, error } = await sb.from('profiles').select('*').eq('id', uid).maybeSingle();
@@ -349,6 +351,7 @@ module.exports = withHandler(async function me(req, res) {
       return send(res, 200, {
         ok: true,
         botUsername: botReady ? botUsername : '',
+        botId: botReady ? botId : '',
         botReady,
         linked,
         telegramUsername: data?.telegram_username

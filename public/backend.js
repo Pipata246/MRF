@@ -478,6 +478,7 @@
     if (!cfg || typeof cfg !== 'object') return;
     MrfAuth.telegram = {
       botUsername: cfg.botUsername || '',
+      botId: cfg.botId || '',
       botReady: !!cfg.botReady,
       trialDays: Number(cfg.trialDays) || 14
     };
@@ -502,6 +503,7 @@
     if (!h || typeof h !== 'object') return;
     writeTelegramCache({
       botUsername: h.telegramBotUsername || '',
+      botId: h.telegramBotId || '',
       botReady: !!h.telegramBotReady,
       trialDays: h.telegramTrialDays || 14
     });

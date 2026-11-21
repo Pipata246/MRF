@@ -9795,13 +9795,13 @@ body.theme-light .prem-visual {
 .pf-tg-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
-.pf-tg-head {
+.pf-tg-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
 }
 .pf-tg-title {
   font-size: 14px;
@@ -9813,12 +9813,66 @@ body.theme-light .prem-visual {
   font-size: 13px;
   color: var(--text-2);
 }
-.pf-tg-trial {
-  margin-top: 6px;
-  font-size: 12px;
-  font-weight: 600;
+.pf-tg-card.is-linked .pf-tg-status {
   color: var(--accent);
+  font-weight: 600;
+}
+.pf-tg-bind {
+  flex-shrink: 0;
+  padding: 9px 16px;
+  font-size: 13px;
+  border-radius: 999px;
+}
+.pf-tg-offer {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+    var(--bg-3);
+}
+.pf-tg-offer-badge {
+  flex-shrink: 0;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #111;
+  background: var(--accent);
+  line-height: 1.2;
+}
+.pf-tg-offer-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.pf-tg-offer-text {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-2);
 }
 .pf-tg-widget {
-  min-height: 40px;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+@media (max-width: 900px) {
+  .pf-tg-row {
+    flex-wrap: wrap;
+  }
+  .pf-tg-bind {
+    width: 100%;
+  }
+  .pf-tg-offer {
+    flex-direction: column;
+    gap: 8px;
+  }
 }
