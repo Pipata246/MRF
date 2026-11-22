@@ -6524,15 +6524,15 @@ body.theme-light .color-swatch-custom.is-open {
   }
 
   /*
-   * ——— FROM HOME: album / artist / mix / playlist / … ———
-   * Do NOT touch home. Fixed header under glass (same Y as home search),
-   * back strictly under that header.
-   * Order: glass → header → back → content
+   * ——— FROM HOME / SEARCH: album / artist / mix / playlist / … ———
+   * Do NOT touch home. Fixed header under glass (same Y as home search).
+   * Back floats over content — no reserved black slab (+44px) under header.
+   * Order: glass → header → content (back overlays)
    */
   html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page):not(.is-search-page):not(.is-library-page):not(.is-liked-page) main.main-content,
   html[data-ui="mobile"][data-tg="1"] body.is-playlist-page main.main-content {
-    /* glass + header + back row */
-    padding-top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px) + 44px) !important;
+    /* glass + header only — back overlays content like home */
+    padding-top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-bar-h, 48px)) !important;
   }
   html[data-ui="mobile"][data-tg="1"] body.is-deep-page:not(.is-home-page):not(.is-search-page):not(.is-library-page):not(.is-liked-page) #topbar-root,
   html[data-ui="mobile"][data-tg="1"] body.is-playlist-page #topbar-root {
@@ -6655,10 +6655,10 @@ body.theme-light .color-swatch-custom.is-open {
     width: 40px !important;
     height: 40px !important;
   }
-  /* Results start under header; back floats over them */
+  /* Results flush under search; back floats over tabs (like home) */
   html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results .feed,
   html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results #search-results-section {
-    padding-top: 48px !important;
+    padding-top: 0 !important;
   }
   html[data-ui="mobile"][data-tg="1"] body.is-search-page.is-search-results.has-mobile-back .mobile-back-fab.is-on {
     top: calc(var(--mrf-tg-pad, 64px) + var(--mrf-tg-search-bar-h, 52px) + 10px) !important;
