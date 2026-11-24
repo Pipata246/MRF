@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MRF — Главная</title>
-  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
+  <title>NOVALIBER — Главная</title>
+  <link rel="icon" href="img/favicon.svg?v=5" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   /* Layout boot: large screens = PC, smaller = mobile shell */
@@ -31,7 +31,7 @@
       <div class="home-feature-glow" aria-hidden="true"></div>
       <img class="home-feature-cover" id="home-feature-cover" alt="" hidden/>
       <div class="home-feature-body">
-        <div class="home-feature-brand">MRF</div>
+        <div class="home-feature-brand">NOVALIBER</div>
         <p class="home-feature-kicker" id="home-feature-kicker">Сейчас на пике</p>
         <h1 class="home-feature-title" id="home-feature-title">Слушай то, что сейчас в тренде</h1>
         <p class="home-feature-sub" id="home-feature-sub">Трек недели подтянется автоматически</p>
@@ -65,21 +65,8 @@
 
       <section class="section">
         <div class="section-header">
-          <h3 class="section-title">Новые релизы</h3>
-          <div class="rail-nav" data-rail="new-releases-row"></div>
-        </div>
-        <div class="rail-wrap">
-          <div class="horiz-scroll" id="new-releases-row"></div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-header">
           <h3 class="section-title">Популярные исполнители</h3>
-          <div class="section-header-actions">
-            <a href="artists.html" class="section-link">Все →</a>
-            <div class="rail-nav" data-rail="home-artists-row"></div>
-          </div>
+          <div class="rail-nav" data-rail="home-artists-row"></div>
         </div>
         <div class="rail-wrap">
           <div class="home-artist-row" id="home-artists-row"></div>
@@ -107,10 +94,7 @@
         <section class="section">
           <div class="section-header">
             <h3 class="section-title">Недавно прослушанное</h3>
-            <div class="section-header-actions">
-              <a href="library.html" class="section-link">Вся библиотека →</a>
-              <div class="rail-nav" data-rail="recent-rail"></div>
-            </div>
+            <div class="rail-nav" data-rail="recent-rail"></div>
           </div>
           <div class="rail-wrap">
             <div class="recent-rail" id="recent-rail"></div>
@@ -120,10 +104,7 @@
         <section class="section" id="my-playlists-section" style="display:none">
           <div class="section-header">
             <h3 class="section-title">Мои плейлисты</h3>
-            <div class="section-header-actions">
-              <a href="library.html" class="section-link">Все плейлисты →</a>
-              <div class="rail-nav" data-rail="my-playlists-row"></div>
-            </div>
+            <div class="rail-nav" data-rail="my-playlists-row"></div>
           </div>
           <div class="rail-wrap">
             <div class="horiz-scroll" id="my-playlists-row"></div>
@@ -151,10 +132,6 @@
       <div class="home-footer-top">
         <div class="home-footer-brand">
           <div class="home-footer-logo" id="home-footer-logo" aria-hidden="true"></div>
-          <div class="home-footer-brand-text">
-            <div class="home-footer-name">MRF</div>
-            <div class="home-footer-tag">make russia free</div>
-          </div>
         </div>
         <nav class="home-footer-cols" aria-label="Ссылки">
           <div class="home-footer-col">
@@ -174,13 +151,13 @@
           </div>
           <div class="home-footer-col">
             <div class="home-footer-col-title">Premium</div>
-            <a href="premium.html">MRF Premium</a>
+            <a href="premium.html">NOVALIBER Premium</a>
             <button type="button" class="home-footer-btn" onclick="openPremiumCheckout()">Подробнее</button>
           </div>
         </nav>
       </div>
       <div class="home-footer-bottom">
-        <span>© <span id="home-footer-year">2026</span> MRF</span>
+        <span>© <span id="home-footer-year">2026</span> NOVALIBER</span>
       </div>
     </footer>
 
@@ -196,8 +173,8 @@
 <script>
 function syncHomeFooter() {
   const logo = document.getElementById('home-footer-logo');
-  if (logo && typeof mrfLogoSVG === 'function' && !logo.dataset.ready) {
-    logo.innerHTML = mrfLogoSVG(36);
+  if (logo && typeof novaliberLogoSVG === 'function' && !logo.dataset.ready) {
+    logo.innerHTML = novaliberLogoSVG(22);
     logo.dataset.ready = '1';
   }
   const y = document.getElementById('home-footer-year');
@@ -239,7 +216,6 @@ async function applyHomeWorldCache(cache) {
         : '';
     }
   }
-  if (cache.releases) await renderNewReleases(cache.releases);
   if (cache.artists) await renderHomeArtists(cache.artists);
   if (typeof syncPlayingRows === 'function') syncPlayingRows();
 }
@@ -260,14 +236,12 @@ async function loadHomePage() {
       }
       await Promise.all([
         renderHomeCharts(),
-        renderNewReleases(),
         renderHomeArtists()
       ]);
       window.__mrfHomeWorldCache = {
         localDay: day,
         ready: true,
         homeTracks: (_src['home'] || []).slice(),
-        releases: (window.__mrfHomeLastReleases || []).slice(),
         artists: (window.__mrfHomeLastArtists || []).slice()
       };
     })();
@@ -1395,19 +1369,6 @@ if (!window.__mrfRecsPaintBound) {
     }
     if (typeof mrfFlushPendingScroll === 'function') mrfFlushPendingScroll();
   });
-}
-
-async function renderNewReleases(cachedAlbums) {
-  const box = document.getElementById('new-releases-row');
-  if (!box) return;
-  const albums = Array.isArray(cachedAlbums) ? cachedAlbums : await dzArr('/chart/0/albums?limit=10');
-  window.__mrfHomeLastReleases = albums;
-  box.innerHTML = albums.map(a => `
-    <button type="button" class="cover-card" onclick="location.href='${mrfUrl('album',{id:a.id,title:a.title,artist:a.artist?.name||''})}'">
-      ${a.cover_medium ? `<img src="${a.cover_medium}" class="cover-card-art" alt="">` : `<span class="cover-card-art cover-card-fallback">${noteSVGShared()}</span>`}
-      <span class="cover-card-title">${escHtml(a.title)}</span>
-      <span class="cover-card-sub">${escHtml(a.artist?.name||'')}</span>
-    </button>`).join('');
 }
 
 async function renderHomeArtists(cachedArtists) {

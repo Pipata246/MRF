@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════
--- MRF — recently played + search history
+-- NOVALIBER — recently played + search history
 -- Run in Supabase SQL Editor once.
 -- ═══════════════════════════════════════════════════════════
 

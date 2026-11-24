@@ -330,7 +330,7 @@ module.exports = withHandler(async function billing(req, res) {
     try {
       yoo = await createYooPayment({
         amountValue: plan.amountValue,
-        description: `MRF Premium — ${plan.title}`,
+        description: `NOVALIBER Premium — ${plan.title}`,
         returnUrl: `${origin}/premium.html?paid=1&pid=${encodeURIComponent(localId)}`,
         idempotenceKey: localId,
         metadata: {

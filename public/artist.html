@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Артист — MRF</title>
-  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
+  <title>Артист — NOVALIBER</title>
+  <link rel="icon" href="img/favicon.svg?v=5" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   /* Layout boot: large screens = PC, smaller = mobile shell */
@@ -218,7 +218,7 @@ async function loadArtistPage(forced) {
   _artistPageTab = 'tracks';
   _artistTracksExpanded = false;
 
-  document.title = aName + ' — MRF';
+  document.title = aName + ' — NOVALIBER';
   const isFollowing = Store.isFollowing(id);
   const feed = liveFeed();
   if (!feed || !stillHere()) return;
@@ -400,7 +400,7 @@ function renderArtistTab() {
         <article class="artist-about-card">
           <h3 class="artist-about-title">Об исполнителе</h3>
           <p class="artist-about-text">
-            ${escHtml(_artistPageName)} — исполнитель в каталоге MRF.
+            ${escHtml(_artistPageName)} — исполнитель в каталоге NOVALIBER.
             Здесь собраны популярные треки, релизы и похожие артисты.
           </p>
           <dl class="artist-about-stats">

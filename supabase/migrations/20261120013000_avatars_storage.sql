@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════
--- MRF — avatars storage bucket (public read, owner write)
+-- NOVALIBER — avatars storage bucket (public read, owner write)
 -- Run in Supabase SQL Editor once.
 -- ═══════════════════════════════════════════════════════════
 

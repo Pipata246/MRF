@@ -1,5 +1,5 @@
 /* =====================================================
-   MRF — soft-nav.js
+   NOVALIBER — soft-nav.js
    In-app navigation without full reload so Audio keeps playing.
    ===================================================== */
 (function () {
@@ -358,7 +358,7 @@
 
     for (const src of externals) {
       try { await loadScriptOnce(src); }
-      catch (e) { console.warn('[MRF soft-nav] script', e); }
+      catch (e) { console.warn('[NOVALIBER soft-nav] script', e); }
     }
 
     // Inline page scripts (charts/artist/album/…) — whenDomReady runs immediately
@@ -609,7 +609,7 @@
       if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
       updateChromeNavButtons();
     } catch (err) {
-      console.warn('[MRF soft-nav] fallback hard nav', err);
+      console.warn('[NOVALIBER soft-nav] fallback hard nav', err);
       window.__mrfSoftNavigating = false;
       busy = false;
       pendingNav = null;
@@ -736,7 +736,7 @@
         });
       }
     } catch (e) {
-      console.warn('[MRF soft-nav] href patch skipped', e);
+      console.warn('[NOVALIBER soft-nav] href patch skipped', e);
     }
   }
 

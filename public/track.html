@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Трек — MRF</title>
-  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
+  <title>Трек — NOVALIBER</title>
+  <link rel="icon" href="img/favicon.svg?v=5" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   /* Layout boot: large screens = PC, smaller = mobile shell */
@@ -71,7 +71,7 @@ async function loadTrackPage() {
     return;
   }
 
-  document.title = (t.title || 'Трек') + ' — MRF';
+  document.title = (t.title || 'Трек') + ' — NOVALIBER';
   _src['track_page'] = [t];
   const cover = t.album?.cover_xl || t.album?.cover_medium || t.cover || '';
   const artist = t.artist?.name || '';

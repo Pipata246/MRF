@@ -1,7 +1,7 @@
 {
-  "name": "mrf-music",
+  "name": "novaliber-music",
   "version": "1.0.0",
-  "description": "MRF — Music Streaming",
+  "description": "NOVALIBER — Music Streaming",
   "private": true,
   "scripts": {
     "dev": "node scripts/dev-server.js",

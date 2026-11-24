@@ -1,4 +1,4 @@
-/* MRF — search-page.js (external to avoid let collisions with app.js) */
+/* NOVALIBER — search-page.js (external to avoid let collisions with app.js) */
 var _searchPageTimer = null;
 var _searchPageResults = { tracks: [], artists: [], albums: [], playlists: [], accounts: [] };
 

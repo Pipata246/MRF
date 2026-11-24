@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Профиль — MRF</title>
-  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
+  <title>Профиль — NOVALIBER</title>
+  <link rel="icon" href="img/favicon.svg?v=5" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   /* Layout boot: large screens = PC, smaller = mobile shell */
@@ -120,7 +120,7 @@
           <div class="pf-plan-top">
             <div class="pf-plan-ico" aria-hidden="true" id="pf-plan-ico"></div>
             <div class="pf-plan-meta">
-              <div class="pf-plan-title">MRF Premium</div>
+              <div class="pf-plan-title">NOVALIBER Premium</div>
               <div class="pf-sub-status" id="pf-sub-status">Нет</div>
               <div class="pf-sub-until" id="pf-sub-until" hidden></div>
             </div>
@@ -258,7 +258,7 @@
         <h3>О приложении</h3>
         <div class="settings-row">
           <div class="settings-row-info">
-            <div class="settings-row-label">MRF</div>
+            <div class="settings-row-label">NOVALIBER</div>
           </div>
           <span class="pf-version">v2.0.0</span>
         </div>
@@ -685,13 +685,14 @@ function formatPremiumUntil(iso) {
 
 function ensurePlanIcon() {
   const host = document.getElementById('pf-plan-ico');
-  if (!host || host.dataset.ready === '1') return;
-  if (typeof mrfLogoMarkInner === 'function') {
-    host.innerHTML = `<svg class="pf-plan-ico-svg" viewBox="0 0 1000 1000" width="34" height="34" aria-hidden="true" fill="currentColor" xmlns="http://www.w3.org/2000/svg">${mrfLogoMarkInner()}</svg>`;
-  } else {
-    host.innerHTML = `<svg class="pf-plan-ico-svg" viewBox="0 0 48 24" width="34" height="18" aria-hidden="true" fill="currentColor"><rect x="2" y="8" width="6" height="10" rx="3"/><rect x="12" y="4" width="6" height="18" rx="3"/><rect x="22" y="1" width="6" height="22" rx="3"/><rect x="32" y="4" width="6" height="18" rx="3"/><rect x="42" y="8" width="6" height="10" rx="3"/></svg>`;
+  if (!host) return;
+  if (typeof novaliberMarkSVG === 'function') {
+    host.innerHTML = novaliberMarkSVG(28).replace('class="logo-img logo-img--mark"', 'class="pf-plan-ico-svg logo-img logo-img--mark"');
+    host.dataset.ready = '1';
+  } else if (typeof novaliberLogoSVG === 'function') {
+    host.innerHTML = novaliberLogoSVG(18);
+    host.dataset.ready = '1';
   }
-  host.dataset.ready = '1';
 }
 
 function syncPremiumBlock(premium, planLabel, endsAt) {

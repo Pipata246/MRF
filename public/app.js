@@ -1,5 +1,5 @@
 /* =====================================================
-   MRF — Music Streaming
+   NOVALIBER — Music Streaming
    API:   Deezer JSONP  (каталог / превью) + /api (auth / library / recs)
    Audio: HTML5 Audio   (30-сек превью Deezer)
    DB:    Supabase via /api
@@ -2208,7 +2208,7 @@ function updateNavBtns() {
 ══════════════════════════════════ */
 function showNotification(msg){
   if (typeof showNotif === 'function') return showNotif(msg, 1400);
-  console.log('[MRF]', msg);
+  console.log('[NOVALIBER]', msg);
 }
 
 /* ══════════════════════════════════
@@ -2424,7 +2424,6 @@ function renderHomeSections() {
   renderRecentGrid();
   renderMoodGrid();
   renderRecommendations();
-  renderNewReleases();
 }
 
 function renderRecentGrid() {
@@ -2484,19 +2483,6 @@ function renderRecommendations() {
         : `<div class="horiz-card-cover-placeholder">${noteSVG()}</div>`}
       <div class="horiz-card-title">${esc(t.title)}</div>
       <div class="horiz-card-sub">${esc(t.artist.name)}</div>
-    </div>`).join('');
-}
-
-function renderNewReleases() {
-  const box = el('new-releases-row'); if (!box) return;
-  // BACKEND TODO: Получение новых релизов
-  box.innerHTML = MOCK.newReleases.map(r => `
-    <div class="horiz-card" onclick="searchByTag('${esc(r.artist)}')">
-      ${r.cover
-        ? `<img src="${r.cover}" class="horiz-card-cover" alt="" loading="lazy">`
-        : `<div class="horiz-card-cover-placeholder">${noteSVG()}</div>`}
-      <div class="horiz-card-title">${esc(r.title)}</div>
-      <div class="horiz-card-sub">${esc(r.artist)}</div>
     </div>`).join('');
 }
 

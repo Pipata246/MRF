@@ -1,5 +1,5 @@
 /* =====================================================
-   MRF — frontend bridge to /api/* only (no Supabase in browser)
+   NOVALIBER — frontend bridge to /api/* only (no Supabase in browser)
    ===================================================== */
 (function () {
   'use strict';
@@ -158,7 +158,7 @@
         if (typeof MOCK !== 'undefined') MOCK.searchHistory = history.items;
       }
     } catch (e) {
-      console.warn('[MRF] pullLibrary', e.message);
+      console.warn('[NOVALIBER] pullLibrary', e.message);
     } finally {
       MrfCloud._quiet = false;
     }
@@ -209,7 +209,7 @@
           await api('/api/me?resource=profile', { method: 'PATCH', body });
         }
       } catch (e) {
-        console.warn('[MRF] cloud push', e.message);
+        console.warn('[NOVALIBER] cloud push', e.message);
       }
     }, 400);
   }
@@ -327,7 +327,7 @@
         try { Store.savePlaylist(data.item); } finally { MrfCloud._quiet = false; }
       }
     }).catch((e) => {
-      console.warn('[MRF] saved playlist sync', e.message);
+      console.warn('[NOVALIBER] saved playlist sync', e.message);
     });
   }
 

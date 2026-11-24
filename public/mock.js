@@ -1,5 +1,5 @@
 /* =====================================================
-   MRF — Mock Data v2
+   NOVALIBER — Mock Data v2
    BACKEND TODO: Заменить все данные на реальные API-запросы
    ===================================================== */
 
@@ -437,7 +437,7 @@ const Store = {
     try {
       localStorage.setItem(this.keys.history, JSON.stringify(arr));
     } catch (e) {
-      console.warn('[MRF] history save failed', e);
+      console.warn('[NOVALIBER] history save failed', e);
     }
   },
   clearHistory()  { this._set(this.keys.history, []); },
@@ -463,7 +463,7 @@ const Store = {
     try {
       localStorage.setItem(this.keys.history, JSON.stringify(kept.slice(0, 12)));
     } catch (e) {
-      console.warn('[MRF] history prune failed', e);
+      console.warn('[NOVALIBER] history prune failed', e);
     }
     return kept;
   },

@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════
--- MRF — Supabase schema (Auth + user library)
+-- NOVALIBER — Supabase schema (Auth + user library)
 -- Run in Supabase SQL Editor once per project.
 -- Security: RLS on every table. No public writes without auth.
 -- ═══════════════════════════════════════════════════════════

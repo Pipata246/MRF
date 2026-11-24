@@ -1,11 +1,11 @@
-# MRF — Make Russia Free
+# NOVALIBER
 
 Музыкальный стриминговый сервис на чистом HTML, CSS и Vanilla JavaScript.
 
 ## Структура проекта
 
 ```
-MRF/
+novaliber/
 ├── public/
 │   ├── index.html          # Главная страница
 │   ├── search.html         # Поиск
@@ -171,4 +171,4 @@ vercel deploy
 
 ## Лицензия
 
-© 2024 MRF — Make Russia Free
+© 2024 NOVALIBER — NOVALIBER

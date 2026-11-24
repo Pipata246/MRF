@@ -1,5 +1,5 @@
 /* =====================================================
-   MRF — shared.js
+   NOVALIBER — shared.js
    Общие компоненты: sidebar, player, right panel
    Инжектируются на каждую страницу
    ===================================================== */
@@ -89,115 +89,6 @@ window.addEventListener('orientationchange', () => {
 });
 
 /* ══════════════════════════════════
-   TELEGRAM MINI APP — glass top inset (mobile only)
-   Empty frosted strip under TG Close/More so search isn’t covered.
-══════════════════════════════════ */
-(function initMrfTelegramChrome() {
-  const FLAG = 'mrf_in_tma';
-  const root = document.documentElement;
-
-  function markTg() {
-    root.setAttribute('data-tg', '1');
-  }
-
-  function setGlassTop(px) {
-    const n = Math.max(0, Math.round(Number(px) || 0));
-    // One pad for glass + every page chrome / back button
-    root.style.setProperty('--mrf-tg-pad', n + 'px');
-    root.style.setProperty('--mrf-tg-glass-top', n + 'px');
-  }
-
-  function applyInsets(tg) {
-    if (!tg) return;
-    try {
-      if (tg.initData) sessionStorage.setItem(FLAG, '1');
-    } catch (_) {}
-    markTg();
-
-    try {
-      const meta = document.querySelector('meta[name="viewport"]');
-      if (meta && meta.content && !/viewport-fit/i.test(meta.content)) {
-        meta.content = meta.content.replace(/\s+$/, '') + ', viewport-fit=cover';
-      }
-    } catch (_) {}
-
-    const sa = tg.safeAreaInset || {};
-    const csa = tg.contentSafeAreaInset || {};
-    let saTop = Number(sa.top) || 0;
-    let csaTop = Number(csa.top) || 0;
-
-    // Prefer CSS vars Telegram injects when available
-    try {
-      const cs = getComputedStyle(root);
-      const vSafe = parseFloat(cs.getPropertyValue('--tg-safe-area-inset-top')) || 0;
-      const vContent = parseFloat(cs.getPropertyValue('--tg-content-safe-area-inset-top')) || 0;
-      if (vSafe > saTop) saTop = vSafe;
-      if (vContent > csaTop) csaTop = vContent;
-    } catch (_) {}
-
-    // Real TG chrome only — do NOT inflate (was forcing 100px → huge empty header)
-    let top = saTop + csaTop;
-    if (csaTop < 8) top = saTop + 48;
-    if (top < 52) top = 56;
-    if (top > 120) top = 120;
-
-    setGlassTop(top);
-  }
-
-  function boot(tg) {
-    try { tg.ready(); } catch (_) {}
-    try { tg.expand(); } catch (_) {}
-    try {
-      if (typeof tg.requestFullscreen === 'function') tg.requestFullscreen();
-    } catch (_) {}
-    applyInsets(tg);
-    try {
-      tg.onEvent('safeAreaChanged', () => applyInsets(tg));
-      tg.onEvent('contentSafeAreaChanged', () => applyInsets(tg));
-      tg.onEvent('fullscreenChanged', () => applyInsets(tg));
-      tg.onEvent('viewportChanged', () => applyInsets(tg));
-    } catch (_) {}
-  }
-
-  function loadTgScript() {
-    if (window.Telegram && window.Telegram.WebApp) {
-      boot(window.Telegram.WebApp);
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = 'https://telegram.org/js/telegram-web-app.js';
-    s.async = true;
-    s.onload = () => {
-      if (window.Telegram && window.Telegram.WebApp) boot(window.Telegram.WebApp);
-      else {
-        markTg();
-        setGlassTop(64);
-      }
-    };
-    s.onerror = () => {
-      markTg();
-      setGlassTop(64);
-    };
-    document.head.appendChild(s);
-  }
-
-  let likely = false;
-  try {
-    likely = sessionStorage.getItem(FLAG) === '1'
-      || /Telegram/i.test(navigator.userAgent || '')
-      || !!(window.TelegramWebviewProxy);
-  } catch (_) {
-    likely = /Telegram/i.test(navigator.userAgent || '');
-  }
-
-  if (!likely) return;
-
-  markTg();
-  setGlassTop(64);
-  loadTgScript();
-})();
-
-/* ══════════════════════════════════
    ОПРЕДЕЛЕНИЕ ТЕКУЩЕЙ СТРАНИЦЫ
 ══════════════════════════════════ */
 function getPageId(href) {
@@ -212,39 +103,39 @@ function getPageId(href) {
 const PAGE = getPageId();
 window.getPageId = getPageId;
 
-/** Shared MRF mark geometry (vector wordmark — no system fonts). */
-function mrfLogoMarkInner(opts = {}) {
-  const ringClass = opts.ringClass ? ` class="${opts.ringClass}"` : '';
-  const barsClass = opts.barsClass ? ` class="${opts.barsClass}"` : '';
-  const barClass = opts.barClass || '';
+/**
+ * NOVALIBER logos — wordmark format (no circle / equalizer).
+ * - wordmark: full «NOVALIBER» (sidebar, boot, premium, footer)
+ * - mark: compact «N» path (collapsed, fab, plan icon) — no webfont dependency
+ */
+function novaliberLogoWordmarkInner(opts = {}) {
   const wordClass = opts.wordClass ? ` class="${opts.wordClass}"` : '';
-  const bar = (i, x, y, h) => {
-    const cls = barClass ? ` class="${barClass}" style="--i:${i}"` : '';
-    return `<rect${cls} x="${x}" y="${y}" width="48" height="${h}" rx="24"/>`;
-  };
-  return `
-    <circle${ringClass} cx="500" cy="500" r="458" fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
-    <g transform="translate(500 500) scale(0.9) translate(-500 -505)">
-      <g${barsClass} fill="currentColor">
-        ${bar(0, 310, 292, 156)}
-        ${bar(1, 394, 236, 212)}
-        ${bar(2, 478, 172, 276)}
-        ${bar(3, 562, 236, 212)}
-        ${bar(4, 646, 292, 156)}
-      </g>
-      <g${wordClass} fill="currentColor">
-        <path d="M240 722V538h46l34 100 34-100h46v184h-42V592l-20 64h-36l-20-64v130h-42z"/>
-        <path fill-rule="evenodd" d="M448 538h78c46 0 72 24 72 62 0 34-22 56-58 62l56 70h-50l-50-64h-14v64h-44V538zm44 40v50h36c20 0 32-10 32-25s-12-25-32-25h-36z"/>
-        <path d="M620 722V538h118v40H664v46h86v40H664v58H620z"/>
-      </g>
-    </g>`;
+  return `<text${wordClass} x="500" y="118" text-anchor="middle" font-family="Nunito, Arial, Helvetica, sans-serif" font-weight="800" font-size="128" letter-spacing="8" textLength="920" lengthAdjust="spacingAndGlyphs" fill="currentColor">NOVALIBER</text>`;
 }
 
-/** Inline MRF mark — uses currentColor / --accent */
-function mrfLogoSVG(size = 52) {
-  const s = Number(size) || 52;
-  return `<svg class="logo-img" viewBox="0 0 1000 1000" width="${s}" height="${s}" role="img" aria-label="MRF" fill="currentColor" xmlns="http://www.w3.org/2000/svg">${mrfLogoMarkInner()}</svg>`;
+function novaliberLogoMarkInner(opts = {}) {
+  const wordClass = opts.wordClass ? ` class="${opts.wordClass}"` : '';
+  const n = '\u004E'; /* Latin capital N only */
+  return `<text${wordClass} x="50" y="68" text-anchor="middle" font-family="Nunito, Arial, Helvetica, sans-serif" font-weight="800" font-size="64" fill="currentColor">${n}</text>`;
 }
+
+function novaliberLogoSVG(height = 28) {
+  const h = Number(height) || 28;
+  const w = Math.round(h * (1000 / 160));
+  return `<svg class="logo-img logo-img--word" viewBox="0 0 1000 160" width="${w}" height="${h}" role="img" aria-label="NOVALIBER" fill="currentColor" xmlns="http://www.w3.org/2000/svg">${novaliberLogoWordmarkInner()}</svg>`;
+}
+
+function novaliberMarkSVG(size = 36) {
+  const s = Number(size) || 36;
+  return `<svg class="logo-img logo-img--mark" viewBox="0 0 100 100" width="${s}" height="${s}" role="img" aria-label="NOVALIBER" fill="currentColor" xmlns="http://www.w3.org/2000/svg">${novaliberLogoMarkInner()}</svg>`;
+}
+
+function mrfLogoMarkInner(opts) { return novaliberLogoMarkInner(opts); }
+function mrfLogoSVG(size) { return novaliberLogoSVG(size); }
+window.novaliberLogoSVG = novaliberLogoSVG;
+window.novaliberMarkSVG = novaliberMarkSVG;
+window.novaliberLogoMarkInner = novaliberLogoMarkInner;
+window.novaliberLogoWordmarkInner = novaliberLogoWordmarkInner;
 window.mrfLogoSVG = mrfLogoSVG;
 window.mrfLogoMarkInner = mrfLogoMarkInner;
 
@@ -269,6 +160,10 @@ function injectSidebar() {
     ensureSidebarPlaylistsBox();
     renderSidebarPlaylists();
     if (typeof updateFavBadge === 'function') updateFavBadge();
+    const markHost = root.querySelector('.sidebar-expand-mark');
+    if (markHost && typeof novaliberMarkSVG === 'function') {
+      markHost.innerHTML = novaliberMarkSVG(28);
+    }
     return;
   }
 
@@ -293,8 +188,7 @@ function injectSidebar() {
   root.innerHTML = `
     <aside class="sidebar" id="sidebar">
       <div class="logo" id="sidebar-logo" onclick="(window.mrfGo||function(u){location.href=u})('index.html')" style="cursor:pointer">
-        ${mrfLogoSVG(52)}
-        <span class="logo-brand">make russia free</span>
+        ${novaliberLogoSVG(26)}
         <button class="sidebar-collapse-btn" onclick="event.stopPropagation();toggleSidebar()" title="Свернуть">
           <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
             <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/>
@@ -304,12 +198,15 @@ function injectSidebar() {
         </button>
       </div>
       <div class="logo-collapsed hidden" id="logo-collapsed">
-        <button class="sidebar-expand-btn" onclick="toggleSidebar()" title="Развернуть">
-          <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-            <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/>
-            <path d="M9 3v18" stroke="currentColor" stroke-width="1.8"/>
-            <path d="M12 9l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+        <button class="sidebar-expand-btn" onclick="toggleSidebar()" title="Развернуть" aria-label="Развернуть меню">
+          <span class="sidebar-expand-mark" aria-hidden="true">${novaliberMarkSVG(28)}</span>
+          <span class="sidebar-expand-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+              <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M9 3v18" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M12 15l3-3-3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
         </button>
       </div>
 
@@ -1338,7 +1235,7 @@ window.updateMobileNavActive = updateMobileNavActive;
    ИНИЦИАЛИЗАЦИЯ SHARED
 ══════════════════════════════════ */
 function initShared() {
-  console.log('[MRF] initShared started');
+  console.log('[NOVALIBER] initShared started');
   const coldBoot = !window.__mrfSharedInited;
   window.__mrfSharedInited = true;
   if (coldBoot) {
@@ -1389,7 +1286,7 @@ function initShared() {
 
   try { syncMrfPremFab(); } catch (_) {}
   try { syncPrisonPlayerUi(); } catch (_) {}
-  console.log('[MRF] initShared completed');
+  console.log('[NOVALIBER] initShared completed');
   if (coldBoot) hidePageBootWhenAuthReady();
 }
 
@@ -1595,10 +1492,10 @@ function syncMrfPremFab() {
     if (fab) fab.hidden = true;
     return;
   }
-  const markHTML = `<svg class="mrf-prem-fab-mark" viewBox="0 0 1000 1000" width="40" height="40" aria-hidden="true" fill="currentColor" xmlns="http://www.w3.org/2000/svg">${mrfLogoMarkInner()}</svg>
+  const markHTML = `${novaliberMarkSVG(28).replace('class="logo-img logo-img--mark"', 'class="mrf-prem-fab-mark logo-img logo-img--mark"')}
     <span class="mrf-prem-fab-tag">Prem</span>
     <span class="mrf-prem-fab-copy">
-      <span class="mrf-prem-fab-kicker">MRF</span>
+      <span class="mrf-prem-fab-kicker">NOVALIBER</span>
       <span class="mrf-prem-fab-title">Premium</span>
     </span>`;
   if (!fab) {
@@ -1606,7 +1503,7 @@ function syncMrfPremFab() {
     fab.type = 'button';
     fab.id = 'mrf-prem-fab';
     fab.className = 'mrf-prem-fab';
-    fab.setAttribute('aria-label', 'MRF Premium');
+    fab.setAttribute('aria-label', 'NOVALIBER Premium');
     fab.innerHTML = markHTML;
     fab.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1852,19 +1749,17 @@ function loaderHTMLShared(msg) {
   return `<div class="loading-placeholder">${mrfBallSpinHTML()}${label}</div>`;
 }
 
-/** Boot logo — assemble + calm progress (PC + mobile). */
-function mrfBootLogoHTML(size = 112) {
-  const s = Number(size) || 112;
+/** Boot logo — wordmark + calm progress (PC + mobile). */
+function mrfBootLogoHTML(height = 42) {
+  const h = Number(height) || 42;
+  const w = Math.round(h * (1000 / 160));
   return `<div class="page-boot-inner" role="status" aria-live="polite" aria-label="Загрузка">
     <div class="page-boot-mark">
-      <svg class="page-boot-logo" viewBox="0 0 1000 1000" width="${s}" height="${s}" role="img" aria-label="MRF" fill="currentColor" xmlns="http://www.w3.org/2000/svg">${mrfLogoMarkInner({
-        ringClass: 'page-boot-ring',
-        barsClass: 'page-boot-bars',
-        barClass: 'page-boot-bar',
+      <svg class="page-boot-logo" viewBox="0 0 1000 160" width="${w}" height="${h}" role="img" aria-label="NOVALIBER" fill="currentColor" xmlns="http://www.w3.org/2000/svg">${novaliberLogoWordmarkInner({
         wordClass: 'page-boot-word'
       })}</svg>
+      <div class="page-boot-progress" aria-hidden="true"><span></span></div>
     </div>
-    <div class="page-boot-progress" aria-hidden="true"><span></span></div>
     <p class="page-boot-hint" id="page-boot-hint" hidden></p>
   </div>`;
 }
@@ -1874,7 +1769,7 @@ function pageBootInnerHTML() {
   const desktop = typeof isDesktopLayout === 'function'
     ? isDesktopLayout()
     : window.matchMedia('(min-width: 901px)').matches;
-  return mrfBootLogoHTML(desktop ? 128 : 104);
+  return mrfBootLogoHTML(desktop ? 48 : 36);
 }
 
 function syncBootAccentFromSettings() {
@@ -2158,7 +2053,7 @@ function hidePageBootWhenAuthReady() {
         ]);
       }
     } catch (e) {
-      console.warn('[MRF] boot recs', e);
+      console.warn('[NOVALIBER] boot recs', e);
     }
     if (typeof updateTopbarAvatar === 'function') updateTopbarAvatar();
     hidePageBoot();

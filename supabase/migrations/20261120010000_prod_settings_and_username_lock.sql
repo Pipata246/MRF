@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════
--- MRF migration — prod settings + immutable username
+-- NOVALIBER migration — prod settings + immutable username
 -- Run in Supabase SQL Editor (once).
 -- Safe to re-run (IF NOT EXISTS / OR REPLACE).
 -- ═══════════════════════════════════════════════════════════

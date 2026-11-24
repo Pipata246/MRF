@@ -104,5 +104,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(port, () => {
   const n = Object.keys(API).length;
-  console.log(`[MRF] http://127.0.0.1:${port}  (API ${n}/12)`);
+  console.log(`[NOVALIBER] http://127.0.0.1:${port}  (API ${n}/12)`);
 });

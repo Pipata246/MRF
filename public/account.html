@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Аккаунт — MRF</title>
-  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
+  <title>Аккаунт — NOVALIBER</title>
+  <link rel="icon" href="img/favicon.svg?v=5" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   (function () {
@@ -104,7 +104,7 @@ async function loadAccountPage(forcedUser) {
     return;
   }
 
-  document.title = (data.profile.name || accountHandleOf(data.profile.username)) + ' — MRF';
+  document.title = (data.profile.name || accountHandleOf(data.profile.username)) + ' — NOVALIBER';
   renderAccountHero(hero, data.profile, {
     isSelf: false,
     library: data,

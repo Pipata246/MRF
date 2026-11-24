@@ -3,11 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MRF Premium</title>
-  <link rel="icon" href="img/favicon.svg?v=3" type="image/svg+xml" sizes="any"/>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet"/>
+  <title>NOVALIBER Premium</title>
+  <link rel="icon" href="img/favicon.svg?v=5" type="image/svg+xml" sizes="any"/>
   <link rel="stylesheet" href="style.css"/>
   <script>
   (function () {
@@ -46,7 +43,7 @@
     <section class="prem-hero" aria-labelledby="prem-hero-title">
       <div class="prem-hero-glow" aria-hidden="true"></div>
       <div class="prem-hero-mark" aria-hidden="true" id="prem-hero-logo"></div>
-      <p class="prem-kicker">MRF Premium</p>
+      <p class="prem-kicker">NOVALIBER Premium</p>
       <h1 class="prem-hero-title" id="prem-hero-title">Слушай как хочешь</h1>
       <p class="prem-hero-lead">Free — можно. Premium — без наручников: любой трек, любой порядок, свой стиль.</p>
       <div class="prem-hero-cta" id="prem-hero-cta"></div>
@@ -272,8 +269,8 @@ function bindPremiumCheckoutButtons() {
 
 function renderPremiumPage() {
   const logo = document.getElementById('prem-hero-logo');
-  if (logo && typeof mrfLogoSVG === 'function') {
-    logo.innerHTML = mrfLogoSVG(88);
+  if (logo && typeof novaliberLogoSVG === 'function') {
+    logo.innerHTML = novaliberLogoSVG(44);
   }
   const on = typeof mrfUserHasPremium === 'function' && mrfUserHasPremium();
   const ctaHtml = on

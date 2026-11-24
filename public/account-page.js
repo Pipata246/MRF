@@ -1,4 +1,4 @@
-/* MRF — public account page helpers (search + profile + account.html) */
+/* NOVALIBER — public account page helpers (search + profile + account.html) */
 
 function accountUsernameOf(raw) {
   if (window.MrfAuth?.normalizeUsername) return MrfAuth.normalizeUsername(raw);
