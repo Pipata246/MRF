@@ -292,17 +292,34 @@ module.exports = withHandler(async function me(req, res) {
     if (!m) return send(res, 400, { ok: false, error: 'Нужно изображение JPEG/PNG/WebP' });
     const mime = m[1];
     const buf = Buffer.from(m[2].replace(/\s+/g, ''), 'base64');
-    if (!buf.length || buf.length > 2 * 1024 * 1024) {
-      return send(res, 400, { ok: false, error: 'Файл слишком большой (макс. 2 МБ)' });
+    // Client sends prepared squares (profile ~1024 + optional chrome ~256)
+    if (!buf.length || buf.length > 3 * 1024 * 1024) {
+      return send(res, 400, { ok: false, error: 'Файл слишком большой' });
     }
     const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
     const path = `${uid}/avatar.${ext}`;
     const up = await sb.storage.from('avatars').upload(path, buf, {
       contentType: mime,
       upsert: true,
-      cacheControl: '3600'
+      cacheControl: '86400'
     });
     if (up.error) return send(res, 400, { ok: false, error: up.error.message || 'Не удалось загрузить фото' });
+
+    const rawSm = String(body.imageSm || body.dataUrlSm || '');
+    const mSm = rawSm.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/);
+    if (mSm) {
+      const mimeSm = mSm[1];
+      const bufSm = Buffer.from(mSm[2].replace(/\s+/g, ''), 'base64');
+      if (bufSm.length && bufSm.length <= 1024 * 1024) {
+        const extSm = mimeSm === 'image/png' ? 'png' : mimeSm === 'image/webp' ? 'webp' : 'jpg';
+        await sb.storage.from('avatars').upload(`${uid}/avatar_sm.${extSm}`, bufSm, {
+          contentType: mimeSm,
+          upsert: true,
+          cacheControl: '86400'
+        });
+      }
+    }
+
     const pub = sb.storage.from('avatars').getPublicUrl(path);
     const avatarUrl = `${pub?.data?.publicUrl || ''}?v=${Date.now()}`;
     const { data, error } = await sb

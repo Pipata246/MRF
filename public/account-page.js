@@ -63,7 +63,7 @@ function accountAvatarHTML(profile, sizeClass) {
   const letter = escHtml(String(name).replace(/^@+/, '')[0] || '?').toUpperCase();
   const cls = sizeClass || '';
   if (profile?.avatar) {
-    return `<div class="profile-avatar ${cls}"><img src="${escHtml(profile.avatar)}" alt=""></div>`;
+    return `<div class="profile-avatar ${cls}"><img src="${escHtml(profile.avatar)}" alt="" decoding="async"></div>`;
   }
   return `<div class="profile-avatar ${cls}">${letter}</div>`;
 }

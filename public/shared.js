@@ -324,7 +324,7 @@ function injectTopbar() {
   const profile = Store.getProfile();
   const initials = (profile.name || 'П')[0].toUpperCase();
   const avatarInner = profile.avatar
-    ? `<img src="${profile.avatar}" alt="">`
+    ? `<img src="${profile.avatar}" alt="" decoding="async">`
     : initials;
 
   root.innerHTML = `
@@ -409,6 +409,14 @@ function mobileGoBack() {
       return;
     }
   }
+  /* Profile settings: back = close edit (same as old «Закрыть») */
+  if (typeof getPageId === 'function' && getPageId() === 'profile'
+    && typeof isProfileEditMode === 'function' && isProfileEditMode()
+    && typeof setProfileEditMode === 'function') {
+    setProfileEditMode(false);
+    updateMobileBackFab();
+    return;
+  }
   const hist = window.__mrfSoftHist;
   if (hist && hist.index > 0 && typeof mrfHistoryBack === 'function') {
     mrfHistoryBack();
@@ -484,12 +492,14 @@ function updateTopbarAvatar() {
   const title = logged ? (profile.name || 'Профиль') : 'Профиль';
   const fill = (el) => {
     if (!el) return;
-    if (avatar) el.innerHTML = `<img src="${avatar}" alt="">`;
-    else {
+    el.title = title;
+    if (avatar) {
+      const src = typeof escHtml === 'function' ? escHtml(avatar) : String(avatar);
+      el.innerHTML = `<img src="${src}" alt="" decoding="async">`;
+    } else {
       el.innerHTML = '';
       el.textContent = letter || 'П';
     }
-    el.title = title;
   };
   fill(document.getElementById('topbar-avatar'));
   fill(document.getElementById('search-mobile-avatar'));
@@ -1813,7 +1823,6 @@ function schedulePageBootSlowHint() {
       hint.textContent = msg;
       requestAnimationFrame(() => hint.classList.add('is-show'));
     }
-    if (typeof showNotif === 'function') showNotif(msg, 4200);
   }, 10000);
 }
 
@@ -2070,6 +2079,56 @@ function hidePageBootWhenAuthReady() {
 }
 window.hidePageBootWhenAuthReady = hidePageBootWhenAuthReady;
 
+/** Square high-quality avatar for upload (profile 1024 / chrome 256). */
+async function prepareAvatarDataUrl(file, size = 1024) {
+  const out = Math.max(128, Math.min(1536, Number(size) || 1024));
+  let bmp = null;
+  try {
+    if (typeof createImageBitmap === 'function') {
+      bmp = await createImageBitmap(file);
+    }
+  } catch (_) {}
+  if (!bmp) {
+    const url = URL.createObjectURL(file);
+    try {
+      bmp = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('bad image'));
+        img.src = url;
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+  const iw = bmp.width || bmp.naturalWidth || 0;
+  const ih = bmp.height || bmp.naturalHeight || 0;
+  if (!iw || !ih) throw new Error('bad image');
+  const side = Math.min(iw, ih);
+  const sx = Math.floor((iw - side) / 2);
+  const sy = Math.floor((ih - side) / 2);
+  const canvas = document.createElement('canvas');
+  canvas.width = out;
+  canvas.height = out;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bmp, sx, sy, side, side, 0, 0, out, out);
+  if (typeof bmp.close === 'function') {
+    try { bmp.close(); } catch (_) {}
+  }
+  let dataUrl = '';
+  try {
+    dataUrl = canvas.toDataURL('image/webp', 0.92);
+  } catch (_) {}
+  if (!dataUrl || !dataUrl.startsWith('data:image/webp')) {
+    dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+  }
+  return dataUrl;
+}
+window.prepareAvatarDataUrl = prepareAvatarDataUrl;
+
 // Always refresh chrome avatar when session/profile settles (refresh / soft-nav)
 if (!window.__mrfAvatarAuthBound) {
   window.__mrfAvatarAuthBound = true;
@@ -2083,6 +2142,10 @@ try { showPageBoot(); } catch (_) {}
 function showNotif(msg, duration = 1400) {
   const n = document.getElementById('notification');
   if (!n) return;
+  // Keep toast on <body> so it stays above modals / player stacking contexts
+  if (n.parentElement !== document.body) {
+    try { document.body.appendChild(n); } catch (_) {}
+  }
   const text = String(msg || '');
   n.innerHTML = `<div class="notification-inner">
     <span class="notification-mark" aria-hidden="true">
@@ -2208,7 +2271,10 @@ function showCreatePlaylist() {
   if (_pendingTrackForPlaylist) {
     _createPlDraftTracks.push(_pendingTrackForPlaylist);
   }
-  if (nameInput) nameInput.value = '';
+  if (nameInput) {
+    nameInput.value = '';
+    nameInput.classList.remove('is-invalid');
+  }
   if (searchInput) searchInput.value = '';
   bindCreatePlaylistSearch();
   renderCreatePlaylistPicked();
@@ -2301,11 +2367,28 @@ function pickCreatePlaylistTrack(i) {
 }
 
 function confirmCreatePlaylist() {
-  const name = document.getElementById('playlist-name-input')?.value.trim();
-  if (!name) { showNotif('Введи название'); return; }
-  
+  const nameInput = document.getElementById('playlist-name-input');
+  const name = nameInput?.value.trim();
+  if (!name) {
+    if (nameInput) {
+      nameInput.classList.add('is-invalid');
+      nameInput.focus();
+      const clearInvalid = () => {
+        nameInput.classList.remove('is-invalid');
+        nameInput.removeEventListener('input', clearInvalid);
+      };
+      nameInput.addEventListener('input', clearInvalid);
+    }
+    showNotif('Введи название');
+    return;
+  }
+  if (nameInput) nameInput.classList.remove('is-invalid');
+
   const pl = Store.createPlaylist(name, '');
-  if (!pl) return;
+  if (!pl) {
+    showNotif('Не удалось создать плейлист');
+    return;
+  }
   _createPlDraftTracks.forEach(t => Store.addTrackToPlaylist(pl.id, t));
   if (window._bulkPending?.length) {
     window._bulkPending.forEach(f => Store.addTrackToPlaylist(pl.id, favToTrack(f)));
@@ -2318,7 +2401,7 @@ function confirmCreatePlaylist() {
   renderSidebarPlaylists();
   notifyLibraryChanged();
   showNotif('Плейлист создан');
-  
+
   const url = typeof mrfUrl === 'function' ? mrfUrl('playlist', { id: pl.id }) : `playlist.html?id=${encodeURIComponent(pl.id)}`;
   if (typeof mrfGo === 'function') mrfGo(url);
   else location.href = url;
@@ -2407,8 +2490,22 @@ function showRenamePlaylist(id) {
 window.showRenamePlaylist = showRenamePlaylist;
 
 function confirmRenamePlaylist() {
-  const name = document.getElementById('playlist-rename-input')?.value.trim();
-  if (!name) { showNotif('Введи название'); return; }
+  const nameInput = document.getElementById('playlist-rename-input');
+  const name = nameInput?.value.trim();
+  if (!name) {
+    if (nameInput) {
+      nameInput.classList.add('is-invalid');
+      nameInput.focus();
+      const clearInvalid = () => {
+        nameInput.classList.remove('is-invalid');
+        nameInput.removeEventListener('input', clearInvalid);
+      };
+      nameInput.addEventListener('input', clearInvalid);
+    }
+    showNotif('Введи название');
+    return;
+  }
+  if (nameInput) nameInput.classList.remove('is-invalid');
   if (!_renamePlaylistId) return;
   Store.updatePlaylist(_renamePlaylistId, { name });
   const id = _renamePlaylistId;

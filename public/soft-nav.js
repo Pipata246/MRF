@@ -464,6 +464,10 @@
           if (typeof window.renderPremiumPage === 'function') window.renderPremiumPage();
         });
       }
+    } else if (pname === 'offer' && typeof window.bootOfferPage === 'function') {
+      window.bootOfferPage();
+    } else if (pname === 'privacy' && typeof window.bootPrivacyPage === 'function') {
+      window.bootPrivacyPage();
     }
   }
 
@@ -674,15 +678,26 @@
     }, 40);
   };
 
+  function isLegalDocUrl(url) {
+    try {
+      const p = pageName(new URL(url, location.href));
+      return p === 'offer' || p === 'privacy';
+    } catch (_) {
+      return false;
+    }
+  }
+
   function shouldInterceptAnchor(a, e) {
     if (!a || !a.getAttribute('href')) return false;
     if (a.target && a.target !== '_self') return false;
     if (a.hasAttribute('download')) return false;
+    if (a.hasAttribute('data-mrf-hard')) return false;
     if (e.defaultPrevented) return false;
     if (e.button !== 0) return false;
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return false;
     const href = a.getAttribute('href');
     if (!href || href.startsWith('#') || href.startsWith('javascript:')) return false;
+    if (isLegalDocUrl(a.href)) return false;
     return isInternalUrl(a.href);
   }
 

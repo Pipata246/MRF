@@ -637,7 +637,7 @@ function loadProfilePage() {
   const avatarEl = document.getElementById('profile-avatar-display');
   if (avatarEl) {
     const avatar = cloud?.avatar || profile.avatar;
-    if (avatar) avatarEl.innerHTML = `<img src="${avatar}" alt="">`;
+    if (avatar) avatarEl.innerHTML = `<img src="${avatar}" alt="" decoding="async">`;
     else avatarEl.textContent = (name || 'П')[0].toUpperCase();
   }
 
@@ -1397,48 +1397,52 @@ async function uploadAvatar(input) {
     input.value = '';
     return;
   }
-  if (file.size > 2 * 1024 * 1024) {
+  if (file.size > 12 * 1024 * 1024) {
     showNotif('Файл слишком большой');
     input.value = '';
     return;
   }
   if (!(window.MrfAuth && MrfAuth.isLoggedIn && MrfAuth.isLoggedIn())) {
     showNotif('Сначала войди в аккаунт');
+    input.value = '';
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    const dataUrl = e.target.result;
-    const avatarEl = document.getElementById('profile-avatar-display');
-    if (avatarEl) avatarEl.innerHTML = `<img src="${dataUrl}" alt="">`;
-    try {
-      const data = await window.mrfApi('/api/me?resource=avatar', {
-        method: 'POST',
-        body: { image: dataUrl }
-      });
-      if (data?.profile) {
-        MrfAuth.profile = data.profile;
-        Store.setProfile({
-          ...Store.getProfile(),
-          name: data.profile.name,
-          username: data.profile.username,
-          avatar: data.profile.avatar || null
+  const avatarEl = document.getElementById('profile-avatar-display');
+  try {
+    const dataUrl = typeof prepareAvatarDataUrl === 'function'
+      ? await prepareAvatarDataUrl(file, 1024)
+      : await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error('read'));
+          reader.readAsDataURL(file);
         });
-        if (avatarEl && data.profile.avatar) {
-          avatarEl.innerHTML = `<img src="${data.profile.avatar}" alt="">`;
-        }
+    if (avatarEl) avatarEl.innerHTML = `<img src="${dataUrl}" alt="" decoding="async">`;
+    const data = await window.mrfApi('/api/me?resource=avatar', {
+      method: 'POST',
+      body: { image: dataUrl }
+    });
+    if (data?.profile) {
+      MrfAuth.profile = data.profile;
+      Store.setProfile({
+        ...Store.getProfile(),
+        name: data.profile.name,
+        username: data.profile.username,
+        avatar: data.profile.avatar || null
+      });
+      if (avatarEl && data.profile.avatar) {
+        avatarEl.innerHTML = `<img src="${data.profile.avatar}" alt="" decoding="async">`;
       }
-      refreshTopbarProfile();
-      showNotif('Фото обновлено');
-    } catch (err) {
-      showNotif(err.message || 'Не удалось загрузить фото');
-      loadProfilePage();
-    } finally {
-      input.value = '';
     }
-  };
-  reader.readAsDataURL(file);
+    refreshTopbarProfile();
+    showNotif('Фото обновлено');
+  } catch (err) {
+    showNotif(err.message || 'Не удалось загрузить фото');
+    loadProfilePage();
+  } finally {
+    input.value = '';
+  }
 }
 window.uploadAvatar = uploadAvatar;
 </script>

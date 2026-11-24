@@ -1631,53 +1631,138 @@ function bindMiniPlayerOpen() {
   }, { passive: true });
 }
 
-/** Mobile: drag down on top/hero to dismiss — feels like a real swipe sheet */
+/** Mobile FS: swipe down to dismiss; swipe left/right on track/cover → prev/next */
 function bindFsSwipeClose() {
   const panel = document.getElementById('fs-player');
   if (!panel || panel.dataset.swipeBound === '1') return;
   panel.dataset.swipeBound = '1';
+  let startX = 0;
   let startY = 0;
-  let dragging = false;
+  let mode = null; // null | 'v' | 'h'
   let active = false;
+  let trackZone = false;
+  let coverEl = null;
+
+  const clearCoverSwipe = () => {
+    if (!coverEl) return;
+    coverEl.classList.remove('is-track-swipe');
+    coverEl.style.removeProperty('transform');
+    coverEl.style.removeProperty('opacity');
+    coverEl.style.removeProperty('transition');
+    coverEl = null;
+  };
 
   const onStart = (e) => {
     if (!(typeof isMobilePlayerUi === 'function' ? isMobilePlayerUi() : true)) return;
     if (!panel.classList.contains('is-open')) return;
-    if (e.target.closest('button, a, input, .fs-progress, .fs-controls, .fs-tools')) return;
+    if (e.target.closest('button, a, input, .fs-progress, .fs-controls, .fs-tools, .fs-like')) return;
     const sc = document.getElementById('fs-scroll');
     if (sc && sc.scrollTop > 4) return;
-    const zone = e.target.closest('.fs-player-top, .fs-hero, .fs-cover');
+    const zone = e.target.closest('.fs-player-top, .fs-hero, .fs-cover, .fs-meta-row, .fs-meta, .fs-title, .fs-artist');
     if (!zone) return;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    startY = y;
-    dragging = false;
+    const t = e.touches ? e.touches[0] : null;
+    if (!t) return;
+    startX = t.clientX;
+    startY = t.clientY;
+    mode = null;
     active = true;
+    trackZone = !!e.target.closest('.fs-hero, .fs-cover, .fs-meta-row, .fs-meta, .fs-title, .fs-artist');
+    coverEl = document.getElementById('fs-cover');
   };
   const onMove = (e) => {
     if (!active) return;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    const dy = y - startY;
-    if (!dragging) {
-      if (dy < 8) return;
-      dragging = true;
-      panel.style.transition = 'none';
+    const t = e.touches ? e.touches[0] : null;
+    if (!t) return;
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+
+    if (!mode) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (trackZone && Math.abs(dx) > Math.abs(dy) * 1.05) {
+        mode = 'h';
+        if (coverEl) {
+          coverEl.classList.add('is-track-swipe');
+          coverEl.style.setProperty('transition', 'none', 'important');
+        }
+      } else if (dy > 8 && Math.abs(dy) >= Math.abs(dx)) {
+        mode = 'v';
+        panel.style.transition = 'none';
+        clearCoverSwipe();
+        coverEl = document.getElementById('fs-cover');
+      } else {
+        return;
+      }
     }
-    if (dy <= 0) {
-      panel.style.transform = 'translate3d(0,0,0)';
+
+    if (mode === 'v') {
+      if (dy <= 0) {
+        panel.style.transform = 'translate3d(0,0,0)';
+        return;
+      }
+      if (e.cancelable) e.preventDefault();
+      panel.style.transform = `translate3d(0,${Math.min(dy, window.innerHeight)}px,0)`;
       return;
     }
-    if (e.cancelable) e.preventDefault();
-    panel.style.transform = `translate3d(0,${Math.min(dy, window.innerHeight)}px,0)`;
+
+    if (mode === 'h') {
+      if (e.cancelable) e.preventDefault();
+      const el = coverEl || document.getElementById('fs-cover');
+      if (!el) return;
+      const capped = Math.max(-120, Math.min(120, dx));
+      const fade = 1 - Math.min(0.35, Math.abs(capped) / 280);
+      el.style.setProperty('transform', `translate3d(${capped}px,0,0)`, 'important');
+      el.style.setProperty('opacity', String(fade), 'important');
+    }
   };
   const onEnd = (e) => {
     if (!active) return;
     active = false;
-    const y = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
-    const dy = y - startY;
-    panel.style.transition = '';
-    panel.style.transform = '';
-    if (dragging && dy > 110) closeFsPlayer();
-    dragging = false;
+    const t = e.changedTouches ? e.changedTouches[0] : null;
+    const dx = t ? t.clientX - startX : 0;
+    const dy = t ? t.clientY - startY : 0;
+    const was = mode;
+    mode = null;
+
+    if (was === 'v') {
+      panel.style.transition = '';
+      panel.style.transform = '';
+      if (dy > 110) closeFsPlayer();
+      clearCoverSwipe();
+      return;
+    }
+
+    if (was === 'h') {
+      const el = coverEl || document.getElementById('fs-cover');
+      const commit = Math.abs(dx) > 64;
+      if (el) {
+        el.style.setProperty('transition', 'transform 0.22s ease, opacity 0.22s ease', 'important');
+        if (commit) {
+          const fly = dx < 0 ? -window.innerWidth * 0.55 : window.innerWidth * 0.55;
+          el.style.setProperty('transform', `translate3d(${fly}px,0,0)`, 'important');
+          el.style.setProperty('opacity', '0', 'important');
+        } else {
+          el.style.setProperty('transform', 'translate3d(0,0,0)', 'important');
+          el.style.setProperty('opacity', '1', 'important');
+        }
+      }
+      const finish = () => {
+        clearCoverSwipe();
+        if (typeof resetFsLayoutTransforms === 'function') resetFsLayoutTransforms();
+      };
+      if (commit) {
+        if (dx < 0) {
+          if (typeof nextTrack === 'function') nextTrack();
+        } else if (typeof prevTrack === 'function') {
+          prevTrack();
+        }
+        setTimeout(finish, 180);
+      } else {
+        setTimeout(finish, 220);
+      }
+      return;
+    }
+
+    clearCoverSwipe();
   };
 
   panel.addEventListener('touchstart', onStart, { passive: true });
